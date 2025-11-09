@@ -5,8 +5,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Card } from "@/components/ui/card";
-import { Sparkles, ArrowLeft } from "lucide-react";
+import { Sparkles, ArrowLeft, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useCurrentAccount } from "@mysten/dapp-kit";
+import { encryptData, generateUserKey } from "@/lib/encryption";
+import { prepareEmotionSnapshot, storeEmotionSnapshot } from "@/lib/walrus";
 
 const emotionTags = [
   { label: "😊 Joy", value: "joy", color: "from-yellow-400 to-orange-400" },
@@ -20,9 +23,11 @@ const emotionTags = [
 const Record = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const currentAccount = useCurrentAccount();
   const [selectedEmotion, setSelectedEmotion] = useState<string>("");
   const [intensity, setIntensity] = useState([50]);
   const [description, setDescription] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async () => {
     if (!selectedEmotion || !description.trim()) {
@@ -34,19 +39,69 @@ const Record = () => {
       return;
     }
 
-    // TODO: Integrate with Walrus & Sui
-    // 1. Generate emotion snapshot
-    // 2. Encrypt snapshot
-    // 3. Upload to Walrus → get CID
-    // 4. Mint Emotion NFT on Sui
-    
-    toast({
-      title: "Emotion Recorded! ✨",
-      description: "Your emotion snapshot will be minted as an NFT.",
-    });
+    if (!currentAccount) {
+      toast({
+        title: "Wallet Not Connected",
+        description: "Please connect your Sui wallet first.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    // Navigate to timeline after recording
-    setTimeout(() => navigate("/timeline"), 1500);
+    setIsSubmitting(true);
+
+    try {
+      // Step 1: Generate emotion snapshot
+      const snapshot = prepareEmotionSnapshot(
+        selectedEmotion,
+        intensity[0],
+        description,
+        currentAccount.address
+      );
+
+      // Step 2: Encrypt snapshot
+      const userKey = generateUserKey(currentAccount.address);
+      const encryptedData = await encryptData(JSON.stringify(snapshot), userKey);
+      const encryptedString = JSON.stringify(encryptedData);
+
+      // Step 3: Upload to Walrus
+      toast({
+        title: "Uploading to Walrus...",
+        description: "Encrypting and storing your emotion snapshot.",
+      });
+
+      const walrusResult = await storeEmotionSnapshot(snapshot, encryptedString);
+
+      // Step 4: TODO - Mint Emotion NFT on Sui with walrusResult
+      // This will be implemented when we create the Move contract
+      
+      toast({
+        title: "Emotion Recorded! ✨",
+        description: `Stored on Walrus: ${walrusResult.blobId.slice(0, 8)}...`,
+      });
+
+      // Store result in localStorage for timeline display (temporary)
+      const existingRecords = JSON.parse(localStorage.getItem("emotionRecords") || "[]");
+      existingRecords.push({
+        ...snapshot,
+        blobId: walrusResult.blobId,
+        walrusUrl: walrusResult.walrusUrl,
+        payloadHash: walrusResult.payloadHash,
+      });
+      localStorage.setItem("emotionRecords", JSON.stringify(existingRecords));
+
+      // Navigate to timeline
+      setTimeout(() => navigate("/timeline"), 1500);
+    } catch (error) {
+      console.error("Error recording emotion:", error);
+      toast({
+        title: "Recording Failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -136,11 +191,21 @@ const Record = () => {
             {/* Submit Button */}
             <Button
               onClick={handleSubmit}
-              className="w-full h-12 text-base font-semibold gradient-emotion hover:opacity-90"
+              disabled={isSubmitting || !currentAccount}
+              className="w-full h-12 text-base font-semibold gradient-emotion hover:opacity-90 disabled:opacity-50"
               size="lg"
             >
-              <Sparkles className="mr-2 h-5 w-5" />
-              Record & Mint NFT
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-5 w-5" />
+                  {currentAccount ? "Record & Mint NFT" : "Connect Wallet First"}
+                </>
+              )}
             </Button>
 
             <Card className="p-4 bg-secondary/10 border-secondary/20">
