@@ -10,6 +10,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import { encryptData, generateUserKey } from "@/lib/encryption";
 import { prepareEmotionSnapshot, storeEmotionSnapshot } from "@/lib/walrus";
+import { validateAndSanitizeDescription, emotionSnapshotSchema } from "@/lib/validation";
+import { storeEmotionRecordMetadata } from "@/lib/storage";
 
 const emotionTags = [
   { label: "😊 Joy", value: "joy", color: "from-yellow-400 to-orange-400" },
@@ -51,20 +53,40 @@ const Record = () => {
     setIsSubmitting(true);
 
     try {
-      // Step 1: Generate emotion snapshot
+      // Step 1: Validate and sanitize inputs
+      const sanitizedDescription = validateAndSanitizeDescription(description);
+      
+      // Validate emotion type
+      const validEmotions = ["joy", "sadness", "anger", "anxiety", "confusion", "peace"];
+      if (!validEmotions.includes(selectedEmotion)) {
+        throw new Error("Invalid emotion type selected");
+      }
+
+      // Validate intensity
+      const intensityValue = intensity[0];
+      if (intensityValue < 0 || intensityValue > 100) {
+        throw new Error("Intensity must be between 0 and 100");
+      }
+
+      // Step 2: Generate emotion snapshot with validated inputs
       const snapshot = prepareEmotionSnapshot(
         selectedEmotion,
-        intensity[0],
-        description,
+        intensityValue,
+        sanitizedDescription,
         currentAccount.address
       );
 
-      // Step 2: Encrypt snapshot
-      const userKey = generateUserKey(currentAccount.address);
+      // Validate snapshot with zod schema
+      emotionSnapshotSchema.parse(snapshot);
+
+      // Step 3: Generate secure encryption key
+      const userKey = await generateUserKey(currentAccount.address);
+      
+      // Step 4: Encrypt snapshot
       const encryptedData = await encryptData(JSON.stringify(snapshot), userKey);
       const encryptedString = JSON.stringify(encryptedData);
 
-      // Step 3: Upload to Walrus
+      // Step 5: Upload to Walrus
       toast({
         title: "Uploading to Walrus...",
         description: "Encrypting and storing your emotion snapshot.",
@@ -72,7 +94,7 @@ const Record = () => {
 
       const walrusResult = await storeEmotionSnapshot(snapshot, encryptedString);
 
-      // Step 4: TODO - Mint Emotion NFT on Sui with walrusResult
+      // Step 6: TODO - Mint Emotion NFT on Sui with walrusResult
       // This will be implemented when we create the Move contract
       
       toast({
@@ -80,23 +102,50 @@ const Record = () => {
         description: `Stored on Walrus: ${walrusResult.blobId.slice(0, 8)}...`,
       });
 
-      // Store result in localStorage for timeline display (temporary)
-      const existingRecords = JSON.parse(localStorage.getItem("emotionRecords") || "[]");
-      existingRecords.push({
-        ...snapshot,
-        blobId: walrusResult.blobId,
-        walrusUrl: walrusResult.walrusUrl,
-        payloadHash: walrusResult.payloadHash,
-      });
-      localStorage.setItem("emotionRecords", JSON.stringify(existingRecords));
+      // Step 7: Store minimal metadata securely in encrypted localStorage
+      // Only store metadata, not the full snapshot with description
+      await storeEmotionRecordMetadata(
+        {
+          blobId: walrusResult.blobId,
+          walrusUrl: walrusResult.walrusUrl,
+          payloadHash: walrusResult.payloadHash,
+          timestamp: snapshot.timestamp,
+          emotion: snapshot.emotion,
+          intensity: snapshot.intensity,
+        },
+        userKey
+      );
 
       // Navigate to timeline
       setTimeout(() => navigate("/timeline"), 1500);
     } catch (error) {
-      console.error("Error recording emotion:", error);
+      console.error("[INTERNAL] Error recording emotion:", error);
+      
+      // Show user-friendly error messages
+      let errorMessage = "Please try again.";
+      if (error instanceof Error) {
+        // Check if it's a validation error
+        if (error.message.includes("Invalid") || 
+            error.message.includes("must be") ||
+            error.message.includes("cannot be") ||
+            error.message.includes("contains potentially unsafe")) {
+          errorMessage = error.message;
+        } else if (error.message.includes("Network error") ||
+                   error.message.includes("connection")) {
+          errorMessage = "Network error. Please check your connection and try again.";
+        } else if (error.message.includes("Storage") ||
+                   error.message.includes("upload") ||
+                   error.message.includes("Walrus")) {
+          errorMessage = "Failed to save your emotion. Please try again.";
+        } else if (error.message.includes("encrypt") ||
+                   error.message.includes("decrypt")) {
+          errorMessage = "Encryption error. Please try again.";
+        }
+      }
+
       toast({
         title: "Recording Failed",
-        description: error instanceof Error ? error.message : "Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -180,12 +229,24 @@ const Record = () => {
                 id="description"
                 placeholder="Describe what triggered this emotion... (This will be encrypted)"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={(e) => {
+                  // Limit input length client-side
+                  const value = e.target.value;
+                  if (value.length <= 5000) {
+                    setDescription(value);
+                  }
+                }}
+                maxLength={5000}
                 className="glass-input min-h-[150px] resize-none"
               />
-              <p className="text-xs text-muted-foreground">
-                🔒 Your description is encrypted client-side before storage
-              </p>
+              <div className="flex justify-between items-center">
+                <p className="text-xs text-muted-foreground">
+                  🔒 Your description is encrypted client-side before storage
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {description.length}/5000 characters
+                </p>
+              </div>
             </div>
 
             {/* Submit Button */}

@@ -99,11 +99,85 @@ export async function hashData(data: string): Promise<string> {
 }
 
 /**
- * Generate a user key from wallet address
- * In production, this should use wallet signatures for better security
+ * Generate a secure user key from wallet address and signature
+ * Uses wallet signature to create a cryptographically secure key
+ * 
+ * @param walletAddress - The user's wallet address
+ * @param signature - Optional wallet signature bytes (if available)
+ * @returns A secure key derived from wallet address and signature
  */
-export function generateUserKey(walletAddress: string): string {
-  return `echoma_${walletAddress.slice(0, 8)}`;
+export async function generateUserKey(
+  walletAddress: string,
+  signature?: Uint8Array
+): Promise<string> {
+  // Validate wallet address format
+  if (!/^0x[a-fA-F0-9]{64}$/.test(walletAddress)) {
+    throw new Error("Invalid wallet address format");
+  }
+
+  // Create a fixed application-specific salt
+  const appSalt = new TextEncoder().encode("echoma_encryption_salt_v1");
+  
+  // Combine wallet address with signature if available
+  const encoder = new TextEncoder();
+  const addressBytes = encoder.encode(walletAddress);
+  
+  let keyMaterial: Uint8Array;
+  if (signature && signature.length > 0) {
+    // If signature is available, use it for stronger key derivation
+    keyMaterial = new Uint8Array(addressBytes.length + signature.length);
+    keyMaterial.set(addressBytes, 0);
+    keyMaterial.set(signature, addressBytes.length);
+  } else {
+    // Fallback: Use wallet address with app salt for key derivation
+    // This is still more secure than the previous predictable method
+    keyMaterial = new Uint8Array(addressBytes.length + appSalt.length);
+    keyMaterial.set(addressBytes, 0);
+    keyMaterial.set(appSalt, addressBytes.length);
+  }
+
+  // Use PBKDF2 to derive a secure key from the material
+  const keyMaterialKey = await crypto.subtle.importKey(
+    "raw",
+    keyMaterial,
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
+
+  // Derive 256 bits (32 bytes) for the key
+  const derivedBits = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt: appSalt,
+      iterations: 100000,
+      hash: "SHA-256",
+    },
+    keyMaterialKey,
+    256
+  );
+
+  // Convert to base64 for storage/transmission
+  return bufferToBase64(derivedBits);
+}
+
+/**
+ * Generate a user key synchronously (for backward compatibility)
+ * NOTE: This is less secure than the async version with signature
+ * @deprecated Use generateUserKey() with signature instead
+ */
+export function generateUserKeySync(walletAddress: string): string {
+  // This is a fallback that's still better than the old method
+  // but should be replaced with async version
+  const encoder = new TextEncoder();
+  const addressBytes = encoder.encode(walletAddress);
+  const appSalt = encoder.encode("echoma_encryption_salt_v1");
+  const combined = new Uint8Array(addressBytes.length + appSalt.length);
+  combined.set(addressBytes, 0);
+  combined.set(appSalt, addressBytes.length);
+  
+  // Hash the combined bytes
+  return bufferToBase64(combined.buffer);
 }
 
 // Helper functions

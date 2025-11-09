@@ -1,42 +1,38 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Plus, Lock, CheckCircle } from "lucide-react";
+import { ArrowLeft, Plus, Lock, CheckCircle, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { useCurrentAccount } from "@mysten/dapp-kit";
+import { generateUserKey } from "@/lib/encryption";
+import { getEmotionRecordsMetadata } from "@/lib/storage";
 
 interface EmotionSnapshot {
   id: string;
   emotion: string;
   intensity: number;
-  timestamp: string;
+  timestamp: number;
   moodTag: string;
-  walrusUri?: string;
+  walrusUrl?: string;
+  blobId?: string;
+  payloadHash?: string;
   verified: boolean;
 }
 
-// Mock data - replace with actual Sui chain queries
-const mockSnapshots: EmotionSnapshot[] = [
-  {
-    id: "1",
-    emotion: "joy",
-    intensity: 85,
-    timestamp: new Date().toISOString(),
-    moodTag: "😊 Joy",
-    verified: true,
-  },
-  {
-    id: "2",
-    emotion: "peace",
-    intensity: 70,
-    timestamp: new Date(Date.now() - 86400000).toISOString(),
-    moodTag: "✨ Peace",
-    verified: true,
-  },
-];
+const emotionLabels: Record<string, string> = {
+  joy: "😊 Joy",
+  sadness: "😢 Sadness",
+  anger: "😠 Anger",
+  anxiety: "😰 Anxiety",
+  confusion: "🤔 Confusion",
+  peace: "✨ Peace",
+};
 
 const Timeline = () => {
   const navigate = useNavigate();
-  const [snapshots] = useState<EmotionSnapshot[]>(mockSnapshots);
+  const currentAccount = useCurrentAccount();
+  const [snapshots, setSnapshots] = useState<EmotionSnapshot[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const emotionColors: Record<string, string> = {
     joy: "from-yellow-400 to-orange-400",
@@ -46,6 +42,50 @@ const Timeline = () => {
     confusion: "from-gray-400 to-slate-400",
     peace: "from-green-400 to-teal-400",
   };
+
+  // Load encrypted records from localStorage
+  useEffect(() => {
+    const loadRecords = async () => {
+      if (!currentAccount) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        // Generate encryption key (same method as Record.tsx)
+        const userKey = await generateUserKey(currentAccount.address);
+        
+        // Load encrypted metadata
+        const records = await getEmotionRecordsMetadata(userKey);
+        
+        // Transform to snapshot format
+        const transformedSnapshots: EmotionSnapshot[] = records.map((record, index) => ({
+          id: record.blobId || `record-${index}`,
+          emotion: record.emotion,
+          intensity: record.intensity,
+          timestamp: record.timestamp,
+          moodTag: emotionLabels[record.emotion] || record.emotion,
+          walrusUrl: record.walrusUrl,
+          blobId: record.blobId,
+          payloadHash: record.payloadHash,
+          verified: true, // TODO: Verify on-chain when Sui integration is complete
+        }));
+
+        // Sort by timestamp (newest first)
+        transformedSnapshots.sort((a, b) => b.timestamp - a.timestamp);
+        
+        setSnapshots(transformedSnapshots);
+      } catch (error) {
+        console.error("[INTERNAL] Failed to load emotion records:", error);
+        // Silently fail - user can still use the app
+        setSnapshots([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadRecords();
+  }, [currentAccount]);
 
   return (
     <div className="min-h-screen p-6">
@@ -77,7 +117,22 @@ const Timeline = () => {
             </p>
           </div>
 
-          {snapshots.length === 0 ? (
+          {isLoading ? (
+            <div className="text-center py-12 space-y-4">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
+              <p className="text-muted-foreground">Loading your emotions...</p>
+            </div>
+          ) : !currentAccount ? (
+            <div className="text-center py-12 space-y-4">
+              <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-muted/30 mb-4">
+                <Lock className="w-10 h-10 text-muted-foreground" />
+              </div>
+              <h3 className="text-xl font-semibold">Connect Wallet to View Timeline</h3>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                Connect your wallet to view your encrypted emotion records
+              </p>
+            </div>
+          ) : snapshots.length === 0 ? (
             <div className="text-center py-12 space-y-4">
               <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-muted/30 mb-4">
                 <Lock className="w-10 h-10 text-muted-foreground" />
@@ -146,11 +201,11 @@ const Timeline = () => {
                         )}
                       </div>
 
-                      {snapshot.walrusUri && (
+                      {snapshot.walrusUrl && (
                         <div className="flex items-center gap-2 text-xs">
                           <Lock className="w-3 h-3 text-muted-foreground" />
                           <span className="text-muted-foreground font-mono truncate max-w-xs">
-                            {snapshot.walrusUri}
+                            {snapshot.blobId ? `${snapshot.blobId.slice(0, 8)}...` : "Encrypted"}
                           </span>
                         </div>
                       )}
