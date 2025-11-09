@@ -1,46 +1,22 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Wallet, CheckCircle, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ConnectButton, useCurrentAccount } from "@mysten/dapp-kit";
 
 const WalletConnect = () => {
   const { toast } = useToast();
-  const [isConnected, setIsConnected] = useState(false);
-  const [address, setAddress] = useState("");
-
-  // TODO: Replace with actual Sui wallet integration
-  const handleConnect = async () => {
-    try {
-      // Simulate wallet connection
-      // Replace with: @mysten/wallet-adapter or similar
-      const mockAddress = "0x" + Math.random().toString(16).substr(2, 40);
-      setAddress(mockAddress);
-      setIsConnected(true);
-      
-      toast({
-        title: "Wallet Connected! 🎉",
-        description: "You can now record and mint emotion NFTs.",
-      });
-    } catch (error) {
-      toast({
-        title: "Connection Failed",
-        description: "Please make sure you have a Sui wallet installed.",
-        variant: "destructive",
-      });
-    }
-  };
+  const currentAccount = useCurrentAccount();
 
   const handleDisconnect = () => {
-    setAddress("");
-    setIsConnected(false);
     toast({
       title: "Wallet Disconnected",
       description: "Come back anytime to continue your journey.",
     });
   };
 
-  if (isConnected) {
+  if (currentAccount) {
+    const address = currentAccount.address;
     return (
       <Card className="glass-card p-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -54,14 +30,10 @@ const WalletConnect = () => {
             </p>
           </div>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleDisconnect}
+        <ConnectButton 
+          connectText="Disconnect"
           className="text-muted-foreground hover:text-foreground"
-        >
-          Disconnect
-        </Button>
+        />
       </Card>
     );
   }
@@ -80,17 +52,18 @@ const WalletConnect = () => {
         </div>
       </div>
 
-      <Button
-        onClick={handleConnect}
-        className="w-full gradient-emotion hover:opacity-90"
-        size="lg"
-      >
-        <Wallet className="mr-2 h-4 w-4" />
-        Connect Wallet
-      </Button>
+      <ConnectButton 
+        connectText={
+          <>
+            <Wallet className="mr-2 h-4 w-4" />
+            Connect Wallet
+          </>
+        }
+        className="w-full gradient-emotion hover:opacity-90 h-11 text-base font-semibold"
+      />
 
       <div className="text-xs text-muted-foreground text-center space-y-1">
-        <p>Don't have a Sui wallet?</p>
+        <p>Supports Sui Wallet, Suiet, Ethos & more</p>
         <a
           href="https://docs.sui.io/guides/developer/getting-started/sui-install"
           target="_blank"
