@@ -1,161 +1,161 @@
-# Echoma - 情感加密链
+# Echoma - 情感加密鏈
 
-> 你的情感，加密并永久保存在链上
+> 你的情感，加密並永久保存在鏈上
 
-Echoma 是一个基于 Web3 的情感记录应用，结合了客户端加密、去中心化存储和区块链验证，为你的情感数据提供隐私保护和永久存储。
+Echoma 是一個基於 Web3 的情感記錄應用，結合了客戶端加密、去中心化儲存和區塊鏈驗證，為你的情感數據提供隱私保護和永久儲存。
 
 ## ✨ 核心特性
 
-- 🔒 **客户端加密** - 使用 AES-GCM 加密，数据在离开设备前就已加密
-- 🌊 **Walrus 存储** - 去中心化、可验证的存储方案
-- ⛓️ **Sui 区块链** - NFT 形式的链上验证证明
-- 🤖 **AI 辅助分析** - 智能情感分析和分类
-- 📊 **时间线视图** - 可视化你的情感历程
+- 🔒 **客戶端加密** - 使用 AES-GCM 加密，數據在離開設備前就已加密
+- 🌊 **Walrus 儲存** - 去中心化、可驗證的儲存方案
+- ⛓️ **Sui 區塊鏈** - NFT 形式的鏈上驗證證明
+- 🤖 **AI 輔助分析** - 智能情感分析和分類
+- 📊 **時間線視圖** - 可視化你的情感歷程
 
-## 🚀 快速开始
+## 🚀 快速開始
 
 ### 前置要求
 
-- Node.js 18+ 和 npm（推荐使用 [nvm](https://github.com/nvm-sh/nvm#installing-and-updating) 安装）
-- Sui 钱包（如 Sui Wallet 或 Ethos Wallet）
+- Node.js 18+ 和 npm（推薦使用 [nvm](https://github.com/nvm-sh/nvm#installing-and-updating) 安裝）
+- Sui 錢包（如 Sui Wallet 或 Ethos Wallet）
 
-### 安装步骤
+### 安裝步驟
 
 ```sh
-# 1. 克隆仓库
+# 1. 克隆倉庫
 git clone <YOUR_GIT_URL>
 cd sentiment-cipher-chain
 
-# 2. 安装依赖
+# 2. 安裝依賴
 npm install
 
-# 3. 启动开发服务器
+# 3. 啟動開發伺服器
 npm run dev
 ```
 
-应用将在 `http://localhost:5173` 启动。
+應用將在 `http://localhost:5173` 啟動。
 
-### 构建生产版本
+### 構建生產版本
 
 ```sh
-# 构建生产版本
+# 構建生產版本
 npm run build
 
-# 预览生产构建
+# 預覽生產構建
 npm run preview
 ```
 
-## 🛠️ 技术栈
+## 🛠️ 技術棧
 
 ### 前端框架
 - **React 18** - UI 框架
-- **TypeScript** - 类型安全
-- **Vite** - 构建工具和开发服务器
+- **TypeScript** - 類型安全
+- **Vite** - 構建工具和開發伺服器
 
-### UI 组件
-- **shadcn/ui** - 高质量 UI 组件库
-- **Tailwind CSS** - 实用优先的 CSS 框架
-- **Radix UI** - 无样式、可访问的组件原语
-- **Lucide React** - 图标库
+### UI 組件
+- **shadcn/ui** - 高質量 UI 組件庫
+- **Tailwind CSS** - 實用優先的 CSS 框架
+- **Radix UI** - 無樣式、可訪問的組件原語
+- **Lucide React** - 圖標庫
 
 ### Web3 集成
-- **@mysten/dapp-kit** - Sui 区块链集成
+- **@mysten/dapp-kit** - Sui 區塊鏈集成
 - **@mysten/sui** - Sui SDK
-- **@mysten/walrus** - Walrus 存储 SDK
+- **@mysten/walrus** - Walrus 儲存 SDK
 
 ### 其他工具
 - **React Router** - 路由管理
-- **TanStack Query** - 数据获取和状态管理
-- **React Hook Form** - 表单处理
-- **Zod** - 数据验证
+- **TanStack Query** - 數據獲取和狀態管理
+- **React Hook Form** - 表單處理
+- **Zod** - 數據驗證
 
-## 📁 项目结构
+## 📁 項目結構
 
 ```
 src/
-├── components/          # React 组件
-│   ├── ui/             # shadcn/ui 组件
+├── components/          # React 組件
+│   ├── ui/             # shadcn/ui 組件
 │   └── WalletConnect.tsx
-├── hooks/              # 自定义 React Hooks
-├── lib/                # 工具函数和核心逻辑
-│   ├── encryption.ts   # 客户端加密功能
-│   ├── walrus.ts       # Walrus 存储集成
-│   └── utils.ts        # 通用工具函数
-├── pages/              # 页面组件
-│   ├── Index.tsx       # 首页
-│   ├── Record.tsx      # 情感记录页面
-│   ├── Timeline.tsx    # 时间线页面
-│   └── NotFound.tsx   # 404 页面
-└── App.tsx             # 应用入口
+├── hooks/              # 自定義 React Hooks
+├── lib/                # 工具函數和核心邏輯
+│   ├── encryption.ts   # 客戶端加密功能
+│   ├── walrus.ts       # Walrus 儲存集成
+│   └── utils.ts        # 通用工具函數
+├── pages/              # 頁面組件
+│   ├── Index.tsx       # 首頁
+│   ├── Record.tsx      # 情感記錄頁面
+│   ├── Timeline.tsx    # 時間線頁面
+│   └── NotFound.tsx   # 404 頁面
+└── App.tsx             # 應用入口
 ```
 
 ## 🔐 安全特性
 
-### 客户端加密
+### 客戶端加密
 
-所有情感数据在离开设备前使用 **AES-GCM 256 位加密**：
+所有情感數據在離開設備前使用 **AES-GCM 256 位加密**：
 
-- 使用 PBKDF2 密钥派生（100,000 次迭代）
-- 随机初始化向量 (IV) 和盐值
-- 基于用户钱包地址生成加密密钥
+- 使用 PBKDF2 密鑰派生（100,000 次迭代）
+- 隨機初始化向量 (IV) 和鹽值
+- 基於用戶錢包地址生成加密密鑰
 
-### 数据流程
+### 數據流程
 
-1. **记录** - 用户输入情感和描述
-2. **加密** - 客户端使用 AES-GCM 加密数据
-3. **存储** - 加密数据上传到 Walrus 去中心化存储
-4. **验证** - 在 Sui 区块链上铸造 NFT 作为存储证明
+1. **記錄** - 用戶輸入情感和描述
+2. **加密** - 客戶端使用 AES-GCM 加密數據
+3. **儲存** - 加密數據上傳到 Walrus 去中心化儲存
+4. **驗證** - 在 Sui 區塊鏈上鑄造 NFT 作為儲存證明
 
-## 🌐 网络配置
+## 🌐 網路配置
 
-当前配置为 **Sui Testnet**：
+當前配置為 **Sui Testnet**：
 
 - Sui RPC: `getFullnodeUrl("testnet")`
 - Walrus Publisher: `https://publisher.walrus-testnet.walrus.space`
 - Walrus Aggregator: `https://aggregator.walrus-testnet.walrus.space`
 
-可在 `src/App.tsx` 中修改网络配置。
+可在 `src/App.tsx` 中修改網路配置。
 
-## 📝 使用说明
+## 📝 使用說明
 
-### 记录情感
+### 記錄情感
 
-1. 连接 Sui 钱包
-2. 选择情感类型（喜悦、悲伤、愤怒等）
-3. 调整强度滑块（0-100%）
-4. 输入描述文字
-5. 点击"记录并铸造 NFT"
+1. 連接 Sui 錢包
+2. 選擇情感類型（喜悅、悲傷、憤怒等）
+3. 調整強度滑塊（0-100%）
+4. 輸入描述文字
+5. 點擊「記錄並鑄造 NFT」
 
-### 查看时间线
+### 查看時間線
 
-在时间线页面可以查看所有已记录的情感快照，包括：
-- 情感类型和强度
-- 记录时间
-- Walrus 存储 ID
-- 区块链验证状态
+在時間線頁面可以查看所有已記錄的情感快照，包括：
+- 情感類型和強度
+- 記錄時間
+- Walrus 儲存 ID
+- 區塊鏈驗證狀態
 
-## 🚧 开发计划
+## 🚧 開發計劃
 
-- [ ] 实现 Sui Move 合约用于 NFT 铸造
-- [ ] 添加情感数据解密和查看功能
-- [ ] 实现数据导出功能
-- [ ] 添加情感趋势分析图表
-- [ ] 支持多链网络切换
+- [ ] 實現 Sui Move 合約用於 NFT 鑄造
+- [ ] 添加情感數據解密和查看功能
+- [ ] 實現數據導出功能
+- [ ] 添加情感趨勢分析圖表
+- [ ] 支持多鏈網路切換
 
-## 🤝 贡献
+## 🤝 貢獻
 
-欢迎提交 Issue 和 Pull Request！
+歡迎提交 Issue 和 Pull Request！
 
-## 📄 许可证
+## 📄 許可證
 
-本项目为 Haulout Hackathon 参赛作品。
+本項目為 Haulout Hackathon 參賽作品。
 
-## 🔗 相关链接
+## 🔗 相關連結
 
-- [Sui 区块链文档](https://docs.sui.io/)
-- [Walrus 存储文档](https://docs.walrus.space/)
-- [shadcn/ui 文档](https://ui.shadcn.com/)
+- [Sui 區塊鏈文檔](https://docs.sui.io/)
+- [Walrus 儲存文檔](https://docs.walrus.space/)
+- [shadcn/ui 文檔](https://ui.shadcn.com/)
 
 ---
 
-**注意**: 本项目目前处于开发阶段，部分功能（如 NFT 铸造）尚未完全实现。
+**注意**: 本項目目前處於開發階段，部分功能（如 NFT 鑄造）尚未完全實現。
