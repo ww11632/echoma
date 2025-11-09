@@ -24,7 +24,7 @@ Echoma 是一個基於 Web3 的情感記錄應用，結合了客戶端加密、�
 ```sh
 # 1. 克隆倉庫
 git clone <YOUR_GIT_URL>
-cd sentiment-cipher-chain
+cd echoma
 
 # 2. 安裝依賴
 npm install
