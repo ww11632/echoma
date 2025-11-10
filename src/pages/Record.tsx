@@ -34,6 +34,7 @@ const Record = () => {
   const [intensity, setIntensity] = useState([50]);
   const [description, setDescription] = useState("");
   const [isPublic, setIsPublic] = useState(false);
+  const [saveLocally, setSaveLocally] = useState(true); // 默认保存到本地
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<"idle" | "encrypting" | "uploading" | "saving" | "success" | "error">("idle");
 
@@ -82,21 +83,70 @@ const Record = () => {
         const encrypted = await encryptData(JSON.stringify(anonPayload), randomKey);
         const encryptedString = JSON.stringify(encrypted);
         setUploadStatus("uploading");
-        const apiRes = await postEmotion({
-          emotion: selectedEmotion,
-          intensity: intensityValue,
-          description: sanitizedDescription,
-          encryptedData: encryptedString,
-          isPublic,
-          walletAddress: null,
-        });
-        setUploadStatus("success");
-        toast({
-          title: "情緒已記錄！✨",
-          description: `已儲存至 Walrus: ${apiRes.record.blobId.slice(0, 8)}...`,
-        });
-        setTimeout(() => navigate("/timeline"), 1200);
-        return;
+        
+        try {
+          const apiRes = await postEmotion({
+            emotion: selectedEmotion,
+            intensity: intensityValue,
+            description: sanitizedDescription,
+            encryptedData: encryptedString,
+            isPublic,
+            walletAddress: null,
+          });
+          setUploadStatus("success");
+          
+          // Show warning if Walrus upload failed
+          if (apiRes.warning) {
+            toast({
+              title: "情緒已記錄（本地儲存）",
+              description: "Walrus 服務暫時無法使用，資料已儲存到本地伺服器。",
+              variant: "default",
+            });
+          } else {
+            toast({
+              title: "情緒已記錄！✨",
+              description: `已儲存至 Walrus: ${apiRes.record.blobId.slice(0, 8)}...`,
+            });
+          }
+          setTimeout(() => navigate("/timeline"), 1200);
+          return;
+        } catch (apiError) {
+          // API 失敗，但如果 saveLocally 開啟，嘗試保存到本地
+          if (saveLocally) {
+            console.log("[Client] API failed, saving to local storage as fallback");
+            setUploadStatus("saving");
+            
+            // 保存到客戶端本地存儲（使用简单的 MVP 格式）
+            // 映射 emotion 到 MVP 格式（只支持 joy, sadness, anger）
+            const mvpEmotion = 
+              selectedEmotion === "joy" ? "joy" :
+              selectedEmotion === "sadness" ? "sadness" :
+              selectedEmotion === "anger" ? "anger" : "joy"; // 默认为 joy
+            
+            const localRecord = {
+              id: crypto.randomUUID(),
+              timestamp: new Date().toISOString(),
+              emotion: mvpEmotion as "joy" | "sadness" | "anger",
+              note: sanitizedDescription,
+              proof: null,
+              version: "1.0.0" as const,
+              isPublic: isPublic, // 保存公開分享狀態
+            };
+            
+            await addEmotionRecord(localRecord);
+            setUploadStatus("success");
+            
+            toast({
+              title: "情緒已記錄（本地儲存）",
+              description: "無法連接到伺服器，資料已保存到本地瀏覽器。",
+              variant: "default",
+            });
+            setTimeout(() => navigate("/timeline"), 1200);
+            return;
+          }
+          // 如果 saveLocally 關閉，重新拋出錯誤
+          throw apiError;
+        }
       }
 
       // Step 2: Generate emotion snapshot with validated inputs
@@ -128,21 +178,69 @@ const Record = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         // 沒有 Supabase session：走自建 API（後端存 Walrus + 本地檔案）作為主線
-        const apiRes = await postEmotion({
-          emotion: selectedEmotion,
-          intensity: intensityValue,
-          description: sanitizedDescription,
-          encryptedData: encryptedString,
-          isPublic,
-          walletAddress: currentAccount.address,
-        });
-        setUploadStatus("success");
-        toast({
-          title: "情緒已記錄！✨",
-          description: `已儲存至 Walrus: ${apiRes.record.blobId.slice(0, 8)}...`,
-        });
-        setTimeout(() => navigate("/timeline"), 1200);
-        return;
+        try {
+          const apiRes = await postEmotion({
+            emotion: selectedEmotion,
+            intensity: intensityValue,
+            description: sanitizedDescription,
+            encryptedData: encryptedString,
+            isPublic,
+            walletAddress: currentAccount.address,
+          });
+          setUploadStatus("success");
+          
+          // Show warning if Walrus upload failed
+          if (apiRes.warning) {
+            toast({
+              title: "情緒已記錄（本地儲存）",
+              description: "Walrus 服務暫時無法使用，資料已儲存到本地伺服器。",
+              variant: "default",
+            });
+          } else {
+            toast({
+              title: "情緒已記錄！✨",
+              description: `已儲存至 Walrus: ${apiRes.record.blobId.slice(0, 8)}...`,
+            });
+          }
+          setTimeout(() => navigate("/timeline"), 1200);
+          return;
+        } catch (apiError) {
+          // API 失敗，但如果 saveLocally 開啟，嘗試保存到本地
+          if (saveLocally) {
+            console.log("[Client] API failed, saving to local storage as fallback");
+            setUploadStatus("saving");
+            
+            // 保存到客戶端本地存儲（使用简单的 MVP 格式）
+            // 映射 emotion 到 MVP 格式（只支持 joy, sadness, anger）
+            const mvpEmotion = 
+              selectedEmotion === "joy" ? "joy" :
+              selectedEmotion === "sadness" ? "sadness" :
+              selectedEmotion === "anger" ? "anger" : "joy"; // 默认为 joy
+            
+            const localRecord = {
+              id: crypto.randomUUID(),
+              timestamp: new Date().toISOString(),
+              emotion: mvpEmotion as "joy" | "sadness" | "anger",
+              note: sanitizedDescription,
+              proof: null,
+              version: "1.0.0" as const,
+              isPublic: isPublic, // 保存公開分享狀態
+            };
+            
+            await addEmotionRecord(localRecord);
+            setUploadStatus("success");
+            
+            toast({
+              title: "情緒已記錄（本地儲存）",
+              description: "無法連接到伺服器，資料已保存到本地瀏覽器。",
+              variant: "default",
+            });
+            setTimeout(() => navigate("/timeline"), 1200);
+            return;
+          }
+          // 如果 saveLocally 關閉，重新拋出錯誤
+          throw apiError;
+        }
       }
 
       const response = await supabase.functions.invoke('upload-emotion', {
@@ -177,29 +275,59 @@ const Record = () => {
       console.error("[INTERNAL] Error recording emotion:", error);
       
       // Show user-friendly error messages
-      let errorMessage = "Please try again.";
+      let errorMessage = "請稍後再試。";
+      let errorTitle = "記錄失敗";
+      
       if (error instanceof Error) {
+        const msg = error.message;
+        
         // Check if it's a validation error
-        if (error.message.includes("Invalid") || 
-            error.message.includes("must be") ||
-            error.message.includes("cannot be") ||
-            error.message.includes("contains potentially unsafe")) {
-          errorMessage = error.message;
-        } else if (error.message.includes("Network error") ||
-                   error.message.includes("connection")) {
-          errorMessage = "Network error. Please check your connection and try again.";
-        } else if (error.message.includes("Storage") ||
-                   error.message.includes("upload") ||
-                   error.message.includes("Walrus")) {
-          errorMessage = "Failed to save your emotion. Please try again.";
-        } else if (error.message.includes("encrypt") ||
-                   error.message.includes("decrypt")) {
-          errorMessage = "Encryption error. Please try again.";
+        if (msg.includes("Invalid") || 
+            msg.includes("must be") ||
+            msg.includes("cannot be") ||
+            msg.includes("contains potentially unsafe")) {
+          errorMessage = msg;
+        } 
+        // Check for Walrus service errors
+        else if (msg.includes("Walrus service endpoint not found") ||
+                 msg.includes("Walrus service error")) {
+          errorTitle = "儲存服務暫時無法使用";
+          errorMessage = "Walrus 儲存服務目前無法連接。請稍後再試，或檢查網路連線。";
+        } 
+        // Check for network errors
+        else if (msg.includes("Network error") ||
+                 msg.includes("connection") ||
+                 msg.includes("Failed to connect")) {
+          errorTitle = "網路連線錯誤";
+          errorMessage = "無法連接到伺服器。請檢查您的網路連線後再試。";
+        } 
+        // Check for storage/upload errors
+        else if (msg.includes("Storage") ||
+                 msg.includes("upload") ||
+                 msg.includes("Walrus upload failed")) {
+          errorTitle = "上傳失敗";
+          errorMessage = "無法將資料上傳到儲存服務。請稍後再試。";
+        } 
+        // Check for encryption errors
+        else if (msg.includes("encrypt") ||
+                 msg.includes("decrypt")) {
+          errorTitle = "加密錯誤";
+          errorMessage = "資料加密時發生錯誤。請重新嘗試。";
+        }
+        // Check for data size errors
+        else if (msg.includes("Data too large") ||
+                 msg.includes("Maximum size")) {
+          errorTitle = "資料過大";
+          errorMessage = "您輸入的內容過長。請縮短描述後再試。";
+        }
+        // Use the error message directly if it's already user-friendly
+        else if (msg.length > 0 && msg.length < 200) {
+          errorMessage = msg;
         }
       }
 
       toast({
-        title: "記錄失敗",
+        title: errorTitle,
         description: errorMessage,
         variant: "destructive",
       });
@@ -333,6 +461,32 @@ const Record = () => {
               </div>
             </Card>
 
+            {/* Storage Option */}
+            <Card className="p-4 border-border/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-5 h-5 rounded bg-primary/20 flex items-center justify-center">
+                    <span className="text-xs">💾</span>
+                  </div>
+                  <div>
+                    <Label htmlFor="saveLocally" className="text-sm font-semibold cursor-pointer">
+                      保存到本地
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      {saveLocally 
+                        ? "✅ 資料將保存到本地伺服器（即使 Walrus 上傳失敗）" 
+                        : "⚠️ 僅嘗試上傳到 Walrus，失敗時不會保存"}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  id="saveLocally"
+                  checked={saveLocally}
+                  onCheckedChange={setSaveLocally}
+                />
+              </div>
+            </Card>
+
             {/* Upload Status */}
             {uploadStatus !== "idle" && uploadStatus !== "success" && (
               <Card className="p-3 bg-secondary/10 border-secondary/20">
@@ -346,13 +500,13 @@ const Record = () => {
                   {uploadStatus === "uploading" && (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>上傳至 Walrus...</span>
+                      <span>{saveLocally ? "上傳至 Walrus（失敗時將保存到本地）..." : "上傳至 Walrus..."}</span>
                     </>
                   )}
                   {uploadStatus === "saving" && (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>儲存記錄...</span>
+                      <span>儲存記錄到本地...</span>
                     </>
                   )}
                   {uploadStatus === "error" && (
@@ -377,14 +531,21 @@ const Record = () => {
               ) : (
                 <>
                   <Sparkles className="mr-2 h-5 w-5" />
-                  {currentAccount ? "記錄情緒並鑄造 NFT" : "記錄情緒（上傳 Walrus）"}
+                  {saveLocally 
+                    ? (currentAccount ? "記錄情緒（保存到本地）" : "記錄情緒（保存到本地）")
+                    : (currentAccount ? "記錄情緒並鑄造 NFT" : "記錄情緒（上傳 Walrus）")
+                  }
                 </>
               )}
             </Button>
 
             <Card className="p-4 bg-secondary/10 border-secondary/20">
               <p className="text-xs text-center text-muted-foreground">
-                💡 您的情緒快照將被加密並儲存在 Walrus 上，同時在 Sui 上鑄造 NFT 作為證明
+                {saveLocally ? (
+                  "💾 您的情緒快照將被加密並保存到本地伺服器（會嘗試上傳到 Walrus，失敗時仍會保存到本地）"
+                ) : (
+                  "💡 您的情緒快照將被加密並儲存在 Walrus 上，同時在 Sui 上鑄造 NFT 作為證明"
+                )}
               </p>
             </Card>
           </div>

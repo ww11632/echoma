@@ -5,6 +5,8 @@ import { Card } from "@/components/ui/card";
 import { ArrowLeft, Home, Sparkles, Shield, Clock, Lock, Unlock, Loader2 } from "lucide-react";
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import { supabase } from "@/integrations/supabase/client";
+import { listEmotionRecords } from "@/lib/localIndex";
+import { getEmotions } from "@/lib/api";
 
 interface EmotionRecord {
   id: string;
@@ -37,24 +39,77 @@ const Timeline = () => {
 
   useEffect(() => {
     const loadRecords = async () => {
-      if (!currentAccount) {
-        setIsLoading(false);
-        return;
-      }
+      setIsLoading(true);
+      const allRecords: EmotionRecord[] = [];
 
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          setIsLoading(false);
-          return;
+        // 1. 尝试从本地存储加载记录
+        try {
+          const localRecords = await listEmotionRecords();
+          // 转换本地记录格式到 Timeline 格式
+          const convertedLocalRecords: EmotionRecord[] = localRecords.map((r) => ({
+            id: r.id,
+            emotion: r.emotion,
+            intensity: 50, // 本地记录没有 intensity，使用默认值
+            description: r.note,
+            blob_id: `local_${r.id.slice(0, 8)}`,
+            walrus_url: `local://${r.id}`,
+            payload_hash: "",
+            is_public: r.isPublic ?? false, // 使用保存的 isPublic 值，如果不存在则默认为 false
+            proof_status: "pending" as const,
+            sui_ref: null,
+            created_at: r.timestamp,
+          }));
+          allRecords.push(...convertedLocalRecords);
+        } catch (localError) {
+          console.log("[Timeline] No local records or error loading:", localError);
         }
 
-        const response = await supabase.functions.invoke('get-emotions');
+        // 2. 如果有钱包，尝试从 API 加载记录
+        if (currentAccount) {
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+              // 尝试从 Supabase 加载
+              const response = await supabase.functions.invoke('get-emotions');
+              if (!response.error && response.data?.success) {
+                allRecords.push(...response.data.records);
+              }
+            } else {
+              // 没有 Supabase session，尝试从本地 API 加载
+              try {
+                const apiRecords = await getEmotions();
+                const convertedApiRecords: EmotionRecord[] = apiRecords.map((r: any) => ({
+                  id: r.id,
+                  emotion: r.emotion,
+                  intensity: r.intensity,
+                  description: r.description,
+                  blob_id: r.blob_id || `local_${r.id.slice(0, 8)}`,
+                  walrus_url: r.walrus_url || `local://${r.id}`,
+                  payload_hash: r.payload_hash || "",
+                  is_public: r.is_public || false,
+                  proof_status: r.proof_status || "pending",
+                  sui_ref: r.sui_ref || null,
+                  created_at: r.created_at || r.timestamp,
+                }));
+                allRecords.push(...convertedApiRecords);
+              } catch (apiError) {
+                console.log("[Timeline] API error (expected if server not running):", apiError);
+              }
+            }
+          } catch (supabaseError) {
+            console.log("[Timeline] Supabase error:", supabaseError);
+          }
+        }
 
-        if (response.error) throw new Error(response.error.message);
+        // 3. 去重并排序（按时间倒序）
+        const uniqueRecords = Array.from(
+          new Map(allRecords.map(r => [r.id, r])).values()
+        ).sort((a, b) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
 
-        const result = response.data;
-        if (result.success) setRecords(result.records);
+        setRecords(uniqueRecords);
       } catch (error) {
         console.error("Error loading records:", error);
       } finally {
@@ -92,12 +147,6 @@ const Timeline = () => {
               <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
               <p className="mt-4 text-muted-foreground">載入中...</p>
             </div>
-          ) : !currentAccount ? (
-            <Card className="p-8 text-center border-dashed">
-              <Shield className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-lg font-semibold mb-2">連接您的錢包</h3>
-              <p className="text-muted-foreground">連接 Sui 錢包以查看您的情緒時間軸</p>
-            </Card>
           ) : records.length === 0 ? (
             <Card className="p-8 text-center border-dashed">
               <Sparkles className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
@@ -108,7 +157,13 @@ const Timeline = () => {
           ) : (
             <div className="space-y-4">
               {records.map((record) => {
-                const emotionConfig = emotionLabels[record.emotion as keyof typeof emotionLabels];
+                // 处理 emotion 类型映射
+                const emotionKey = record.emotion as keyof typeof emotionLabels;
+                const emotionConfig = emotionLabels[emotionKey] || {
+                  label: record.emotion.charAt(0).toUpperCase() + record.emotion.slice(1),
+                  emoji: "😊",
+                  gradient: "from-gray-400 to-slate-400"
+                };
                 return (
                   <Card key={record.id} className="p-6 hover:border-primary/50 transition-all">
                     <div className="flex items-start gap-4">
