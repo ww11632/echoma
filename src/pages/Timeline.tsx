@@ -191,6 +191,21 @@ const Timeline = () => {
                             </div>
                           )}
                         </div>
+                        {/* 只顯示公開記錄的描述內容 */}
+                        {record.is_public && record.description && (
+                          <div className="mb-3 p-3 rounded-lg bg-muted/30 border border-border/50">
+                            <p className="text-sm whitespace-pre-wrap break-words">
+                              {record.description}
+                            </p>
+                          </div>
+                        )}
+                        {!record.is_public && (
+                          <div className="mb-3 p-3 rounded-lg bg-muted/10 border border-border/30">
+                            <p className="text-sm text-muted-foreground italic">
+                              🔒 此記錄已加密，描述內容受保護
+                            </p>
+                          </div>
+                        )}
                         <div className="space-y-2 text-xs">
                           {record.is_public && (
                             <div className="flex items-center gap-2 text-muted-foreground">
