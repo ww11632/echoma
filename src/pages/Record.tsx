@@ -13,6 +13,9 @@ import { encryptData, generateUserKey } from "@/lib/encryption";
 import { prepareEmotionSnapshot } from "@/lib/walrus";
 import { validateAndSanitizeDescription, emotionSnapshotSchema } from "@/lib/validation";
 import { supabase } from "@/integrations/supabase/client";
+import { addEmotionRecord } from "@/lib/localIndex";
+import type { EmotionRecord } from "@/lib/dataSchema";
+import { postEmotion } from "@/lib/api";
 
 const emotionTags = [
   { label: "😊 Joy", value: "joy", color: "from-yellow-400 to-orange-400" },
@@ -44,15 +47,6 @@ const Record = () => {
       return;
     }
 
-    if (!currentAccount) {
-      toast({
-        title: "Wallet Not Connected",
-        description: "Please connect your Sui wallet first.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsSubmitting(true);
     setUploadStatus("encrypting");
 
@@ -70,6 +64,39 @@ const Record = () => {
       const intensityValue = intensity[0];
       if (intensityValue < 0 || intensityValue > 100) {
         throw new Error("Intensity must be between 0 and 100");
+      }
+
+      // 無錢包：匿名上傳 Walrus（使用隨機金鑰加密）
+      if (!currentAccount) {
+        // 建立匿名 payload（不含錢包位址）
+        const anonPayload = {
+          emotion: selectedEmotion,
+          intensity: intensityValue,
+          description: sanitizedDescription,
+          timestamp: Date.now(),
+          walletAddress: null,
+          version: "1.0.0",
+        };
+        // 使用隨機 key 加密
+        const randomKey = crypto.randomUUID();
+        const encrypted = await encryptData(JSON.stringify(anonPayload), randomKey);
+        const encryptedString = JSON.stringify(encrypted);
+        setUploadStatus("uploading");
+        const apiRes = await postEmotion({
+          emotion: selectedEmotion,
+          intensity: intensityValue,
+          description: sanitizedDescription,
+          encryptedData: encryptedString,
+          isPublic,
+          walletAddress: null,
+        });
+        setUploadStatus("success");
+        toast({
+          title: "情緒已記錄！✨",
+          description: `已儲存至 Walrus: ${apiRes.record.blobId.slice(0, 8)}...`,
+        });
+        setTimeout(() => navigate("/timeline"), 1200);
+        return;
       }
 
       // Step 2: Generate emotion snapshot with validated inputs
@@ -100,7 +127,22 @@ const Record = () => {
       // Get current session
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        throw new Error("請先登入");
+        // 沒有 Supabase session：走自建 API（後端存 Walrus + 本地檔案）作為主線
+        const apiRes = await postEmotion({
+          emotion: selectedEmotion,
+          intensity: intensityValue,
+          description: sanitizedDescription,
+          encryptedData: encryptedString,
+          isPublic,
+          walletAddress: currentAccount.address,
+        });
+        setUploadStatus("success");
+        toast({
+          title: "情緒已記錄！✨",
+          description: `已儲存至 Walrus: ${apiRes.record.blobId.slice(0, 8)}...`,
+        });
+        setTimeout(() => navigate("/timeline"), 1200);
+        return;
       }
 
       const response = await supabase.functions.invoke('upload-emotion', {
@@ -323,7 +365,7 @@ const Record = () => {
             {/* Submit Button */}
             <Button
               onClick={handleSubmit}
-              disabled={isSubmitting || !currentAccount}
+              disabled={isSubmitting}
               className="w-full h-12 text-base font-semibold gradient-emotion hover:opacity-90 disabled:opacity-50"
               size="lg"
             >
@@ -335,7 +377,7 @@ const Record = () => {
               ) : (
                 <>
                   <Sparkles className="mr-2 h-5 w-5" />
-                  {currentAccount ? "記錄情緒並鑄造 NFT" : "請先連接錢包"}
+                  {currentAccount ? "記錄情緒並鑄造 NFT" : "記錄情緒（上傳 Walrus）"}
                 </>
               )}
             </Button>

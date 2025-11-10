@@ -5,9 +5,9 @@
 
 import { hashData } from "./encryption";
 
-// Walrus testnet configuration
-const WALRUS_PUBLISHER_URL = "https://publisher.walrus-testnet.walrus.space";
-const WALRUS_AGGREGATOR_URL = "https://aggregator.walrus-testnet.walrus.space";
+// Walrus testnet configuration (new upload relay + aggregator hosts)
+const WALRUS_PUBLISHER_URL = "https://upload-relay.testnet.walrus.space";
+const WALRUS_AGGREGATOR_URL = "https://aggregator.testnet.walrus.space";
 const DEFAULT_EPOCHS = 5; // Store for 5 epochs (~1 year on testnet)
 
 export interface WalrusUploadResult {

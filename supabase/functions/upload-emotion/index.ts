@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
     // Upload to Walrus
     console.log('Uploading to Walrus...');
     const walrusResponse = await fetch(
-      'https://publisher.walrus-testnet.walrus.space/v1/store?epochs=5',
+      'https://upload-relay.testnet.walrus.space/v1/store?epochs=5',
       {
         method: 'PUT',
         body: encryptedData,
@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
       throw new Error('Unexpected storage response format');
     }
 
-    const walrusUrl = `https://aggregator.walrus-testnet.walrus.space/v1/${blobId}`;
+    const walrusUrl = `https://aggregator.testnet.walrus.space/v1/${blobId}`;
 
     // Calculate payload hash
     const encoder = new TextEncoder();

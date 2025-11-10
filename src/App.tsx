@@ -10,6 +10,8 @@ import Index from "./pages/Index";
 import Record from "./pages/Record";
 import Timeline from "./pages/Timeline";
 import NotFound from "./pages/NotFound";
+import MvpRecord from "./pages/MvpRecord";
+import MvpTimeline from "./pages/MvpTimeline";
 import "@mysten/dapp-kit/dist/index.css";
 
 const queryClient = new QueryClient();
@@ -32,6 +34,9 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/record" element={<Record />} />
               <Route path="/timeline" element={<Timeline />} />
+              {/* MVP local-only flow */}
+              <Route path="/mvp" element={<MvpRecord />} />
+              <Route path="/mvp-timeline" element={<MvpTimeline />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

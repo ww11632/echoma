@@ -111,8 +111,8 @@ src/
 當前配置為 **Sui Testnet**：
 
 - Sui RPC: `getFullnodeUrl("testnet")`
-- Walrus Publisher: `https://publisher.walrus-testnet.walrus.space`
-- Walrus Aggregator: `https://aggregator.walrus-testnet.walrus.space`
+- Walrus Upload Relay: `https://upload-relay.testnet.walrus.space`
+- Walrus Aggregator: `https://aggregator.testnet.walrus.space`
 
 可在 `src/App.tsx` 中修改網路配置。
 
