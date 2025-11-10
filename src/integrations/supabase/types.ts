@@ -14,7 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      emotion_records: {
+        Row: {
+          blob_id: string
+          created_at: string
+          description: string
+          emotion: Database["public"]["Enums"]["emotion_type"]
+          id: string
+          intensity: number
+          is_public: boolean
+          payload_hash: string
+          proof_status: Database["public"]["Enums"]["proof_status"]
+          sui_ref: string | null
+          updated_at: string
+          user_id: string
+          walrus_url: string
+        }
+        Insert: {
+          blob_id: string
+          created_at?: string
+          description: string
+          emotion: Database["public"]["Enums"]["emotion_type"]
+          id?: string
+          intensity: number
+          is_public?: boolean
+          payload_hash: string
+          proof_status?: Database["public"]["Enums"]["proof_status"]
+          sui_ref?: string | null
+          updated_at?: string
+          user_id: string
+          walrus_url: string
+        }
+        Update: {
+          blob_id?: string
+          created_at?: string
+          description?: string
+          emotion?: Database["public"]["Enums"]["emotion_type"]
+          id?: string
+          intensity?: number
+          is_public?: boolean
+          payload_hash?: string
+          proof_status?: Database["public"]["Enums"]["proof_status"]
+          sui_ref?: string | null
+          updated_at?: string
+          user_id?: string
+          walrus_url?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +70,14 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      emotion_type:
+        | "joy"
+        | "sadness"
+        | "anger"
+        | "anxiety"
+        | "confusion"
+        | "peace"
+      proof_status: "pending" | "confirmed" | "failed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +204,16 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      emotion_type: [
+        "joy",
+        "sadness",
+        "anger",
+        "anxiety",
+        "confusion",
+        "peace",
+      ],
+      proof_status: ["pending", "confirmed", "failed"],
+    },
   },
 } as const

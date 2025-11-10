@@ -5,13 +5,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Card } from "@/components/ui/card";
-import { Sparkles, ArrowLeft, Loader2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Sparkles, ArrowLeft, Loader2, Lock, Unlock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import { encryptData, generateUserKey } from "@/lib/encryption";
-import { prepareEmotionSnapshot, storeEmotionSnapshot } from "@/lib/walrus";
+import { prepareEmotionSnapshot } from "@/lib/walrus";
 import { validateAndSanitizeDescription, emotionSnapshotSchema } from "@/lib/validation";
-import { storeEmotionRecordMetadata } from "@/lib/storage";
+import { supabase } from "@/integrations/supabase/client";
 
 const emotionTags = [
   { label: "😊 Joy", value: "joy", color: "from-yellow-400 to-orange-400" },
@@ -29,7 +30,9 @@ const Record = () => {
   const [selectedEmotion, setSelectedEmotion] = useState<string>("");
   const [intensity, setIntensity] = useState([50]);
   const [description, setDescription] = useState("");
+  const [isPublic, setIsPublic] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<"idle" | "encrypting" | "uploading" | "saving" | "success" | "error">("idle");
 
   const handleSubmit = async () => {
     if (!selectedEmotion || !description.trim()) {
@@ -51,6 +54,7 @@ const Record = () => {
     }
 
     setIsSubmitting(true);
+    setUploadStatus("encrypting");
 
     try {
       // Step 1: Validate and sanitize inputs
@@ -86,35 +90,44 @@ const Record = () => {
       const encryptedData = await encryptData(JSON.stringify(snapshot), userKey);
       const encryptedString = JSON.stringify(encryptedData);
 
-      // Step 5: Upload to Walrus
+      // Step 5: Upload to backend API
+      setUploadStatus("uploading");
       toast({
-        title: "Uploading to Walrus...",
-        description: "Encrypting and storing your emotion snapshot.",
+        title: "上傳中...",
+        description: "正在加密並儲存您的情緒快照",
       });
 
-      const walrusResult = await storeEmotionSnapshot(snapshot, encryptedString);
+      // Get current session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error("請先登入");
+      }
 
-      // Step 6: TODO - Mint Emotion NFT on Sui with walrusResult
-      // This will be implemented when we create the Move contract
+      const response = await supabase.functions.invoke('upload-emotion', {
+        body: {
+          emotion: selectedEmotion,
+          intensity: intensityValue,
+          description: sanitizedDescription,
+          encryptedData: encryptedString,
+          isPublic,
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Upload failed');
+      }
+
+      const result = response.data;
+      if (!result.success) {
+        throw new Error(result.error || 'Upload failed');
+      }
+
+      setUploadStatus("success");
       
       toast({
-        title: "Emotion Recorded! ✨",
-        description: `Stored on Walrus: ${walrusResult.blobId.slice(0, 8)}...`,
+        title: "情緒已記錄！✨",
+        description: `已儲存至 Walrus: ${result.record.blobId.slice(0, 8)}...`,
       });
-
-      // Step 7: Store minimal metadata securely in encrypted localStorage
-      // Only store metadata, not the full snapshot with description
-      await storeEmotionRecordMetadata(
-        {
-          blobId: walrusResult.blobId,
-          walrusUrl: walrusResult.walrusUrl,
-          payloadHash: walrusResult.payloadHash,
-          timestamp: snapshot.timestamp,
-          emotion: snapshot.emotion,
-          intensity: snapshot.intensity,
-        },
-        userKey
-      );
 
       // Navigate to timeline
       setTimeout(() => navigate("/timeline"), 1500);
@@ -144,10 +157,11 @@ const Record = () => {
       }
 
       toast({
-        title: "Recording Failed",
+        title: "記錄失敗",
         description: errorMessage,
         variant: "destructive",
       });
+      setUploadStatus("error");
     } finally {
       setIsSubmitting(false);
     }
@@ -223,11 +237,11 @@ const Record = () => {
             {/* Description */}
             <div className="space-y-3">
               <Label htmlFor="description" className="text-base font-semibold">
-                What happened?
+                發生了什麼事？
               </Label>
               <Textarea
                 id="description"
-                placeholder="Describe what triggered this emotion... (This will be encrypted)"
+                placeholder="描述觸發這個情緒的事件...（將被加密）"
                 value={description}
                 onChange={(e) => {
                   // Limit input length client-side
@@ -241,13 +255,70 @@ const Record = () => {
               />
               <div className="flex justify-between items-center">
                 <p className="text-xs text-muted-foreground">
-                  🔒 Your description is encrypted client-side before storage
+                  🔒 您的描述在儲存前會在客戶端加密
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {description.length}/5000 characters
+                  {description.length}/5000 字元
                 </p>
               </div>
             </div>
+
+            {/* Privacy Control */}
+            <Card className="p-4 border-border/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {isPublic ? (
+                    <Unlock className="h-5 w-5 text-primary" />
+                  ) : (
+                    <Lock className="h-5 w-5 text-primary" />
+                  )}
+                  <div>
+                    <Label htmlFor="privacy" className="text-sm font-semibold cursor-pointer">
+                      {isPublic ? "公開分享" : "私人記錄"}
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      {isPublic 
+                        ? "任何人都可以看到 blob_id 和驗證狀態" 
+                        : "🔒 已加密保存（需授權存取）"}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  id="privacy"
+                  checked={isPublic}
+                  onCheckedChange={setIsPublic}
+                />
+              </div>
+            </Card>
+
+            {/* Upload Status */}
+            {uploadStatus !== "idle" && uploadStatus !== "success" && (
+              <Card className="p-3 bg-secondary/10 border-secondary/20">
+                <div className="flex items-center gap-2 text-sm">
+                  {uploadStatus === "encrypting" && (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>正在加密...</span>
+                    </>
+                  )}
+                  {uploadStatus === "uploading" && (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>上傳至 Walrus...</span>
+                    </>
+                  )}
+                  {uploadStatus === "saving" && (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>儲存記錄...</span>
+                    </>
+                  )}
+                  {uploadStatus === "error" && (
+                    <span className="text-destructive">❌ 上傳失敗</span>
+                  )}
+                </div>
+              </Card>
+            )}
 
             {/* Submit Button */}
             <Button
@@ -259,19 +330,19 @@ const Record = () => {
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Processing...
+                  處理中...
                 </>
               ) : (
                 <>
                   <Sparkles className="mr-2 h-5 w-5" />
-                  {currentAccount ? "Record & Mint NFT" : "Connect Wallet First"}
+                  {currentAccount ? "記錄情緒並鑄造 NFT" : "請先連接錢包"}
                 </>
               )}
             </Button>
 
             <Card className="p-4 bg-secondary/10 border-secondary/20">
               <p className="text-xs text-center text-muted-foreground">
-                💡 Your emotion snapshot will be encrypted and stored on Walrus, with an NFT minted on Sui as proof
+                💡 您的情緒快照將被加密並儲存在 Walrus 上，同時在 Sui 上鑄造 NFT 作為證明
               </p>
             </Card>
           </div>

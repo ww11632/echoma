@@ -1,49 +1,40 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Plus, Lock, CheckCircle, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { ArrowLeft, Home, Sparkles, Shield, Clock, Lock, Unlock, Loader2 } from "lucide-react";
 import { useCurrentAccount } from "@mysten/dapp-kit";
-import { generateUserKey } from "@/lib/encryption";
-import { getEmotionRecordsMetadata } from "@/lib/storage";
+import { supabase } from "@/integrations/supabase/client";
 
-interface EmotionSnapshot {
+interface EmotionRecord {
   id: string;
   emotion: string;
   intensity: number;
-  timestamp: number;
-  moodTag: string;
-  walrusUrl?: string;
-  blobId?: string;
-  payloadHash?: string;
-  verified: boolean;
+  description: string;
+  blob_id: string;
+  walrus_url: string;
+  payload_hash: string;
+  is_public: boolean;
+  proof_status: "pending" | "confirmed" | "failed";
+  sui_ref: string | null;
+  created_at: string;
 }
 
-const emotionLabels: Record<string, string> = {
-  joy: "😊 Joy",
-  sadness: "😢 Sadness",
-  anger: "😠 Anger",
-  anxiety: "😰 Anxiety",
-  confusion: "🤔 Confusion",
-  peace: "✨ Peace",
+const emotionLabels = {
+  joy: { label: "Joy", emoji: "😊", gradient: "from-yellow-400 to-orange-400" },
+  sadness: { label: "Sadness", emoji: "😢", gradient: "from-blue-400 to-indigo-400" },
+  anger: { label: "Anger", emoji: "😠", gradient: "from-red-400 to-rose-400" },
+  anxiety: { label: "Anxiety", emoji: "😰", gradient: "from-purple-400 to-pink-400" },
+  confusion: { label: "Confusion", emoji: "🤔", gradient: "from-gray-400 to-slate-400" },
+  peace: { label: "Peace", emoji: "✨", gradient: "from-green-400 to-teal-400" },
 };
 
 const Timeline = () => {
   const navigate = useNavigate();
   const currentAccount = useCurrentAccount();
-  const [snapshots, setSnapshots] = useState<EmotionSnapshot[]>([]);
+  const [records, setRecords] = useState<EmotionRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const emotionColors: Record<string, string> = {
-    joy: "from-yellow-400 to-orange-400",
-    sadness: "from-blue-400 to-indigo-400",
-    anger: "from-red-400 to-rose-400",
-    anxiety: "from-purple-400 to-pink-400",
-    confusion: "from-gray-400 to-slate-400",
-    peace: "from-green-400 to-teal-400",
-  };
-
-  // Load encrypted records from localStorage
   useEffect(() => {
     const loadRecords = async () => {
       if (!currentAccount) {
@@ -52,33 +43,20 @@ const Timeline = () => {
       }
 
       try {
-        // Generate encryption key (same method as Record.tsx)
-        const userKey = await generateUserKey(currentAccount.address);
-        
-        // Load encrypted metadata
-        const records = await getEmotionRecordsMetadata(userKey);
-        
-        // Transform to snapshot format
-        const transformedSnapshots: EmotionSnapshot[] = records.map((record, index) => ({
-          id: record.blobId || `record-${index}`,
-          emotion: record.emotion,
-          intensity: record.intensity,
-          timestamp: record.timestamp,
-          moodTag: emotionLabels[record.emotion] || record.emotion,
-          walrusUrl: record.walrusUrl,
-          blobId: record.blobId,
-          payloadHash: record.payloadHash,
-          verified: true, // TODO: Verify on-chain when Sui integration is complete
-        }));
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          setIsLoading(false);
+          return;
+        }
 
-        // Sort by timestamp (newest first)
-        transformedSnapshots.sort((a, b) => b.timestamp - a.timestamp);
-        
-        setSnapshots(transformedSnapshots);
+        const response = await supabase.functions.invoke('get-emotions');
+
+        if (response.error) throw new Error(response.error.message);
+
+        const result = response.data;
+        if (result.success) setRecords(result.records);
       } catch (error) {
-        console.error("[INTERNAL] Failed to load emotion records:", error);
-        // Silently fail - user can still use the app
-        setSnapshots([]);
+        console.error("Error loading records:", error);
       } finally {
         setIsLoading(false);
       }
@@ -91,145 +69,99 @@ const Timeline = () => {
     <div className="min-h-screen p-6">
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-8">
-          <Button
-            variant="ghost"
-            onClick={() => navigate("/")}
-            className="text-muted-foreground hover:text-foreground"
-          >
+          <Button variant="ghost" onClick={() => navigate("/")} className="text-muted-foreground">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
+            返回
           </Button>
-
-          <Button
-            onClick={() => navigate("/record")}
-            className="gradient-emotion hover:opacity-90"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            New Record
+          <Button variant="ghost" onClick={() => navigate("/")} className="text-muted-foreground">
+            <Home className="h-4 w-4" />
           </Button>
         </div>
 
-        <div className="glass-card rounded-2xl p-8 space-y-6">
-          <div className="text-center space-y-2 pb-6 border-b border-border">
-            <h1 className="text-3xl font-bold">Your Emotion Timeline</h1>
-            <p className="text-muted-foreground">
-              Each glass sphere represents a verified emotion snapshot on Sui
-            </p>
+        <div className="glass-card rounded-2xl p-8">
+          <div className="text-center space-y-2 mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full gradient-emotion glow-primary mb-4">
+              <Clock className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold">情緒時間軸</h1>
+            <p className="text-muted-foreground">您個人的情緒歷程記錄</p>
           </div>
 
           {isLoading ? (
-            <div className="text-center py-12 space-y-4">
-              <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
-              <p className="text-muted-foreground">Loading your emotions...</p>
+            <div className="text-center py-12">
+              <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
+              <p className="mt-4 text-muted-foreground">載入中...</p>
             </div>
           ) : !currentAccount ? (
-            <div className="text-center py-12 space-y-4">
-              <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-muted/30 mb-4">
-                <Lock className="w-10 h-10 text-muted-foreground" />
-              </div>
-              <h3 className="text-xl font-semibold">Connect Wallet to View Timeline</h3>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                Connect your wallet to view your encrypted emotion records
-              </p>
-            </div>
-          ) : snapshots.length === 0 ? (
-            <div className="text-center py-12 space-y-4">
-              <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-muted/30 mb-4">
-                <Lock className="w-10 h-10 text-muted-foreground" />
-              </div>
-              <h3 className="text-xl font-semibold">No Emotions Recorded Yet</h3>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                Start your emotion journey by recording your first snapshot
-              </p>
-              <Button
-                onClick={() => navigate("/record")}
-                className="gradient-emotion hover:opacity-90 mt-4"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Record First Emotion
-              </Button>
-            </div>
+            <Card className="p-8 text-center border-dashed">
+              <Shield className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+              <h3 className="text-lg font-semibold mb-2">連接您的錢包</h3>
+              <p className="text-muted-foreground">連接 Sui 錢包以查看您的情緒時間軸</p>
+            </Card>
+          ) : records.length === 0 ? (
+            <Card className="p-8 text-center border-dashed">
+              <Sparkles className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+              <h3 className="text-lg font-semibold mb-2">尚未記錄任何情緒</h3>
+              <p className="text-muted-foreground mb-4">開始記錄您的情緒旅程</p>
+              <Button onClick={() => navigate("/record")} className="gradient-emotion">記錄第一個情緒</Button>
+            </Card>
           ) : (
             <div className="space-y-4">
-              {snapshots.map((snapshot, index) => (
-                <Card
-                  key={snapshot.id}
-                  className="glass-card p-6 hover:scale-[1.02] transition-all duration-300 cursor-pointer group"
-                  onClick={() => {
-                    // TODO: Navigate to detail page or open modal
-                  }}
-                >
-                  <div className="flex items-start gap-6">
-                    {/* Glass Sphere Visualization */}
-                    <div className="relative">
-                      <div
-                        className={`
-                          w-20 h-20 rounded-full bg-gradient-to-br ${emotionColors[snapshot.emotion]}
-                          animate-float glow-primary
-                          flex items-center justify-center text-3xl
-                          group-hover:scale-110 transition-transform duration-300
-                        `}
-                        style={{
-                          animationDelay: `${index * 0.2}s`,
-                        }}
-                      >
-                        {snapshot.moodTag.split(" ")[0]}
+              {records.map((record) => {
+                const emotionConfig = emotionLabels[record.emotion as keyof typeof emotionLabels];
+                return (
+                  <Card key={record.id} className="p-6 hover:border-primary/50 transition-all">
+                    <div className="flex items-start gap-4">
+                      <div className={`w-16 h-16 rounded-full flex items-center justify-center bg-gradient-to-br ${emotionConfig.gradient} glow-primary flex-shrink-0`}>
+                        <span className="text-2xl">{emotionConfig.emoji}</span>
                       </div>
-                      {snapshot.verified && (
-                        <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-secondary rounded-full flex items-center justify-center">
-                          <CheckCircle className="w-4 h-4 text-white" />
+                      <div className="flex-1">
+                        <div className="flex items-start justify-between mb-2">
+                          <div>
+                            <h3 className="font-semibold text-lg">{emotionConfig.label}</h3>
+                            <p className="text-sm text-muted-foreground">強度: {record.intensity}%</p>
+                          </div>
+                          <span className="text-xs text-muted-foreground">{new Date(record.created_at).toLocaleDateString('zh-TW')}</span>
                         </div>
-                      )}
-                    </div>
-
-                    {/* Snapshot Info */}
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-xl font-semibold">{snapshot.moodTag}</h3>
-                        <span className="text-sm text-muted-foreground">
-                          {new Date(snapshot.timestamp).toLocaleDateString()}
-                        </span>
-                      </div>
-                      
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span>Intensity: {snapshot.intensity}%</span>
-                        {snapshot.verified && (
-                          <span className="flex items-center gap-1 text-secondary">
-                            <CheckCircle className="w-3 h-3" />
-                            Verified on Sui
-                          </span>
-                        )}
-                      </div>
-
-                      {snapshot.walrusUrl && (
-                        <div className="flex items-center gap-2 text-xs">
-                          <Lock className="w-3 h-3 text-muted-foreground" />
-                          <span className="text-muted-foreground font-mono truncate max-w-xs">
-                            {snapshot.blobId ? `${snapshot.blobId.slice(0, 8)}...` : "Encrypted"}
-                          </span>
+                        <div className="mb-2">
+                          {record.is_public ? (
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Unlock className="w-3 h-3" />
+                              <span>公開記錄</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Lock className="w-3 h-3" />
+                              <span>🔒 已加密保存</span>
+                            </div>
+                          )}
                         </div>
-                      )}
+                        <div className="space-y-2 text-xs">
+                          {record.is_public && (
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Shield className="w-3 h-3" />
+                              <span className="font-mono truncate">Blob: {record.blob_id.slice(0, 8)}...{record.blob_id.slice(-8)}</span>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {record.proof_status === "confirmed" ? (
+                              <span className="px-2 py-1 rounded-full bg-green-500/10 text-green-500 text-xs">✓ 已驗證</span>
+                            ) : record.proof_status === "pending" ? (
+                              <span className="px-2 py-1 rounded-full bg-yellow-500/10 text-yellow-500 text-xs">⏳ 等待中</span>
+                            ) : (
+                              <span className="px-2 py-1 rounded-full bg-red-500/10 text-red-500 text-xs">❌ 失敗</span>
+                            )}
+                            {record.sui_ref && <span className="px-2 py-1 rounded-full bg-primary/10 text-primary text-xs">🔗 已上鏈</span>}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </Card>
-              ))}
+                  </Card>
+                );
+              })}
             </div>
           )}
         </div>
-
-        {/* Info Card */}
-        <Card className="mt-6 p-6 bg-primary/5 border-primary/20">
-          <div className="space-y-2">
-            <h3 className="font-semibold flex items-center gap-2">
-              <Lock className="w-4 h-4" />
-              Privacy & Verification
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              Your emotion details are encrypted client-side and stored on Walrus. Only metadata
-              and verification hashes exist on Sui blockchain. You control the decryption keys.
-            </p>
-          </div>
-        </Card>
       </div>
     </div>
   );
