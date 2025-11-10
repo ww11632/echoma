@@ -125,21 +125,23 @@ export async function generateUserKey(
   let keyMaterial: Uint8Array;
   if (signature && signature.length > 0) {
     // If signature is available, use it for stronger key derivation
-    keyMaterial = new Uint8Array(addressBytes.length + signature.length);
-    keyMaterial.set(addressBytes, 0);
-    keyMaterial.set(signature, addressBytes.length);
+    const tempBuffer = new Uint8Array(addressBytes.length + signature.length);
+    tempBuffer.set(addressBytes, 0);
+    tempBuffer.set(new Uint8Array(signature), addressBytes.length);
+    keyMaterial = tempBuffer;
   } else {
     // Fallback: Use wallet address with app salt for key derivation
     // This is still more secure than the previous predictable method
-    keyMaterial = new Uint8Array(addressBytes.length + appSalt.length);
-    keyMaterial.set(addressBytes, 0);
-    keyMaterial.set(appSalt, addressBytes.length);
+    const tempBuffer = new Uint8Array(addressBytes.length + appSalt.length);
+    tempBuffer.set(addressBytes, 0);
+    tempBuffer.set(appSalt, addressBytes.length);
+    keyMaterial = tempBuffer;
   }
 
   // Use PBKDF2 to derive a secure key from the material
   const keyMaterialKey = await crypto.subtle.importKey(
     "raw",
-    keyMaterial,
+    keyMaterial.buffer as ArrayBuffer,
     "PBKDF2",
     false,
     ["deriveBits"]
