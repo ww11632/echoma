@@ -6,8 +6,8 @@ import { componentTagger } from "lovable-tagger";
 // Plugin to handle WebAssembly files with correct MIME type
 const wasmPlugin = () => ({
   name: "wasm-mime-type",
-  configureServer(server) {
-    server.middlewares.use((req, res, next) => {
+  configureServer(server: any) {
+    server.middlewares.use((req: any, res: any, next: any) => {
       if (req.url?.endsWith(".wasm")) {
         res.setHeader("Content-Type", "application/wasm");
       }
