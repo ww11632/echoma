@@ -246,7 +246,7 @@ function createWalrusClient(): WalrusClient {
   });
   
   // Extend the SuiClient with walrus functionality
-  return suiClient.$extend(walrus()) as unknown as WalrusClient;
+  return suiClient.$extend(walrus()) as WalrusClient;
 }
 
 /**
@@ -347,6 +347,8 @@ export function createSignerFromWallet(
   const signerAdapter: Signer = {
     toSuiAddress: () => accountAddress,
     
+    getAddress: async () => accountAddress,
+    
     sign: async (bytes: Uint8Array) => {
       const signature = await signBytes(bytes);
       return {
@@ -366,7 +368,7 @@ export function createSignerFromWallet(
       const signatureBytes = await signBytes(transactionBytes);
       const signatureBase64 = toBase64(signatureBytes);
       
-      const response = await (client as any).executeTransactionBlock({
+      const response = await client.executeTransactionBlock({
         transactionBlock: transactionBytes,
         signature: signatureBase64,
         options: {
@@ -436,38 +438,13 @@ export function createSignerFromWallet(
     
     getKeyScheme: () => 'ED25519' as const,
     
-    getPublicKey: () => {
+    getPublicKey: async () => {
       // Return a placeholder Ed25519PublicKey - wallet adapters don't expose public keys
       // Override toSuiAddress to return the actual account address
       const publicKey = new Ed25519PublicKey(new Uint8Array(32));
       return {
         ...publicKey,
         toSuiAddress: () => accountAddress,
-      } as any;
-    },
-    
-    // Required methods for Signer interface
-    signWithIntent: async (bytes: Uint8Array) => {
-      const signature = await signBytes(bytes);
-      return {
-        signature,
-        signatureScheme: 'ED25519',
-      } as any;
-    },
-    
-    signTransaction: async (transaction: any) => {
-      const transactionBytes = await transaction.build({ client: clientToUse });
-      const signature = await signBytes(transactionBytes);
-      return {
-        signature,
-        transactionBytes,
-      } as any;
-    },
-    
-    signPersonalMessage: async (message: Uint8Array) => {
-      const signature = await signBytes(message);
-      return {
-        signature,
       } as any;
     },
   };
@@ -887,7 +864,7 @@ export async function uploadToWalrusWithSDK(
         try {
           console.log("[Walrus SDK] Querying transaction to get blobId...");
           console.log("[Walrus SDK] Using digest:", digest);
-          const txDetails = await (client as any).getTransactionBlock({
+          const txDetails = await client.getTransactionBlock({
             digest: digest,
             options: {
               showEffects: true,
@@ -927,7 +904,7 @@ export async function uploadToWalrusWithSDK(
     if (!blobId && result?.digest && typeof result.digest === 'string' && result.digest.length >= 20 && !result.digest.includes('::')) {
       console.log("[Walrus SDK] BlobId not found in result, but transaction succeeded. Querying transaction...");
       try {
-        const txDetails = await (client as any).getTransactionBlock({
+        const txDetails = await client.getTransactionBlock({
           digest: result.digest,
           options: {
             showEffects: true,

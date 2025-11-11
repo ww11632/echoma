@@ -198,28 +198,8 @@ const Record = () => {
       // Validate snapshot with zod schema
       emotionSnapshotSchema.parse(snapshot);
 
-      // Step 3: Generate secure encryption key with wallet signature
-      let userKey: string;
-      try {
-        // Request wallet signature for secure key derivation
-        const message = new TextEncoder().encode('Echoma Encryption Key v1');
-        const signatureResult = await (currentWallet as any)?.features?.['standard:signPersonalMessage']
-          ?.signPersonalMessage?.({ account: currentAccount, message });
-        
-        if (signatureResult?.signature) {
-          // Convert signature to Uint8Array
-          const signatureBytes = new Uint8Array(signatureResult.signature);
-          userKey = await generateUserKey(currentAccount.address, signatureBytes);
-          console.log("[Record] ✓ Using signature-based encryption key");
-        } else {
-          // Fallback to address-based key if signature not available
-          userKey = await generateUserKey(currentAccount.address);
-          console.log("[Record] ⚠ Using address-based encryption key (signature not available)");
-        }
-      } catch (signError) {
-        console.warn("[Record] Signature request failed, using fallback key:", signError);
-        userKey = await generateUserKey(currentAccount.address);
-      }
+      // Step 3: Generate secure encryption key
+      const userKey = await generateUserKey(currentAccount.address);
       
       // Step 4: Encrypt snapshot
       const encryptedData = await encryptData(JSON.stringify(snapshot), userKey);
