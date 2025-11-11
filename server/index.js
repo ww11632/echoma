@@ -18,6 +18,99 @@ app.use(cors());
 app.use(express.json({ limit: "2mb" }));
 
 /**
+ * Error codes for client-facing error messages
+ * Prevents exposure of technical details
+ */
+const ERROR_CODES = {
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
+  STORAGE_ERROR: 'STORAGE_ERROR',
+  NETWORK_ERROR: 'NETWORK_ERROR',
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  AUTH_ERROR: 'AUTH_ERROR',
+} as const;
+
+/**
+ * User-friendly error messages mapped to error codes
+ */
+const ERROR_MESSAGES = {
+  [ERROR_CODES.INTERNAL_ERROR]: 'An internal error occurred. Please try again later.',
+  [ERROR_CODES.STORAGE_ERROR]: 'Failed to save your emotion record. Please try again.',
+  [ERROR_CODES.NETWORK_ERROR]: 'Network error. Please check your connection and try again.',
+  [ERROR_CODES.VALIDATION_ERROR]: 'Invalid request data. Please check your input.',
+  [ERROR_CODES.AUTH_ERROR]: 'Authentication failed. Please sign in again.',
+} as const;
+
+/**
+ * Determine error code from error object
+ * Maps technical errors to safe error codes
+ */
+function getErrorCode(error) {
+  if (!error) {
+    return ERROR_CODES.INTERNAL_ERROR;
+  }
+
+  const message = error.message || '';
+  const lowerMessage = message.toLowerCase();
+
+  // Network-related errors
+  if (
+    lowerMessage.includes('network') ||
+    lowerMessage.includes('connection') ||
+    lowerMessage.includes('fetch') ||
+    lowerMessage.includes('econnrefused') ||
+    lowerMessage.includes('timeout')
+  ) {
+    return ERROR_CODES.NETWORK_ERROR;
+  }
+
+  // Storage/Walrus errors
+  if (
+    lowerMessage.includes('walrus') ||
+    lowerMessage.includes('storage') ||
+    lowerMessage.includes('upload') ||
+    lowerMessage.includes('blob')
+  ) {
+    return ERROR_CODES.STORAGE_ERROR;
+  }
+
+  // Validation errors (these are usually safe to show)
+  if (
+    lowerMessage.includes('required') ||
+    lowerMessage.includes('invalid') ||
+    lowerMessage.includes('must be')
+  ) {
+    return ERROR_CODES.VALIDATION_ERROR;
+  }
+
+  // Default to internal error for unknown errors
+  return ERROR_CODES.INTERNAL_ERROR;
+}
+
+/**
+ * Create safe error response for client
+ * Logs full error details server-side but only returns error code to client
+ */
+function createErrorResponse(error, statusCode = 500) {
+  const errorCode = getErrorCode(error);
+  const userMessage = ERROR_MESSAGES[errorCode];
+
+  // Log full error details server-side for debugging
+  console.error('[Error Response]', {
+    errorCode,
+    statusCode,
+    originalError: error?.message,
+    stack: error?.stack,
+    name: error?.name,
+  });
+
+  return {
+    success: false,
+    error: userMessage,
+    errorCode,
+  };
+}
+
+/**
  * Authentication middleware - verifies JWT token from Supabase
  */
 async function requireAuth(req, res, next) {
@@ -25,9 +118,10 @@ async function requireAuth(req, res, next) {
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ 
-        success: false, 
-        error: 'Unauthorized - Missing or invalid authorization header' 
+      return res.status(401).json({
+        success: false,
+        error: ERROR_MESSAGES[ERROR_CODES.AUTH_ERROR],
+        errorCode: ERROR_CODES.AUTH_ERROR,
       });
     }
     
@@ -38,9 +132,10 @@ async function requireAuth(req, res, next) {
     
     if (error || !user) {
       console.error('[Auth] Token verification failed:', error?.message);
-      return res.status(401).json({ 
-        success: false, 
-        error: 'Unauthorized - Invalid or expired token' 
+      return res.status(401).json({
+        success: false,
+        error: ERROR_MESSAGES[ERROR_CODES.AUTH_ERROR],
+        errorCode: ERROR_CODES.AUTH_ERROR,
       });
     }
     
@@ -49,10 +144,8 @@ async function requireAuth(req, res, next) {
     next();
   } catch (error) {
     console.error('[Auth] Unexpected error during authentication:', error);
-    return res.status(500).json({ 
-      success: false, 
-      error: 'Internal server error during authentication' 
-    });
+    const errorResponse = createErrorResponse(error, 500);
+    return res.status(500).json(errorResponse);
   }
 }
 
@@ -239,19 +332,35 @@ app.post("/api/emotion", requireAuth, rateLimitMiddleware, async (req, res) => {
     // Validate inputs
     if (!emotion || typeof emotion !== "string") {
       console.error(`[API] Validation error: emotion required`);
-      return res.status(400).json({ success: false, error: "emotion required" });
+      return res.status(400).json({
+        success: false,
+        error: ERROR_MESSAGES[ERROR_CODES.VALIDATION_ERROR],
+        errorCode: ERROR_CODES.VALIDATION_ERROR,
+      });
     }
     if (typeof intensity !== "number") {
       console.error(`[API] Validation error: intensity required`);
-      return res.status(400).json({ success: false, error: "intensity required" });
+      return res.status(400).json({
+        success: false,
+        error: ERROR_MESSAGES[ERROR_CODES.VALIDATION_ERROR],
+        errorCode: ERROR_CODES.VALIDATION_ERROR,
+      });
     }
     if (!description || typeof description !== "string") {
       console.error(`[API] Validation error: description required`);
-      return res.status(400).json({ success: false, error: "description required" });
+      return res.status(400).json({
+        success: false,
+        error: ERROR_MESSAGES[ERROR_CODES.VALIDATION_ERROR],
+        errorCode: ERROR_CODES.VALIDATION_ERROR,
+      });
     }
     if (!encryptedData || typeof encryptedData !== "string") {
       console.error(`[API] Validation error: encryptedData required`);
-      return res.status(400).json({ success: false, error: "encryptedData required" });
+      return res.status(400).json({
+        success: false,
+        error: ERROR_MESSAGES[ERROR_CODES.VALIDATION_ERROR],
+        errorCode: ERROR_CODES.VALIDATION_ERROR,
+      });
     }
 
     console.log(`[API] Validated inputs - emotion: ${emotion}, intensity: ${intensity}, description length: ${description.length}, encryptedData length: ${encryptedData.length}`);
@@ -334,16 +443,8 @@ app.post("/api/emotion", requireAuth, rateLimitMiddleware, async (req, res) => {
     
     res.json(response);
   } catch (e) {
-    console.error(`[API] Error in POST /api/emotion:`, {
-      message: e?.message,
-      stack: e?.stack,
-      name: e?.name,
-    });
-    const errorMessage = e?.message || "Internal error";
-    res.status(500).json({ 
-      success: false, 
-      error: errorMessage 
-    });
+    const errorResponse = createErrorResponse(e, 500);
+    res.status(500).json(errorResponse);
   }
 });
 
@@ -363,7 +464,8 @@ app.get("/api/emotions", requireAuth, async (req, res) => {
     console.log(`[API] Returning ${userRecords.length} records for user ${req.user.id}`);
     res.json({ success: true, records: userRecords.sort((a, b) => (a.created_at < b.created_at ? 1 : -1)) });
   } catch (e) {
-    res.status(500).json({ success: false, error: e?.message || "Internal error" });
+    const errorResponse = createErrorResponse(e, 500);
+    res.status(500).json(errorResponse);
   }
 });
 
