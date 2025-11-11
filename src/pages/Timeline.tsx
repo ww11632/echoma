@@ -7,7 +7,7 @@ import { ArrowLeft, Home, Sparkles, Shield, Clock, Lock, Unlock, Loader2, BookOp
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import { supabase } from "@/integrations/supabase/client";
 import { listEmotionRecords } from "@/lib/localIndex";
-import { getEmotions } from "@/lib/api";
+import { getEmotions, getEmotionsByWallet } from "@/lib/api";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Legend } from "recharts";
@@ -72,18 +72,34 @@ const Timeline = () => {
           console.log("[Timeline] No local records or error loading:", localError);
         }
 
-        // 2. 如果有钱包，尝试从 API 加载记录
-        if (currentAccount) {
-          try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
+        // 2. 尝试从 API 加载记录（无论是否有钱包）
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            // 如果有Supabase session，使用Supabase function
+            try {
               const response = await supabase.functions.invoke('get-emotions');
               if (!response.error && response.data?.success) {
-                allRecords.push(...response.data.records);
+                const convertedRecords: EmotionRecord[] = response.data.records.map((r: any) => ({
+                  id: r.id,
+                  emotion: r.emotion,
+                  intensity: r.intensity,
+                  description: r.description,
+                  blob_id: r.blob_id || `local_${r.id.slice(0, 8)}`,
+                  walrus_url: r.walrus_url || `local://${r.id}`,
+                  payload_hash: r.payload_hash || "",
+                  is_public: r.is_public || false,
+                  proof_status: r.proof_status || "pending",
+                  sui_ref: r.sui_ref || null,
+                  created_at: r.created_at || r.timestamp,
+                }));
+                allRecords.push(...convertedRecords);
               }
-            } else {
+            } catch (supabaseFuncError) {
+              console.log("[Timeline] Supabase function error:", supabaseFuncError);
+              // 如果Supabase function失败，尝试使用直接API调用
               try {
-                const apiRecords = await getEmotions();
+                const apiRecords = await getEmotions(session.access_token);
                 const convertedApiRecords: EmotionRecord[] = apiRecords.map((r: any) => ({
                   id: r.id,
                   emotion: r.emotion,
@@ -102,9 +118,34 @@ const Timeline = () => {
                 console.log("[Timeline] API error (expected if server not running):", apiError);
               }
             }
-          } catch (supabaseError) {
-            console.log("[Timeline] Supabase error:", supabaseError);
+          } else {
+            // 没有Supabase session，但可能有钱包连接，尝试使用钱包地址查询
+            if (currentAccount?.address) {
+              try {
+                console.log("[Timeline] Fetching records by wallet address:", currentAccount.address);
+                const apiRecords = await getEmotionsByWallet(currentAccount.address);
+                const convertedApiRecords: EmotionRecord[] = apiRecords.map((r: any) => ({
+                  id: r.id,
+                  emotion: r.emotion,
+                  intensity: r.intensity,
+                  description: r.description,
+                  blob_id: r.blob_id || `local_${r.id.slice(0, 8)}`,
+                  walrus_url: r.walrus_url || `local://${r.id}`,
+                  payload_hash: r.payload_hash || "",
+                  is_public: r.is_public || false,
+                  proof_status: r.proof_status || "pending",
+                  sui_ref: r.sui_ref || null,
+                  created_at: r.created_at || r.timestamp,
+                }));
+                allRecords.push(...convertedApiRecords);
+                console.log(`[Timeline] Found ${convertedApiRecords.length} Walrus records for wallet`);
+              } catch (apiError) {
+                console.log("[Timeline] Error fetching records by wallet address:", apiError);
+              }
+            }
           }
+        } catch (supabaseError) {
+          console.log("[Timeline] Supabase error:", supabaseError);
         }
 
         // 3. 去重并排序（按时间倒序）

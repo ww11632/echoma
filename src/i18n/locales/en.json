@@ -79,7 +79,8 @@
       "walrus": "Walrus Upload",
       "localOnly": "Save to local browser only, do not upload to Walrus",
       "walrusOnly": "Only attempt to upload to Walrus, will not save on failure",
-      "walletRequired": "⚠️ Wallet connection required to upload emotions to Walrus"
+      "walletRequired": "⚠️ Wallet connection required to upload emotions to Walrus",
+      "walrusHint": "Using Walrus storage means your emotion records will be stored on decentralized storage, and no third party can decrypt them."
     },
     "status": {
       "encrypting": "Encrypting...",

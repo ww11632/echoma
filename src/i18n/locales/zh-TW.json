@@ -79,7 +79,8 @@
       "walrus": "Walrus 上傳",
       "localOnly": "僅保存到本地瀏覽器，不上傳到 Walrus",
       "walrusOnly": "僅嘗試上傳到 Walrus，失敗時不會保存",
-      "walletRequired": "⚠️ 需要連接錢包才能上傳情緒到 Walrus"
+      "walletRequired": "⚠️ 需要連接錢包才能上傳情緒到 Walrus",
+      "walrusHint": "使用 Walrus 儲存代表您的情緒記錄會上鏈至去中心化儲存，任何第三方無法解密。"
     },
     "status": {
       "encrypting": "正在加密...",

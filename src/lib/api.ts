@@ -58,8 +58,31 @@ export async function postEmotion(payload: {
   }
 }
 
-export async function getEmotions() {
-  const res = await fetch(`${API_BASE}/api/emotions`);
+export async function getEmotions(accessToken?: string) {
+  const headers: HeadersInit = { "Content-Type": "application/json" };
+  
+  // 如果有access token，添加到请求头
+  if (accessToken) {
+    headers["Authorization"] = `Bearer ${accessToken}`;
+  }
+  
+  const res = await fetch(`${API_BASE}/api/emotions`, {
+    headers,
+  });
+  
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || "Failed to fetch");
+  }
+  return data.records as any[];
+}
+
+// Get emotions by wallet address (for anonymous users)
+export async function getEmotionsByWallet(walletAddress: string) {
+  const res = await fetch(`${API_BASE}/api/emotions/by-wallet/${encodeURIComponent(walletAddress)}`, {
+    headers: { "Content-Type": "application/json" },
+  });
+  
   const data = await res.json();
   if (!res.ok || !data.success) {
     throw new Error(data.error || "Failed to fetch");

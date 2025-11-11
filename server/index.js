@@ -469,6 +469,40 @@ app.get("/api/emotions", requireAuth, async (req, res) => {
   }
 });
 
+// New endpoint: Get emotions by wallet address (for anonymous users)
+// This allows wallet-connected anonymous users to see their Walrus records
+app.get("/api/emotions/by-wallet/:walletAddress", async (req, res) => {
+  try {
+    const walletAddress = req.params.walletAddress;
+    
+    if (!walletAddress || typeof walletAddress !== "string") {
+      return res.status(400).json({
+        success: false,
+        error: ERROR_MESSAGES[ERROR_CODES.VALIDATION_ERROR],
+        errorCode: ERROR_CODES.VALIDATION_ERROR,
+      });
+    }
+    
+    console.log(`[API] GET /api/emotions/by-wallet - Request for wallet: ${walletAddress}`);
+    const list = await readAll();
+    
+    // Filter records by wallet address
+    // Only return records that match the wallet address
+    const walletRecords = list.filter(record => {
+      return record.wallet_address && record.wallet_address.toLowerCase() === walletAddress.toLowerCase();
+    });
+    
+    console.log(`[API] Returning ${walletRecords.length} records for wallet ${walletAddress}`);
+    res.json({ 
+      success: true, 
+      records: walletRecords.sort((a, b) => (a.created_at < b.created_at ? 1 : -1)) 
+    });
+  } catch (e) {
+    const errorResponse = createErrorResponse(e, 500);
+    res.status(500).json(errorResponse);
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`API server running at http://localhost:${PORT}`);
 });

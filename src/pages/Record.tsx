@@ -629,6 +629,13 @@ const Record = () => {
                     {t("record.storage.walrusOnly")}
                     </p>
                 </Button>
+                {!saveLocally && (
+                  <Card className="p-3 bg-blue-500/10 border-blue-500/20">
+                    <p className="text-xs text-center text-blue-600 dark:text-blue-400">
+                      {t("record.storage.walrusHint")}
+                    </p>
+                  </Card>
+                )}
                   </div>
                 </div>
 
