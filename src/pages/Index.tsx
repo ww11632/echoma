@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Sparkles, Lock, Shield, Database, ArrowRight } from "lucide-react";
+import { Sparkles, Lock, Shield, Database, Unlock } from "lucide-react";
 import WalletConnect from "@/components/WalletConnect";
 
 const Index = () => {
@@ -55,24 +55,61 @@ const Index = () => {
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-4 justify-center pt-4">
-              <Button
-                onClick={() => navigate("/record")}
-                size="lg"
-                className="h-14 px-8 text-lg font-semibold gradient-emotion hover:opacity-90 glow-primary"
-              >
-                <Sparkles className="mr-2 h-5 w-5" />
-                Start Recording
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-              <Button
-                onClick={() => navigate("/timeline")}
-                size="lg"
-                variant="outline"
-                className="h-14 px-8 text-lg glass-card hover:bg-primary/10"
-              >
-                View Timeline
-              </Button>
+            {/* Mode Selection Cards */}
+            <div className="grid md:grid-cols-2 gap-6 pt-4 max-w-4xl mx-auto">
+              {/* Anonymous Mode */}
+              <Card className="glass-card p-6 space-y-4 hover:scale-105 transition-all duration-300">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-secondary/30">
+                  <Unlock className="w-6 h-6 text-secondary" />
+                </div>
+                <h3 className="text-xl font-semibold">Anonymous Mode</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Record emotions using your wallet. Data encrypted locally with wallet signatures.
+                </p>
+                <div className="space-y-2">
+                  <Button
+                    onClick={() => navigate("/record")}
+                    className="w-full gradient-emotion hover:opacity-90 glow-primary"
+                  >
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Start Recording
+                  </Button>
+                  <Button
+                    onClick={() => navigate("/timeline")}
+                    variant="outline"
+                    className="w-full glass-card hover:bg-primary/10"
+                  >
+                    View Timeline
+                  </Button>
+                </div>
+              </Card>
+
+              {/* Secure Mode */}
+              <Card className="glass-card p-6 space-y-4 hover:scale-105 transition-all duration-300">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/30">
+                  <Lock className="w-6 h-6 text-primary" />
+                </div>
+                <h3 className="text-xl font-semibold">Secure Mode</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Sign in for cloud backup and enhanced security. Access from any device.
+                </p>
+                <div className="space-y-2">
+                  <Button
+                    onClick={() => navigate("/auth")}
+                    className="w-full gradient-cool hover:opacity-90 glow-secondary"
+                  >
+                    <Lock className="mr-2 h-4 w-4" />
+                    Sign In / Sign Up
+                  </Button>
+                  <Button
+                    onClick={() => navigate("/auth-timeline")}
+                    variant="outline"
+                    className="w-full glass-card hover:bg-secondary/10"
+                  >
+                    View Secure Timeline
+                  </Button>
+                </div>
+              </Card>
             </div>
           </div>
 
