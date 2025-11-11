@@ -74,9 +74,12 @@
       "privateDesc": "🔒 Encrypted and saved (requires authorization to access)"
     },
     "storage": {
-      "title": "Save Locally",
-      "localOnly": "✅ Save to local browser only, do not upload to Walrus",
-      "walrusOnly": "⚠️ Only attempt to upload to Walrus, will not save on failure"
+      "title": "Choose Storage Method",
+      "local": "Local Storage",
+      "walrus": "Walrus Upload",
+      "localOnly": "Save to local browser only, do not upload to Walrus",
+      "walrusOnly": "Only attempt to upload to Walrus, will not save on failure",
+      "walletRequired": "⚠️ Wallet connection required to upload emotions to Walrus"
     },
     "status": {
       "encrypting": "Encrypting...",

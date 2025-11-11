@@ -19,6 +19,7 @@ import { addEmotionRecord } from "@/lib/localIndex";
 import type { EmotionRecord } from "@/lib/dataSchema";
 import { postEmotion } from "@/lib/api";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import WalletConnect from "@/components/WalletConnect";
 
 const isBackendUnavailable = (error: unknown) => {
   if (!(error instanceof Error)) return false;
@@ -585,30 +586,65 @@ const Record = () => {
             </Card>
 
             {/* Storage Option */}
-            <Card className="p-4 border-border/50">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-5 h-5 rounded bg-primary/20 flex items-center justify-center">
-                    <span className="text-xs">💾</span>
+            <div className="space-y-3">
+              <Label className="text-base font-semibold">
+                {t("record.storage.title")}
+              </Label>
+              <div className="space-y-3">
+                <Button
+                  type="button"
+                  variant={saveLocally ? "default" : "outline"}
+                  onClick={() => setSaveLocally(true)}
+                  className={`
+                    w-full h-auto py-4 px-4 flex flex-col items-start gap-2
+                    ${saveLocally 
+                      ? "gradient-emotion border-primary" 
+                      : "border-border hover:border-primary/50"}
+                  `}
+                >
+                  <div className="flex items-center gap-2 w-full">
+                    <span className="text-lg">💾</span>
+                    <span className="font-semibold">{t("record.storage.local")}</span>
                   </div>
-                  <div>
-                    <Label htmlFor="saveLocally" className="text-sm font-semibold cursor-pointer">
-                      {t("record.storage.title")}
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      {saveLocally 
-                        ? t("record.storage.localOnly")
-                        : t("record.storage.walrusOnly")}
-                    </p>
+                  <p className="text-xs text-left opacity-80 whitespace-normal break-words">
+                    {t("record.storage.localOnly")}
+                  </p>
+                </Button>
+                <Button
+                  type="button"
+                  variant={!saveLocally ? "default" : "outline"}
+                  onClick={() => setSaveLocally(false)}
+                  className={`
+                    w-full h-auto py-4 px-4 flex flex-col items-start gap-2
+                    ${!saveLocally 
+                      ? "gradient-cool border-secondary" 
+                      : "border-border hover:border-secondary/50"}
+                  `}
+                >
+                  <div className="flex items-center gap-2 w-full">
+                    <span className="text-lg">☁️</span>
+                    <span className="font-semibold">{t("record.storage.walrus")}</span>
                   </div>
-                </div>
-                <Switch
-                  id="saveLocally"
-                  checked={saveLocally}
-                  onCheckedChange={setSaveLocally}
-                />
+                  <p className="text-xs text-left opacity-80 whitespace-normal break-words">
+                    {t("record.storage.walrusOnly")}
+                  </p>
+                </Button>
               </div>
-            </Card>
+            </div>
+
+            {/* Wallet Connect Section */}
+            {!saveLocally && (
+              <div className="space-y-3">
+                {!currentAccount && (
+                  <Card className="p-3 bg-orange-500/10 border-orange-500/20">
+                    <p className="text-sm text-center text-orange-600 dark:text-orange-400 mb-3">
+                      {t("record.storage.walletRequired")}
+                    </p>
+                  </Card>
+                )}
+                <WalletConnect />
+              </div>
+            )}
 
             {/* Upload Status */}
             {uploadStatus !== "idle" && uploadStatus !== "success" && (
