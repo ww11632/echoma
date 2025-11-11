@@ -10,6 +10,7 @@ import { Sparkles, ArrowLeft, Loader2, Lock, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { validateAndSanitizeDescription } from "@/lib/validation";
+import { encryptData, generateUserKey } from "@/lib/encryption";
 import type { User, Session } from "@supabase/supabase-js";
 
 const emotionTags = [
@@ -90,15 +91,20 @@ const AuthRecord = () => {
     try {
       const sanitizedDescription = validateAndSanitizeDescription(description);
 
-      // Simple encryption using user ID as key
-      const encoder = new TextEncoder();
-      const data = encoder.encode(JSON.stringify({
+      // Create snapshot of emotion data
+      const snapshot = {
         emotion: selectedEmotion,
         intensity: intensity[0],
         description: sanitizedDescription,
         timestamp: new Date().toISOString(),
-      }));
-      const encryptedData = btoa(String.fromCharCode(...data));
+      };
+
+      // Generate encryption key from user ID (secure key derivation using PBKDF2)
+      const userKey = await generateUserKey(user.id);
+
+      // Properly encrypt the data using AES-GCM
+      const encrypted = await encryptData(JSON.stringify(snapshot), userKey);
+      const encryptedData = JSON.stringify(encrypted);
 
       // Call Supabase edge function to upload
       const { data: result, error } = await supabase.functions.invoke('upload-emotion', {

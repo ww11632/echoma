@@ -4,11 +4,57 @@ import { randomUUID, createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import fetch from "node-fetch";
+import { createClient } from "@supabase/supabase-js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Initialize Supabase client for JWT verification
+const supabase = createClient(
+  process.env.VITE_SUPABASE_URL || '',
+  process.env.VITE_SUPABASE_PUBLISHABLE_KEY || ''
+);
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
+
+/**
+ * Authentication middleware - verifies JWT token from Supabase
+ */
+async function requireAuth(req, res, next) {
+  try {
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Unauthorized - Missing or invalid authorization header' 
+      });
+    }
+    
+    const token = authHeader.replace('Bearer ', '');
+    
+    // Verify the JWT token with Supabase
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    
+    if (error || !user) {
+      console.error('[Auth] Token verification failed:', error?.message);
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Unauthorized - Invalid or expired token' 
+      });
+    }
+    
+    // Attach user to request object for use in route handlers
+    req.user = user;
+    next();
+  } catch (error) {
+    console.error('[Auth] Unexpected error during authentication:', error);
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error during authentication' 
+    });
+  }
+}
 
 const DATA_DIR = path.join(process.cwd(), "server", "data");
 const DATA_FILE = path.join(DATA_DIR, "emotions.json");
@@ -115,9 +161,9 @@ async function uploadToWalrus(encryptedData, epochs = DEFAULT_EPOCHS) {
   }
 }
 
-app.post("/api/emotion", async (req, res) => {
+app.post("/api/emotion", requireAuth, async (req, res) => {
   try {
-    console.log(`[API] POST /api/emotion - Request received`);
+    console.log(`[API] POST /api/emotion - Authenticated request from user: ${req.user.id}`);
     const { emotion, intensity, description, encryptedData, isPublic = false, walletAddress = null } = req.body || {};
     
     // Validate inputs
@@ -176,6 +222,7 @@ app.post("/api/emotion", async (req, res) => {
 
     const record = {
       id: randomUUID(),
+      user_id: req.user.id, // Add user_id for access control
       emotion,
       intensity,
       description,
@@ -230,10 +277,21 @@ app.post("/api/emotion", async (req, res) => {
   }
 });
 
-app.get("/api/emotions", async (_req, res) => {
+app.get("/api/emotions", requireAuth, async (req, res) => {
   try {
+    console.log(`[API] GET /api/emotions - Authenticated request from user: ${req.user.id}`);
     const list = await readAll();
-    res.json({ success: true, records: list.sort((a, b) => (a.created_at < b.created_at ? 1 : -1)) });
+    
+    // Filter records to only show the authenticated user's records
+    // For privacy, users should only see their own emotion records
+    const userRecords = list.filter(record => {
+      // If record has a user_id field, check if it matches
+      // Otherwise, for backward compatibility, return all records
+      return !record.user_id || record.user_id === req.user.id;
+    });
+    
+    console.log(`[API] Returning ${userRecords.length} records for user ${req.user.id}`);
+    res.json({ success: true, records: userRecords.sort((a, b) => (a.created_at < b.created_at ? 1 : -1)) });
   } catch (e) {
     res.status(500).json({ success: false, error: e?.message || "Internal error" });
   }
