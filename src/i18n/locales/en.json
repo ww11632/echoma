@@ -22,9 +22,10 @@
   },
   "index": {
     "title": "Echoma",
-    "subtitle": "Your emotions, encrypted and preserved on-chain.",
+    "subtitle": "Your emotions, encrypted and preserved on-chain",
     "subtitleHighlight1": "AI-powered analysis",
     "subtitleHighlight2": "Web3 privacy",
+    "subtitleConnector": "meets",
     "anonymousMode": "Anonymous Mode",
     "anonymousModeDesc": "Record emotions using your wallet. Data encrypted locally with wallet signatures.",
     "startRecording": "Start Recording",

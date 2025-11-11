@@ -58,8 +58,8 @@ const Index = () => {
               <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
                 {t("index.subtitle")}
                 <br />
-                <span className="text-secondary">{t("index.subtitleHighlight1")}</span> meets{" "}
-                <span className="text-primary">{t("index.subtitleHighlight2")}</span>.
+                <span className="text-secondary">{t("index.subtitleHighlight1")}</span> {t("index.subtitleConnector")}{" "}
+                <span className="text-primary">{t("index.subtitleHighlight2")}</span>
               </p>
             </div>
 

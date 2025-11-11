@@ -22,9 +22,10 @@
   },
   "index": {
     "title": "Echoma",
-    "subtitle": "您的情緒，加密並保存在鏈上。",
-    "subtitleHighlight1": "AI 驅動的分析",
+    "subtitle": "您的情緒，加密並保存在鏈上",
+    "subtitleHighlight1": "AI 分析",
     "subtitleHighlight2": "Web3 隱私",
+    "subtitleConnector": "×",
     "anonymousMode": "匿名模式",
     "anonymousModeDesc": "使用您的錢包記錄情緒。資料使用錢包簽名在本地加密。",
     "startRecording": "開始記錄",
