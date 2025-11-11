@@ -470,7 +470,14 @@ const Record = () => {
           <div className="space-y-6">
             {/* Emotion Tag Selection */}
             <div className="space-y-3">
-              <Label className="text-base font-semibold">{t("record.howAreYouFeeling")}</Label>
+              <Label className="text-base font-semibold">
+                {t("record.howAreYouFeelingRequired")}
+              </Label>
+              {!selectedEmotion && (
+                <p className="text-sm text-muted-foreground italic">
+                  {t("record.selectEmotionFirst")}
+                </p>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 {emotionTags.map((emotion) => (
                   <button
@@ -481,6 +488,8 @@ const Record = () => {
                       ${
                         selectedEmotion === emotion.value
                           ? "border-primary bg-primary/10 scale-105"
+                          : !selectedEmotion
+                          ? "border-destructive/50 hover:border-destructive"
                           : "border-border hover:border-primary/50"
                       }
                     `}
@@ -514,8 +523,13 @@ const Record = () => {
             {/* Description */}
             <div className="space-y-3">
               <Label htmlFor="description" className="text-base font-semibold">
-                {t("record.whatHappened")}
+                {t("record.whatHappenedRequired")}
               </Label>
+              {!description.trim() && (
+                <p className="text-sm text-muted-foreground italic">
+                  {t("record.addDescriptionFirst")}
+                </p>
+              )}
               <Textarea
                 id="description"
                 placeholder={t("record.descriptionPlaceholder")}
@@ -528,7 +542,9 @@ const Record = () => {
                   }
                 }}
                 maxLength={5000}
-                className="glass-input min-h-[150px] resize-none"
+                className={`glass-input min-h-[150px] resize-none ${
+                  !description.trim() ? "border-destructive/50 focus:border-destructive" : ""
+                }`}
               />
               <div className="flex justify-between items-center">
                 <p className="text-xs text-muted-foreground">
@@ -623,11 +639,20 @@ const Record = () => {
               </Card>
             )}
 
+            {/* Required Fields Hint */}
+            {(!selectedEmotion || !description.trim()) && (
+              <Card className="p-3 bg-yellow-500/10 border-yellow-500/20">
+                <p className="text-sm text-center text-yellow-600 dark:text-yellow-400">
+                  {t("record.requiredFieldsHint")}
+                </p>
+              </Card>
+            )}
+
             {/* Submit Button */}
             <Button
               onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="w-full h-12 text-base font-semibold gradient-emotion hover:opacity-90 disabled:opacity-50"
+              disabled={isSubmitting || !selectedEmotion || !description.trim()}
+              className="w-full h-12 text-base font-semibold gradient-emotion hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
               size="lg"
             >
               {isSubmitting ? (
