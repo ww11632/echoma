@@ -1,11 +1,47 @@
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Sparkles, Lock, Shield, Database, ArrowRight } from "lucide-react";
+import { Sparkles, Lock, Shield, Database, ArrowRight, LogIn, LogOut } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import WalletConnect from "@/components/WalletConnect";
+import { supabase } from "@/integrations/supabase/client";
+import type { User } from "@supabase/supabase-js";
 
 const Index = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleSignOut = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Signed Out",
+        description: "You have been signed out successfully.",
+      });
+    }
+  };
 
   const features = [
     {
@@ -56,23 +92,56 @@ const Index = () => {
             </div>
 
             <div className="flex flex-wrap gap-4 justify-center pt-4">
-              <Button
-                onClick={() => navigate("/record")}
-                size="lg"
-                className="h-14 px-8 text-lg font-semibold gradient-emotion hover:opacity-90 glow-primary"
-              >
-                <Sparkles className="mr-2 h-5 w-5" />
-                Start Recording
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-              <Button
-                onClick={() => navigate("/timeline")}
-                size="lg"
-                variant="outline"
-                className="h-14 px-8 text-lg glass-card hover:bg-primary/10"
-              >
-                View Timeline
-              </Button>
+              {user ? (
+                <>
+                  <Button
+                    onClick={() => navigate("/record")}
+                    size="lg"
+                    className="h-14 px-8 text-lg font-semibold gradient-emotion hover:opacity-90 glow-primary"
+                  >
+                    <Sparkles className="mr-2 h-5 w-5" />
+                    Start Recording
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                  <Button
+                    onClick={() => navigate("/timeline")}
+                    size="lg"
+                    variant="outline"
+                    className="h-14 px-8 text-lg glass-card hover:bg-primary/10"
+                  >
+                    View Timeline
+                  </Button>
+                  <Button
+                    onClick={handleSignOut}
+                    size="lg"
+                    variant="ghost"
+                    className="h-14 px-8 text-lg"
+                  >
+                    <LogOut className="mr-2 h-5 w-5" />
+                    Sign Out
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    onClick={() => navigate("/auth")}
+                    size="lg"
+                    className="h-14 px-8 text-lg font-semibold gradient-emotion hover:opacity-90 glow-primary"
+                  >
+                    <LogIn className="mr-2 h-5 w-5" />
+                    Sign In to Start
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                  <Button
+                    onClick={() => navigate("/mvp")}
+                    size="lg"
+                    variant="outline"
+                    className="h-14 px-8 text-lg glass-card hover:bg-primary/10"
+                  >
+                    Try MVP (No Login)
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 
