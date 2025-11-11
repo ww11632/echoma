@@ -9,6 +9,7 @@ import { createNetworkConfig } from "@mysten/dapp-kit";
 import Index from "./pages/Index";
 import Record from "./pages/Record";
 import Timeline from "./pages/Timeline";
+import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import MvpRecord from "./pages/MvpRecord";
 import MvpTimeline from "./pages/MvpTimeline";
@@ -32,6 +33,7 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<Auth />} />
               <Route path="/record" element={<Record />} />
               <Route path="/timeline" element={<Timeline />} />
               {/* MVP local-only flow */}
