@@ -8,9 +8,10 @@ import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Sparkles, ArrowLeft, Loader2, Lock, Unlock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useCurrentAccount } from "@mysten/dapp-kit";
+import { useCurrentAccount, useCurrentWallet } from "@mysten/dapp-kit";
+import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
 import { encryptData, generateUserKey } from "@/lib/encryption";
-import { prepareEmotionSnapshot } from "@/lib/walrus";
+import { prepareEmotionSnapshot, uploadToWalrusWithSDK, createSignerFromWallet } from "@/lib/walrus";
 import { validateAndSanitizeDescription, emotionSnapshotSchema } from "@/lib/validation";
 import { supabase } from "@/integrations/supabase/client";
 import { addEmotionRecord } from "@/lib/localIndex";
@@ -26,10 +27,23 @@ const emotionTags = [
   { label: "✨ Peace", value: "peace", color: "from-green-400 to-teal-400" },
 ];
 
+const isBackendUnavailable = (error: unknown) => {
+  if (!(error instanceof Error)) return false;
+  const message = error.message || "";
+  return (
+    message.includes("Failed to fetch") ||
+    message.includes("ERR_CONNECTION_REFUSED") ||
+    message.includes("Network error") ||
+    message.includes("fetch") ||
+    message.includes("connection refused")
+  );
+};
+
 const Record = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const currentAccount = useCurrentAccount();
+  const { currentWallet } = useCurrentWallet();
   const [selectedEmotion, setSelectedEmotion] = useState<string>("");
   const [intensity, setIntensity] = useState([50]);
   const [description, setDescription] = useState("");
@@ -37,6 +51,33 @@ const Record = () => {
   const [saveLocally, setSaveLocally] = useState(true); // 默认保存到本地
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<"idle" | "encrypting" | "uploading" | "saving" | "success" | "error">("idle");
+
+  const saveToLocalIndex = async (
+    sanitizedDescription: string,
+    emotionValue: string,
+    isPublicValue: boolean
+  ) => {
+    const mvpEmotion =
+      emotionValue === "joy"
+        ? "joy"
+        : emotionValue === "sadness"
+        ? "sadness"
+        : emotionValue === "anger"
+        ? "anger"
+        : "joy";
+
+    const localRecord: EmotionRecord = {
+      id: crypto.randomUUID(),
+      timestamp: new Date().toISOString(),
+      emotion: mvpEmotion as "joy" | "sadness" | "anger",
+      note: sanitizedDescription,
+      proof: null,
+      version: "1.0.0",
+      isPublic: isPublicValue,
+    };
+
+    await addEmotionRecord(localRecord);
+  };
 
   const handleSubmit = async () => {
     if (!selectedEmotion || !description.trim()) {
@@ -69,6 +110,22 @@ const Record = () => {
 
       // 無錢包：匿名上傳 Walrus（使用隨機金鑰加密）
       if (!currentAccount) {
+        // 如果用戶選擇保存到本地，直接保存，不上傳
+        if (saveLocally) {
+          console.log("[Record] Anonymous user chose to save locally only, skipping Walrus upload");
+          setUploadStatus("saving");
+          await saveToLocalIndex(sanitizedDescription, selectedEmotion, isPublic);
+          setUploadStatus("success");
+          
+          toast({
+            title: "情緒已記錄（本地儲存）",
+            description: "資料已保存到本地瀏覽器。",
+            variant: "default",
+          });
+          setTimeout(() => navigate("/timeline"), 1200);
+          return;
+        }
+        
         // 建立匿名 payload（不含錢包位址）
         const anonPayload = {
           emotion: selectedEmotion,
@@ -111,40 +168,21 @@ const Record = () => {
           setTimeout(() => navigate("/timeline"), 1200);
           return;
         } catch (apiError) {
-          // API 失敗，但如果 saveLocally 開啟，嘗試保存到本地
-          if (saveLocally) {
+          // Only fallback to local if backend is unavailable (not if user explicitly chose not to save locally)
+          if (isBackendUnavailable(apiError)) {
             console.log("[Client] API failed, saving to local storage as fallback");
             setUploadStatus("saving");
-            
-            // 保存到客戶端本地存儲（使用简单的 MVP 格式）
-            // 映射 emotion 到 MVP 格式（只支持 joy, sadness, anger）
-            const mvpEmotion = 
-              selectedEmotion === "joy" ? "joy" :
-              selectedEmotion === "sadness" ? "sadness" :
-              selectedEmotion === "anger" ? "anger" : "joy"; // 默认为 joy
-            
-            const localRecord = {
-              id: crypto.randomUUID(),
-              timestamp: new Date().toISOString(),
-              emotion: mvpEmotion as "joy" | "sadness" | "anger",
-              note: sanitizedDescription,
-              proof: null,
-              version: "1.0.0" as const,
-              isPublic: isPublic, // 保存公開分享狀態
-            };
-            
-            await addEmotionRecord(localRecord);
+            await saveToLocalIndex(sanitizedDescription, selectedEmotion, isPublic);
             setUploadStatus("success");
             
             toast({
               title: "情緒已記錄（本地儲存）",
-              description: "無法連接到伺服器，資料已保存到本地瀏覽器。",
+              description: "後端未連線，資料已暫存於本地瀏覽器。",
               variant: "default",
             });
             setTimeout(() => navigate("/timeline"), 1200);
             return;
           }
-          // 如果 saveLocally 關閉，重新拋出錯誤
           throw apiError;
         }
       }
@@ -167,12 +205,94 @@ const Record = () => {
       const encryptedData = await encryptData(JSON.stringify(snapshot), userKey);
       const encryptedString = JSON.stringify(encryptedData);
 
-      // Step 5: Upload to backend API
+      // Step 5: Check if user wants to save locally only
+      if (saveLocally) {
+        // User chose to save locally only - skip Walrus upload
+        console.log("[Record] User chose to save locally only, skipping Walrus upload");
+        setUploadStatus("saving");
+        await saveToLocalIndex(sanitizedDescription, selectedEmotion, isPublic);
+        setUploadStatus("success");
+        
+        toast({
+          title: "情緒已記錄（本地儲存）",
+          description: "資料已保存到本地瀏覽器。",
+          variant: "default",
+        });
+        setTimeout(() => navigate("/timeline"), 1200);
+        return;
+      }
+
+      // Step 6: Upload to Walrus (only if saveLocally is false)
       setUploadStatus("uploading");
       toast({
         title: "上傳中...",
         description: "正在加密並儲存您的情緒快照",
       });
+
+      // Try SDK method first if wallet is connected (this will trigger transaction popup)
+      if (currentWallet && currentAccount) {
+        try {
+          console.log("[Record] Attempting SDK upload with wallet - THIS WILL TRIGGER TRANSACTION POPUP");
+          
+          const suiClient = new SuiClient({
+            url: getFullnodeUrl("testnet"),
+          });
+          
+          const signer = createSignerFromWallet(currentWallet, currentAccount.address, suiClient);
+          const sdkResult = await uploadToWalrusWithSDK(encryptedString, signer, 5);
+          
+          console.log("[Record] ✅ SDK upload successful:", sdkResult);
+          
+          setUploadStatus("success");
+          toast({
+            title: "情緒已記錄！✨",
+            description: `已使用 SDK 儲存至 Walrus: ${sdkResult.blobId.slice(0, 8)}...`,
+          });
+          
+          // Try to save metadata to backend (optional)
+          try {
+            await postEmotion({
+              emotion: selectedEmotion,
+              intensity: intensityValue,
+              description: sanitizedDescription,
+              encryptedData: encryptedString,
+              isPublic,
+              walletAddress: currentAccount.address,
+            });
+          } catch (metadataError) {
+            console.warn("[Record] Metadata save failed (not critical):", metadataError);
+          }
+          
+          setTimeout(() => navigate("/timeline"), 1200);
+          return;
+        } catch (sdkError: any) {
+          console.warn("[Record] SDK upload failed, falling back to HTTP API:", sdkError);
+          
+          // Show specific error message for SDK failures
+          if (sdkError.message.includes("餘額不足")) {
+            toast({
+              title: "餘額不足",
+              description: "請確保你有足夠的 SUI 和 WAL 測試網代幣。",
+              variant: "destructive",
+            });
+          } else if (sdkError.message.includes("簽名失敗")) {
+            toast({
+              title: "簽名失敗",
+              description: "錢包簽名失敗，請重試。",
+              variant: "destructive",
+            });
+          } else if (sdkError.message.includes("交易已取消")) {
+            toast({
+              title: "交易已取消",
+              description: "您已取消交易。",
+              variant: "default",
+            });
+            setIsSubmitting(false);
+            return;
+          }
+          // Continue to HTTP API fallback below
+        }
+      }
 
       // Get current session
       const { data: { session } } = await supabase.auth.getSession();
@@ -205,29 +325,11 @@ const Record = () => {
           setTimeout(() => navigate("/timeline"), 1200);
           return;
         } catch (apiError) {
-          // API 失敗，但如果 saveLocally 開啟，嘗試保存到本地
-          if (saveLocally) {
+          const canFallback = saveLocally || isBackendUnavailable(apiError);
+          if (canFallback) {
             console.log("[Client] API failed, saving to local storage as fallback");
             setUploadStatus("saving");
-            
-            // 保存到客戶端本地存儲（使用简单的 MVP 格式）
-            // 映射 emotion 到 MVP 格式（只支持 joy, sadness, anger）
-            const mvpEmotion = 
-              selectedEmotion === "joy" ? "joy" :
-              selectedEmotion === "sadness" ? "sadness" :
-              selectedEmotion === "anger" ? "anger" : "joy"; // 默认为 joy
-            
-            const localRecord = {
-              id: crypto.randomUUID(),
-              timestamp: new Date().toISOString(),
-              emotion: mvpEmotion as "joy" | "sadness" | "anger",
-              note: sanitizedDescription,
-              proof: null,
-              version: "1.0.0" as const,
-              isPublic: isPublic, // 保存公開分享狀態
-            };
-            
-            await addEmotionRecord(localRecord);
+            await saveToLocalIndex(sanitizedDescription, selectedEmotion, isPublic);
             setUploadStatus("success");
             
             toast({
@@ -238,7 +340,6 @@ const Record = () => {
             setTimeout(() => navigate("/timeline"), 1200);
             return;
           }
-          // 如果 saveLocally 關閉，重新拋出錯誤
           throw apiError;
         }
       }
@@ -474,7 +575,7 @@ const Record = () => {
                     </Label>
                     <p className="text-xs text-muted-foreground">
                       {saveLocally 
-                        ? "✅ 資料將保存到本地伺服器（即使 Walrus 上傳失敗）" 
+                        ? "✅ 僅保存到本地瀏覽器，不上傳到 Walrus" 
                         : "⚠️ 僅嘗試上傳到 Walrus，失敗時不會保存"}
                     </p>
                   </div>
@@ -542,7 +643,7 @@ const Record = () => {
             <Card className="p-4 bg-secondary/10 border-secondary/20">
               <p className="text-xs text-center text-muted-foreground">
                 {saveLocally ? (
-                  "💾 您的情緒快照將被加密並保存到本地伺服器（會嘗試上傳到 Walrus，失敗時仍會保存到本地）"
+                  "💾 您的情緒快照將被加密並僅保存到本地瀏覽器，不會上傳到 Walrus"
                 ) : (
                   "💡 您的情緒快照將被加密並儲存在 Walrus 上，同時在 Sui 上鑄造 NFT 作為證明"
                 )}

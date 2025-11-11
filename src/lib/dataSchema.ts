@@ -1,4 +1,4 @@
-export type EmotionType = "joy" | "sadness" | "anger";
+export type EmotionType = "joy" | "sadness" | "anger" | "anxiety" | "confusion" | "peace";
 
 export interface EmotionRecord {
   id: string; // uuid
@@ -14,6 +14,9 @@ export const EMOTION_OPTIONS: { label: string; value: EmotionType }[] = [
   { label: "😊 Joy", value: "joy" },
   { label: "😢 Sadness", value: "sadness" },
   { label: "😠 Anger", value: "anger" },
+  { label: "😰 Anxiety", value: "anxiety" },
+  { label: "🤔 Confusion", value: "confusion" },
+  { label: "✨ Peace", value: "peace" },
 ];
 
 

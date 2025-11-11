@@ -12,12 +12,38 @@ Echoma 是一個基於 Web3 的情感記錄應用，結合了客戶端加密、�
 - 🤖 **AI 輔助分析** - 智能情感分析和分類
 - 📊 **時間線視圖** - 可視化你的情感歷程
 
+## 📱 iOS App 支持
+
+Echoma 現在支持打包成 iOS 原生應用！使用 **Capacitor** 框架，可以將 Web 應用轉換為 iOS app。
+
+### 快速開始 iOS 開發
+
+1. **升級 Node.js**（需要 >= 20.0.0）：
+   ```bash
+   nvm install 20
+   nvm use 20
+   ```
+
+2. **構建並添加 iOS 平台**：
+   ```bash
+   npm run build
+   npm run cap:add:ios
+   ```
+
+3. **在 Xcode 中打開**：
+   ```bash
+   npm run cap:open:ios
+   ```
+
+詳細說明請查看 [iOS 開發指南](./IOS_開發指南.md)
+
 ## 🚀 快速開始
 
 ### 前置要求
 
 - Node.js 18+ 和 npm（推薦使用 [nvm](https://github.com/nvm-sh/nvm#installing-and-updating) 安裝）
 - Sui 錢包（如 Sui Wallet 或 Ethos Wallet）
+- iOS 開發需要：Node.js 20+、Xcode 14+、CocoaPods
 
 ### 安裝步驟
 
@@ -43,6 +69,22 @@ npm run build
 
 # 預覽生產構建
 npm run preview
+```
+
+### iOS 開發命令
+
+```sh
+# 添加 iOS 平台（首次）
+npm run cap:add:ios
+
+# 同步 Web 構建到 iOS 項目
+npm run cap:sync
+
+# 打開 Xcode 項目
+npm run cap:open:ios
+
+# 一鍵構建、同步並打開 Xcode
+npm run cap:build:ios
 ```
 
 ## 🛠️ 技術棧
@@ -115,6 +157,21 @@ src/
 - Walrus Aggregator: `https://aggregator.testnet.walrus.space`
 
 可在 `src/App.tsx` 中修改網路配置。
+
+## 💧 獲取測試代幣
+
+使用 Walrus 上傳需要 **SUI** 和 **WAL** 測試代幣：
+
+### SUI 代幣
+- **官方水龍頭**：https://faucet.sui.io/ （推薦）
+- **社群水龍頭**：https://faucet.blockbolt.io/
+- **Sui Discord**：在 `#testnet-faucet` 頻道使用 `!faucet <地址>`
+
+### WAL 代幣
+- **Walrus CLI**：`walrus get-wal`（使用 SUI 以 1:1 比例兌換）
+- **Stakely 水龍頭**：https://stakely.io/faucet/walrus-testnet-wal
+
+詳細說明請查看 [Faucet_獲取測試代幣.md](./Faucet_獲取測試代幣.md)
 
 ## 📝 使用說明
 
