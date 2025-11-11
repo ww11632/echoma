@@ -53,6 +53,27 @@ export interface EmotionSnapshot {
   version: string;
 }
 
+type WalrusOwner =
+  | { $kind: "AddressOwner"; AddressOwner: string }
+  | { $kind: "ObjectOwner"; ObjectOwner: string }
+  | { $kind: "Shared"; Shared: { initialSharedVersion: string } }
+  | { $kind: "Immutable"; Immutable: true }
+  | { $kind: "ConsensusAddressOwner"; ConsensusAddressOwner: { owner: string; startVersion: string } }
+  | { $kind: "Unknown"; Unknown?: true };
+
+interface WalrusChangedObject {
+  id: string;
+  inputState: "Unknown" | "DoesNotExist" | "Exists";
+  inputVersion: string | null;
+  inputDigest: string | null;
+  inputOwner: WalrusOwner | null;
+  outputState: "Unknown" | "DoesNotExist" | "ObjectWrite" | "PackageWrite";
+  outputVersion: string | null;
+  outputDigest: string | null;
+  outputOwner: WalrusOwner | null;
+  idOperation: "Unknown" | "None" | "Created" | "Deleted";
+}
+
 /**
  * Upload encrypted data to Walrus storage
  */
@@ -353,6 +374,7 @@ export function createSignerFromWallet(
         options: {
           showEffects: true,
           showEvents: true,
+          showObjectChanges: true,
         },
       });
       
@@ -379,12 +401,24 @@ export function createSignerFromWallet(
           mutated: Array.isArray(response.effects.mutated) ? response.effects.mutated : [],
           deleted: Array.isArray(response.effects.deleted) ? response.effects.deleted : [],
         };
+
+        // Populate changedObjects so Walrus SDK can inspect created IDs
+        result.effects.changedObjects = buildChangedObjects(response);
+        if (!Array.isArray(result.effects.unchangedConsensusObjects)) {
+          result.effects.unchangedConsensusObjects = [];
+        }
+        if (typeof result.effects.gasObject === "undefined") {
+          result.effects.gasObject = null;
+        }
       } else {
         // If effects is missing, provide empty structure
         result.effects = {
           created: [],
           mutated: [],
           deleted: [],
+          changedObjects: [],
+          unchangedConsensusObjects: [],
+          gasObject: null,
         };
       }
       
@@ -418,7 +452,276 @@ export function createSignerFromWallet(
   return signerAdapter;
 }
 
-/**
+function toNullableString(value: unknown): string | null {
+  if (value === null || typeof value === "undefined") {
+    return null;
+  }
+  return typeof value === "string" ? value : String(value);
+}
+
+function normalizeWalrusOwner(owner: any): WalrusOwner | null {
+  if (!owner) {
+    return null;
+  }
+
+  if (owner.$kind) {
+    return owner as WalrusOwner;
+  }
+
+  if (typeof owner === "string") {
+    if (owner === "Immutable") {
+      return { $kind: "Immutable", Immutable: true };
+    }
+    return { $kind: "Unknown" };
+  }
+
+  const normalized = Object.entries(owner).reduce<Record<string, any>>((acc, [key, value]) => {
+    acc[key.toLowerCase()] = value;
+    return acc;
+  }, {});
+
+  if ("addressowner" in normalized) {
+    return { $kind: "AddressOwner", AddressOwner: String(normalized["addressowner"]) };
+  }
+
+  if ("objectowner" in normalized) {
+    return { $kind: "ObjectOwner", ObjectOwner: String(normalized["objectowner"]) };
+  }
+
+  if ("shared" in normalized) {
+    const sharedValue = normalized["shared"] || {};
+    const initial =
+      sharedValue.initial_shared_version ??
+      sharedValue.initialSharedVersion ??
+      sharedValue.initialversion ??
+      sharedValue.initialVersion ??
+      "0";
+    return {
+      $kind: "Shared",
+      Shared: {
+        initialSharedVersion: String(initial),
+      },
+    };
+  }
+
+  if ("immutable" in normalized) {
+    return { $kind: "Immutable", Immutable: true };
+  }
+
+  if ("consensusaddressowner" in normalized) {
+    const consensus = normalized["consensusaddressowner"] || {};
+    return {
+      $kind: "ConsensusAddressOwner",
+      ConsensusAddressOwner: {
+        owner: String(consensus.owner ?? ""),
+        startVersion: String(consensus.startVersion ?? consensus.start_version ?? "0"),
+      },
+    };
+  }
+
+  return { $kind: "Unknown" };
+}
+
+function buildChangedObjectsFromObjectChanges(response: any): WalrusChangedObject[] {
+  const objectChanges = Array.isArray(response?.objectChanges) ? response.objectChanges : [];
+  const changedObjects: WalrusChangedObject[] = [];
+
+  for (const change of objectChanges) {
+    if (!change || typeof change !== "object") {
+      continue;
+    }
+
+    switch (change.type) {
+      case "created":
+        changedObjects.push({
+          id: change.objectId,
+          inputState: "DoesNotExist",
+          inputVersion: null,
+          inputDigest: null,
+          inputOwner: null,
+          outputState: "ObjectWrite",
+          outputVersion: toNullableString(change.version),
+          outputDigest: change.digest ?? null,
+          outputOwner: normalizeWalrusOwner(change.owner),
+          idOperation: "Created",
+        });
+        break;
+      case "mutated":
+        changedObjects.push({
+          id: change.objectId,
+          inputState: "Exists",
+          inputVersion: toNullableString(change.previousVersion ?? change.version),
+          inputDigest: change.digest ?? null,
+          inputOwner: normalizeWalrusOwner(change.owner),
+          outputState: "ObjectWrite",
+          outputVersion: toNullableString(change.version),
+          outputDigest: change.digest ?? null,
+          outputOwner: normalizeWalrusOwner(change.owner),
+          idOperation: "None",
+        });
+        break;
+      case "transferred":
+        changedObjects.push({
+          id: change.objectId,
+          inputState: "Exists",
+          inputVersion: toNullableString(change.version),
+          inputDigest: change.digest ?? null,
+          inputOwner: {
+            $kind: "AddressOwner",
+            AddressOwner: String(change.sender ?? ""),
+          },
+          outputState: "ObjectWrite",
+          outputVersion: toNullableString(change.version),
+          outputDigest: change.digest ?? null,
+          outputOwner: normalizeWalrusOwner(change.recipient),
+          idOperation: "None",
+        });
+        break;
+      case "deleted":
+        changedObjects.push({
+          id: change.objectId,
+          inputState: "Exists",
+          inputVersion: toNullableString(change.version),
+          inputDigest: null,
+          inputOwner: null,
+          outputState: "DoesNotExist",
+          outputVersion: null,
+          outputDigest: null,
+          outputOwner: null,
+          idOperation: "Deleted",
+        });
+        break;
+      case "wrapped":
+        changedObjects.push({
+          id: change.objectId,
+          inputState: "Exists",
+          inputVersion: toNullableString(change.version),
+          inputDigest: null,
+          inputOwner: {
+            $kind: "AddressOwner",
+            AddressOwner: String(change.sender ?? ""),
+          },
+          outputState: "ObjectWrite",
+          outputVersion: toNullableString(change.version),
+          outputDigest: null,
+          outputOwner: {
+            $kind: "ObjectOwner",
+            ObjectOwner: String(change.sender ?? ""),
+          },
+          idOperation: "None",
+        });
+        break;
+      case "published":
+        changedObjects.push({
+          id: change.packageId,
+          inputState: "DoesNotExist",
+          inputVersion: null,
+          inputDigest: null,
+          inputOwner: null,
+          outputState: "PackageWrite",
+          outputVersion: toNullableString(change.version),
+          outputDigest: change.digest ?? null,
+          outputOwner: null,
+          idOperation: "Created",
+        });
+        break;
+      default:
+        break;
+    }
+  }
+
+  return changedObjects;
+}
+
+function buildChangedObjectsFromEffects(effects: any): WalrusChangedObject[] {
+  const changedObjects: WalrusChangedObject[] = [];
+  if (!effects || typeof effects !== "object") {
+    return changedObjects;
+  }
+
+  const addEntry = (entry: any, overrides: Partial<WalrusChangedObject>) => {
+    if (!entry) return;
+    const objectId = entry.reference?.objectId ?? entry.objectId;
+    if (!objectId) return;
+
+    changedObjects.push({
+      id: objectId,
+      inputState: "Unknown",
+      inputVersion: null,
+      inputDigest: null,
+      inputOwner: null,
+      outputState: "Unknown",
+      outputVersion: null,
+      outputDigest: null,
+      outputOwner: null,
+      idOperation: "Unknown",
+      ...overrides,
+    });
+  };
+
+  const created = Array.isArray(effects.created) ? effects.created : [];
+  for (const entry of created) {
+    addEntry(entry, {
+      inputState: "DoesNotExist",
+      outputState: "ObjectWrite",
+      outputVersion: toNullableString(entry.reference?.version ?? entry.version),
+      outputDigest: entry.reference?.digest ?? entry.digest ?? null,
+      outputOwner: normalizeWalrusOwner(entry.owner),
+      idOperation: "Created",
+    });
+  }
+
+  const mutated = Array.isArray(effects.mutated) ? effects.mutated : [];
+  for (const entry of mutated) {
+    const version = toNullableString(entry.reference?.version ?? entry.version);
+    addEntry(entry, {
+      inputState: "Exists",
+      inputVersion: version,
+      inputOwner: normalizeWalrusOwner(entry.owner),
+      outputState: "ObjectWrite",
+      outputVersion: version,
+      outputDigest: entry.reference?.digest ?? entry.digest ?? null,
+      outputOwner: normalizeWalrusOwner(entry.owner),
+      idOperation: "None",
+    });
+  }
+
+  const deleted = Array.isArray(effects.deleted) ? effects.deleted : [];
+  for (const entry of deleted) {
+    addEntry(entry, {
+      inputState: "Exists",
+      inputVersion: toNullableString(entry.version ?? entry.reference?.version),
+      outputState: "DoesNotExist",
+      idOperation: "Deleted",
+    });
+  }
+
+  const wrapped = Array.isArray(effects.wrapped) ? effects.wrapped : [];
+  for (const entry of wrapped) {
+    addEntry(entry, {
+      inputState: "Exists",
+      inputVersion: toNullableString(entry.version ?? entry.reference?.version),
+      inputOwner: normalizeWalrusOwner(entry.owner),
+      outputState: "ObjectWrite",
+      outputVersion: toNullableString(entry.version ?? entry.reference?.version),
+      outputDigest: entry.reference?.digest ?? entry.digest ?? null,
+      outputOwner: normalizeWalrusOwner(entry.owner),
+      idOperation: "None",
+    });
+  }
+
+  return changedObjects;
+}
+
+function buildChangedObjects(response: any): WalrusChangedObject[] {
+  const fromObjectChanges = buildChangedObjectsFromObjectChanges(response);
+  if (fromObjectChanges.length > 0) {
+    return fromObjectChanges;
+  }
+  return buildChangedObjectsFromEffects(response?.effects);
+}
+
+/** 
  * Upload to Walrus using SDK (will trigger wallet transaction popup)
  */
 export async function uploadToWalrusWithSDK(
