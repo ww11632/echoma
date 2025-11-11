@@ -146,7 +146,26 @@
     "verified": "✓ 已驗證",
     "pending": "⏳ 等待中",
     "failed": "❌ 失敗",
-    "onChain": "🔗 已上鏈"
+    "onChain": "🔗 已上鏈",
+    "filter": {
+      "all": "全部",
+      "local": "本地儲存",
+      "walrus": "Walrus 上傳"
+    },
+    "stats": {
+      "total": "總記錄數",
+      "local": "本地記錄",
+      "walrus": "Walrus 記錄",
+      "emotions": "情緒分布",
+      "averageIntensity": "平均強度",
+      "thisWeek": "本週記錄",
+      "thisMonth": "本月記錄"
+    },
+    "chart": {
+      "emotionDistribution": "情緒分布",
+      "storageDistribution": "儲存方式分布",
+      "timelineChart": "時間趨勢"
+    }
   },
   "auth": {
     "title": "安全模式",

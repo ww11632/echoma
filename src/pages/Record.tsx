@@ -446,14 +446,14 @@ const Record = () => {
     <div className="min-h-screen p-6">
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center justify-between mb-6">
-          <Button
-            variant="ghost"
-            onClick={() => navigate("/")}
+        <Button
+          variant="ghost"
+          onClick={() => navigate("/")}
             className="text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
             {t("common.back")}
-          </Button>
+        </Button>
           <LanguageSwitcher />
         </div>
 
@@ -627,10 +627,10 @@ const Record = () => {
                   </div>
                   <p className="text-xs text-left opacity-80 whitespace-normal break-words">
                     {t("record.storage.walrusOnly")}
-                  </p>
+                    </p>
                 </Button>
-              </div>
-            </div>
+                  </div>
+                </div>
 
             {/* Wallet Connect Section */}
             {!saveLocally && (

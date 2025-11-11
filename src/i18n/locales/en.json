@@ -146,7 +146,26 @@
     "verified": "✓ Verified",
     "pending": "⏳ Pending",
     "failed": "❌ Failed",
-    "onChain": "🔗 On-chain"
+    "onChain": "🔗 On-chain",
+    "filter": {
+      "all": "All",
+      "local": "Local Storage",
+      "walrus": "Walrus Upload"
+    },
+    "stats": {
+      "total": "Total Records",
+      "local": "Local Records",
+      "walrus": "Walrus Records",
+      "emotions": "Emotion Distribution",
+      "averageIntensity": "Average Intensity",
+      "thisWeek": "This Week",
+      "thisMonth": "This Month"
+    },
+    "chart": {
+      "emotionDistribution": "Emotion Distribution",
+      "storageDistribution": "Storage Distribution",
+      "timelineChart": "Timeline Trend"
+    }
   },
   "auth": {
     "title": "Secure Mode",
