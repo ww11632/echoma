@@ -1,35 +1,43 @@
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Sparkles, Lock, Shield, Database, Unlock } from "lucide-react";
 import WalletConnect from "@/components/WalletConnect";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 const Index = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const features = [
     {
       icon: Lock,
-      title: "Client-Side Encryption",
-      description: "Your emotions are encrypted before leaving your device",
+      title: t("index.feature1Title"),
+      description: t("index.feature1Desc"),
       color: "text-primary",
     },
     {
       icon: Database,
-      title: "Walrus Storage",
-      description: "Decentralized, verifiable storage for your encrypted data",
+      title: t("index.feature2Title"),
+      description: t("index.feature2Desc"),
       color: "text-secondary",
     },
     {
       icon: Shield,
-      title: "Sui Blockchain",
-      description: "NFT-based proof with on-chain verification",
+      title: t("index.feature3Title"),
+      description: t("index.feature3Desc"),
       color: "text-accent",
     },
   ];
 
   return (
     <div className="min-h-screen">
+      {/* Language Switcher */}
+      <div className="absolute top-4 right-4 z-20">
+        <LanguageSwitcher />
+      </div>
+      
       {/* Hero Section */}
       <div className="relative overflow-hidden">
         {/* Animated background orbs */}
@@ -45,13 +53,13 @@ const Index = () => {
 
             <div className="space-y-4">
               <h1 className="text-6xl font-bold tracking-tight">
-                Echoma
+                {t("index.title")}
               </h1>
               <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-                Your emotions, encrypted and preserved on-chain.
+                {t("index.subtitle")}
                 <br />
-                <span className="text-secondary">AI-powered analysis</span> meets{" "}
-                <span className="text-primary">Web3 privacy</span>.
+                <span className="text-secondary">{t("index.subtitleHighlight1")}</span> meets{" "}
+                <span className="text-primary">{t("index.subtitleHighlight2")}</span>.
               </p>
             </div>
 
@@ -62,9 +70,9 @@ const Index = () => {
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-secondary/30">
                   <Unlock className="w-6 h-6 text-secondary" />
                 </div>
-                <h3 className="text-xl font-semibold">Anonymous Mode</h3>
+                <h3 className="text-xl font-semibold">{t("index.anonymousMode")}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Record emotions using your wallet. Data encrypted locally with wallet signatures.
+                  {t("index.anonymousModeDesc")}
                 </p>
                 <div className="space-y-2">
                   <Button
@@ -72,14 +80,14 @@ const Index = () => {
                     className="w-full gradient-emotion hover:opacity-90 glow-primary"
                   >
                     <Sparkles className="mr-2 h-4 w-4" />
-                    Start Recording
+                    {t("index.startRecording")}
                   </Button>
                   <Button
                     onClick={() => navigate("/timeline")}
                     variant="outline"
                     className="w-full glass-card hover:bg-primary/10"
                   >
-                    View Timeline
+                    {t("index.viewTimeline")}
                   </Button>
                 </div>
               </Card>
@@ -89,9 +97,9 @@ const Index = () => {
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/30">
                   <Lock className="w-6 h-6 text-primary" />
                 </div>
-                <h3 className="text-xl font-semibold">Secure Mode</h3>
+                <h3 className="text-xl font-semibold">{t("index.secureMode")}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Sign in for cloud backup and enhanced security. Access from any device.
+                  {t("index.secureModeDesc")}
                 </p>
                 <div className="space-y-2">
                   <Button
@@ -99,14 +107,14 @@ const Index = () => {
                     className="w-full gradient-cool hover:opacity-90 glow-secondary"
                   >
                     <Lock className="mr-2 h-4 w-4" />
-                    Sign In / Sign Up
+                    {t("index.signInSignUp")}
                   </Button>
                   <Button
                     onClick={() => navigate("/auth-timeline")}
                     variant="outline"
                     className="w-full glass-card hover:bg-secondary/10"
                   >
-                    View Secure Timeline
+                    {t("index.viewSecureTimeline")}
                   </Button>
                 </div>
               </Card>
@@ -142,13 +150,13 @@ const Index = () => {
 
           {/* How It Works */}
           <Card className="mt-16 glass-card p-8 space-y-6">
-            <h2 className="text-2xl font-bold text-center">How It Works</h2>
+            <h2 className="text-2xl font-bold text-center">{t("index.howItWorks")}</h2>
             <div className="grid md:grid-cols-4 gap-6">
               {[
-                { num: "1", text: "Record your emotion with AI-assisted analysis" },
-                { num: "2", text: "Client-side encryption protects your privacy" },
-                { num: "3", text: "Upload encrypted data to Walrus storage" },
-                { num: "4", text: "Mint verification NFT on Sui blockchain" },
+                { num: "1", text: t("index.step1") },
+                { num: "2", text: t("index.step2") },
+                { num: "3", text: t("index.step3") },
+                { num: "4", text: t("index.step4") },
               ].map((step, i) => (
                 <div key={i} className="text-center space-y-3">
                   <div className="inline-flex items-center justify-center w-10 h-10 rounded-full gradient-cool text-white font-bold">
@@ -162,9 +170,9 @@ const Index = () => {
 
           {/* Tech Stack Badge */}
           <div className="mt-12 text-center space-y-4">
-            <p className="text-sm text-muted-foreground">Built for Haulout Hackathon</p>
+            <p className="text-sm text-muted-foreground">{t("index.builtFor")}</p>
             <div className="flex flex-wrap gap-3 justify-center">
-              {["Sui", "Walrus", "React", "AI Analysis"].map((tech) => (
+              {(t("index.techStack", { returnObjects: true }) as string[]).map((tech) => (
                 <span
                   key={tech}
                   className="px-4 py-2 rounded-full glass-card text-sm font-medium"

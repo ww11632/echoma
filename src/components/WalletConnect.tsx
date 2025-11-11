@@ -3,15 +3,17 @@ import { Card } from "@/components/ui/card";
 import { Wallet, CheckCircle, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ConnectButton, useCurrentAccount } from "@mysten/dapp-kit";
+import { useTranslation } from "react-i18next";
 
 const WalletConnect = () => {
   const { toast } = useToast();
   const currentAccount = useCurrentAccount();
+  const { t } = useTranslation();
 
   const handleDisconnect = () => {
     toast({
-      title: "Wallet Disconnected",
-      description: "Come back anytime to continue your journey.",
+      title: t("wallet.disconnected"),
+      description: t("wallet.disconnectedDesc"),
     });
   };
 
@@ -24,14 +26,14 @@ const WalletConnect = () => {
             <CheckCircle className="w-5 h-5 text-secondary" />
           </div>
           <div>
-            <p className="text-sm font-medium">Connected</p>
+            <p className="text-sm font-medium">{t("wallet.connected")}</p>
             <p className="text-xs text-muted-foreground font-mono">
               {address.slice(0, 6)}...{address.slice(-4)}
             </p>
           </div>
         </div>
         <ConnectButton 
-          connectText="Disconnect"
+          connectText={t("common.disconnect")}
           className="text-muted-foreground hover:text-foreground"
         />
       </Card>
@@ -45,9 +47,9 @@ const WalletConnect = () => {
           <Wallet className="w-6 h-6 text-white" />
         </div>
         <div className="flex-1 space-y-2">
-          <h3 className="font-semibold">Connect Sui Wallet</h3>
+          <h3 className="font-semibold">{t("wallet.connectTitle")}</h3>
           <p className="text-sm text-muted-foreground">
-            Connect your wallet to start recording emotions and minting NFTs on Sui blockchain.
+            {t("wallet.connectDesc")}
           </p>
         </div>
       </div>
@@ -56,21 +58,21 @@ const WalletConnect = () => {
         connectText={
           <>
             <Wallet className="mr-2 h-4 w-4" />
-            Connect Wallet
+            {t("wallet.connectButton")}
           </>
         }
         className="w-full gradient-emotion hover:opacity-90 h-11 text-base font-semibold"
       />
 
       <div className="text-xs text-muted-foreground text-center space-y-1">
-        <p>Supports Sui Wallet, Suiet, Ethos & more</p>
+        <p>{t("wallet.supports")}</p>
         <a
           href="https://docs.sui.io/guides/developer/getting-started/sui-install"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1 text-secondary hover:underline"
         >
-          Learn how to set up <ExternalLink className="w-3 h-3" />
+          {t("wallet.learnMore")} <ExternalLink className="w-3 h-3" />
         </a>
       </div>
     </Card>

@@ -1,0 +1,194 @@
+{
+  "common": {
+    "back": "返回",
+    "backToHome": "返回首頁",
+    "home": "首頁",
+    "loading": "載入中...",
+    "processing": "處理中...",
+    "submit": "提交",
+    "cancel": "取消",
+    "confirm": "確認",
+    "save": "儲存",
+    "delete": "刪除",
+    "edit": "編輯",
+    "close": "關閉",
+    "connect": "連接",
+    "disconnect": "斷開連接",
+    "connected": "已連接",
+    "disconnected": "已斷開"
+  },
+  "nav": {
+    "language": "語言"
+  },
+  "index": {
+    "title": "Echoma",
+    "subtitle": "您的情緒，加密並保存在鏈上。",
+    "subtitleHighlight1": "AI 驅動的分析",
+    "subtitleHighlight2": "Web3 隱私",
+    "anonymousMode": "匿名模式",
+    "anonymousModeDesc": "使用您的錢包記錄情緒。資料使用錢包簽名在本地加密。",
+    "startRecording": "開始記錄",
+    "viewTimeline": "查看時間軸",
+    "secureMode": "安全模式",
+    "secureModeDesc": "登入以獲得雲端備份和增強安全性。從任何設備訪問。",
+    "signInSignUp": "登入 / 註冊",
+    "viewSecureTimeline": "查看安全時間軸",
+    "feature1Title": "客戶端加密",
+    "feature1Desc": "您的情緒在離開設備前會被加密",
+    "feature2Title": "Walrus 儲存",
+    "feature2Desc": "去中心化、可驗證的加密資料儲存",
+    "feature3Title": "Sui 區塊鏈",
+    "feature3Desc": "基於 NFT 的證明，具有鏈上驗證",
+    "howItWorks": "運作方式",
+    "step1": "使用 AI 輔助分析記錄您的情緒",
+    "step2": "客戶端加密保護您的隱私",
+    "step3": "將加密資料上傳到 Walrus 儲存",
+    "step4": "在 Sui 區塊鏈上鑄造驗證 NFT",
+    "builtFor": "為 Haulout Hackathon 打造",
+    "techStack": ["Sui", "Walrus", "React", "AI Analysis"]
+  },
+  "record": {
+    "title": "記錄您的情緒",
+    "subtitle": "捕捉這一刻，加密並在鏈上驗證",
+    "howAreYouFeeling": "您現在感覺如何？",
+    "intensity": "強度",
+    "intensityValue": "強度：{{value}}%",
+    "subtle": "輕微",
+    "moderate": "中等",
+    "intense": "強烈",
+    "whatHappened": "發生了什麼事？",
+    "descriptionPlaceholder": "描述觸發這個情緒的事件...（將被加密）",
+    "descriptionHint": "🔒 您的描述在儲存前會在客戶端加密",
+    "characters": "{{count}}/5000 字元",
+    "privacy": {
+      "title": "隱私控制",
+      "public": "公開分享",
+      "private": "私人記錄",
+      "publicDesc": "任何人都可以看到 blob_id 和驗證狀態",
+      "privateDesc": "🔒 已加密保存（需授權存取）"
+    },
+    "storage": {
+      "title": "保存到本地",
+      "localOnly": "✅ 僅保存到本地瀏覽器，不上傳到 Walrus",
+      "walrusOnly": "⚠️ 僅嘗試上傳到 Walrus，失敗時不會保存"
+    },
+    "status": {
+      "encrypting": "正在加密...",
+      "uploading": "上傳至 Walrus...",
+      "uploadingWithFallback": "上傳至 Walrus（失敗時將保存到本地）...",
+      "saving": "儲存記錄到本地...",
+      "error": "❌ 上傳失敗"
+    },
+    "submit": {
+      "local": "記錄情緒（保存到本地）",
+      "walrus": "記錄情緒（上傳 Walrus）",
+      "nft": "記錄情緒並鑄造 NFT"
+    },
+    "hint": {
+      "local": "💾 您的情緒快照將被加密並僅保存到本地瀏覽器，不會上傳到 Walrus",
+      "walrus": "💡 您的情緒快照將被加密並儲存在 Walrus 上，同時在 Sui 上鑄造 NFT 作為證明"
+    },
+    "errors": {
+      "missingInfo": "缺少資訊",
+      "missingInfoDesc": "請選擇情緒並添加描述。",
+      "recordFailed": "記錄失敗",
+      "tryAgain": "請稍後再試。",
+      "serviceUnavailable": "儲存服務暫時無法使用",
+      "serviceUnavailableDesc": "Walrus 儲存服務目前無法連接。請稍後再試，或檢查網路連線。",
+      "networkError": "網路連線錯誤",
+      "networkErrorDesc": "無法連接到伺服器。請檢查您的網路連線後再試。",
+      "uploadFailed": "上傳失敗",
+      "uploadFailedDesc": "無法將資料上傳到儲存服務。請稍後再試。",
+      "encryptionError": "加密錯誤",
+      "encryptionErrorDesc": "資料加密時發生錯誤。請重新嘗試。",
+      "dataTooLarge": "資料過大",
+      "dataTooLargeDesc": "您輸入的內容過長。請縮短描述後再試。"
+    },
+    "success": {
+      "recorded": "情緒已記錄！✨",
+      "recordedLocal": "情緒已記錄（本地儲存）",
+      "recordedLocalDesc": "資料已保存到本地瀏覽器。",
+      "recordedWalrus": "已儲存至 Walrus：{{blobId}}...",
+      "recordedLocalServer": "Walrus 服務暫時無法使用，資料已儲存到本地伺服器。",
+      "recordedSDK": "已使用 SDK 儲存至 Walrus：{{blobId}}...",
+      "uploading": "上傳中...",
+      "uploadingDesc": "正在加密並儲存您的情緒快照"
+    },
+    "wallet": {
+      "insufficientBalance": "餘額不足",
+      "insufficientBalanceDesc": "請確保你有足夠的 SUI 和 WAL 測試網代幣。",
+      "signFailed": "簽名失敗",
+      "signFailedDesc": "錢包簽名失敗，請重試。",
+      "transactionCancelled": "交易已取消",
+      "transactionCancelledDesc": "您已取消交易。"
+    }
+  },
+  "timeline": {
+    "title": "情緒時間軸",
+    "subtitle": "您個人的情緒歷程記錄",
+    "noRecords": "尚未記錄任何情緒",
+    "noRecordsDesc": "開始記錄您的情緒旅程",
+    "recordFirst": "記錄第一個情緒",
+    "intensity": "強度",
+    "intensityValue": "強度：{{value}}%",
+    "publicRecord": "公開記錄",
+    "privateRecord": "🔒 已加密保存",
+    "encryptedContent": "🔒 此記錄已加密，描述內容受保護",
+    "verified": "✓ 已驗證",
+    "pending": "⏳ 等待中",
+    "failed": "❌ 失敗",
+    "onChain": "🔗 已上鏈"
+  },
+  "auth": {
+    "title": "安全模式",
+    "subtitle": "登入以訪問具有雲端備份的增強功能",
+    "signIn": "登入",
+    "signUp": "註冊",
+    "email": "電子郵件",
+    "emailPlaceholder": "your@email.com",
+    "password": "密碼",
+    "passwordPlaceholder": "••••••••",
+    "passwordHint": "至少 6 個字元",
+    "signingIn": "登入中...",
+    "creatingAccount": "建立帳戶中...",
+    "createAccount": "建立帳戶",
+    "errors": {
+      "missingInfo": "缺少資訊",
+      "missingInfoDesc": "請輸入電子郵件和密碼。",
+      "invalidPassword": "無效的密碼",
+      "invalidPasswordDesc": "密碼長度必須至少為 6 個字元。",
+      "signupFailed": "註冊失敗",
+      "loginFailed": "登入失敗",
+      "invalidCredentials": "無效的電子郵件或密碼。"
+    },
+    "success": {
+      "accountCreated": "帳戶已建立！",
+      "accountCreatedDesc": "您現在可以開始安全地記錄您的情緒。",
+      "welcomeBack": "歡迎回來！",
+      "welcomeBackDesc": "成功登入。"
+    }
+  },
+  "wallet": {
+    "connectTitle": "連接 Sui 錢包",
+    "connectDesc": "連接您的錢包以開始記錄情緒並在 Sui 區塊鏈上鑄造 NFT。",
+    "connectButton": "連接錢包",
+    "disconnected": "錢包已斷開連接",
+    "disconnectedDesc": "隨時回來繼續您的旅程。",
+    "supports": "支援 Sui Wallet、Suiet、Ethos 等",
+    "learnMore": "了解如何設置"
+  },
+  "notFound": {
+    "title": "404",
+    "message": "糟糕！找不到頁面",
+    "returnHome": "返回首頁"
+  },
+  "emotions": {
+    "joy": "😊 喜悅",
+    "sadness": "😢 悲傷",
+    "anger": "😠 憤怒",
+    "anxiety": "😰 焦慮",
+    "confusion": "🤔 困惑",
+    "peace": "✨ 平靜"
+  }
+}
+

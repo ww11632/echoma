@@ -1,0 +1,194 @@
+{
+  "common": {
+    "back": "Back",
+    "backToHome": "Back to Home",
+    "home": "Home",
+    "loading": "Loading...",
+    "processing": "Processing...",
+    "submit": "Submit",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "connect": "Connect",
+    "disconnect": "Disconnect",
+    "connected": "Connected",
+    "disconnected": "Disconnected"
+  },
+  "nav": {
+    "language": "Language"
+  },
+  "index": {
+    "title": "Echoma",
+    "subtitle": "Your emotions, encrypted and preserved on-chain.",
+    "subtitleHighlight1": "AI-powered analysis",
+    "subtitleHighlight2": "Web3 privacy",
+    "anonymousMode": "Anonymous Mode",
+    "anonymousModeDesc": "Record emotions using your wallet. Data encrypted locally with wallet signatures.",
+    "startRecording": "Start Recording",
+    "viewTimeline": "View Timeline",
+    "secureMode": "Secure Mode",
+    "secureModeDesc": "Sign in for cloud backup and enhanced security. Access from any device.",
+    "signInSignUp": "Sign In / Sign Up",
+    "viewSecureTimeline": "View Secure Timeline",
+    "feature1Title": "Client-Side Encryption",
+    "feature1Desc": "Your emotions are encrypted before leaving your device",
+    "feature2Title": "Walrus Storage",
+    "feature2Desc": "Decentralized, verifiable storage for your encrypted data",
+    "feature3Title": "Sui Blockchain",
+    "feature3Desc": "NFT-based proof with on-chain verification",
+    "howItWorks": "How It Works",
+    "step1": "Record your emotion with AI-assisted analysis",
+    "step2": "Client-side encryption protects your privacy",
+    "step3": "Upload encrypted data to Walrus storage",
+    "step4": "Mint verification NFT on Sui blockchain",
+    "builtFor": "Built for Haulout Hackathon",
+    "techStack": ["Sui", "Walrus", "React", "AI Analysis"]
+  },
+  "record": {
+    "title": "Record Your Emotion",
+    "subtitle": "Capture this moment, encrypted and verified on-chain",
+    "howAreYouFeeling": "How are you feeling?",
+    "intensity": "Intensity",
+    "intensityValue": "Intensity: {{value}}%",
+    "subtle": "Subtle",
+    "moderate": "Moderate",
+    "intense": "Intense",
+    "whatHappened": "What happened?",
+    "descriptionPlaceholder": "Describe the event that triggered this emotion... (will be encrypted)",
+    "descriptionHint": "🔒 Your description will be encrypted on the client side before storage",
+    "characters": "{{count}}/5000 characters",
+    "privacy": {
+      "title": "Privacy Control",
+      "public": "Public Share",
+      "private": "Private Record",
+      "publicDesc": "Anyone can see the blob_id and verification status",
+      "privateDesc": "🔒 Encrypted and saved (requires authorization to access)"
+    },
+    "storage": {
+      "title": "Save Locally",
+      "localOnly": "✅ Save to local browser only, do not upload to Walrus",
+      "walrusOnly": "⚠️ Only attempt to upload to Walrus, will not save on failure"
+    },
+    "status": {
+      "encrypting": "Encrypting...",
+      "uploading": "Uploading to Walrus...",
+      "uploadingWithFallback": "Uploading to Walrus (will save locally on failure)...",
+      "saving": "Saving record to local storage...",
+      "error": "❌ Upload failed"
+    },
+    "submit": {
+      "local": "Record Emotion (Save Locally)",
+      "walrus": "Record Emotion (Upload to Walrus)",
+      "nft": "Record Emotion & Mint NFT"
+    },
+    "hint": {
+      "local": "💾 Your emotion snapshot will be encrypted and saved only to your local browser, not uploaded to Walrus",
+      "walrus": "💡 Your emotion snapshot will be encrypted and stored on Walrus, with an NFT minted on Sui as proof"
+    },
+    "errors": {
+      "missingInfo": "Missing Information",
+      "missingInfoDesc": "Please select an emotion and add a description.",
+      "recordFailed": "Record Failed",
+      "tryAgain": "Please try again later.",
+      "serviceUnavailable": "Storage Service Unavailable",
+      "serviceUnavailableDesc": "Walrus storage service is currently unavailable. Please try again later or check your network connection.",
+      "networkError": "Network Connection Error",
+      "networkErrorDesc": "Unable to connect to the server. Please check your network connection and try again.",
+      "uploadFailed": "Upload Failed",
+      "uploadFailedDesc": "Unable to upload data to storage service. Please try again later.",
+      "encryptionError": "Encryption Error",
+      "encryptionErrorDesc": "An error occurred during data encryption. Please try again.",
+      "dataTooLarge": "Data Too Large",
+      "dataTooLargeDesc": "Your input is too long. Please shorten your description and try again."
+    },
+    "success": {
+      "recorded": "Emotion Recorded! ✨",
+      "recordedLocal": "Emotion Recorded (Local Storage)",
+      "recordedLocalDesc": "Data saved to local browser.",
+      "recordedWalrus": "Saved to Walrus: {{blobId}}...",
+      "recordedLocalServer": "Walrus service temporarily unavailable, data saved to local server.",
+      "recordedSDK": "Saved to Walrus via SDK: {{blobId}}...",
+      "uploading": "Uploading...",
+      "uploadingDesc": "Encrypting and saving your emotion snapshot"
+    },
+    "wallet": {
+      "insufficientBalance": "Insufficient Balance",
+      "insufficientBalanceDesc": "Please ensure you have enough SUI and WAL testnet tokens.",
+      "signFailed": "Sign Failed",
+      "signFailedDesc": "Wallet signature failed, please try again.",
+      "transactionCancelled": "Transaction Cancelled",
+      "transactionCancelledDesc": "You have cancelled the transaction."
+    }
+  },
+  "timeline": {
+    "title": "Emotion Timeline",
+    "subtitle": "Your personal emotion journey record",
+    "noRecords": "No emotions recorded yet",
+    "noRecordsDesc": "Start recording your emotion journey",
+    "recordFirst": "Record First Emotion",
+    "intensity": "Intensity",
+    "intensityValue": "Intensity: {{value}}%",
+    "publicRecord": "Public Record",
+    "privateRecord": "🔒 Encrypted and saved",
+    "encryptedContent": "🔒 This record is encrypted, description content is protected",
+    "verified": "✓ Verified",
+    "pending": "⏳ Pending",
+    "failed": "❌ Failed",
+    "onChain": "🔗 On-chain"
+  },
+  "auth": {
+    "title": "Secure Mode",
+    "subtitle": "Sign in to access enhanced features with cloud backup",
+    "signIn": "Sign In",
+    "signUp": "Sign Up",
+    "email": "Email",
+    "emailPlaceholder": "your@email.com",
+    "password": "Password",
+    "passwordPlaceholder": "••••••••",
+    "passwordHint": "At least 6 characters",
+    "signingIn": "Signing In...",
+    "creatingAccount": "Creating Account...",
+    "createAccount": "Create Account",
+    "errors": {
+      "missingInfo": "Missing Information",
+      "missingInfoDesc": "Please enter both email and password.",
+      "invalidPassword": "Invalid Password",
+      "invalidPasswordDesc": "Password must be at least 6 characters long.",
+      "signupFailed": "Signup Failed",
+      "loginFailed": "Login Failed",
+      "invalidCredentials": "Invalid email or password."
+    },
+    "success": {
+      "accountCreated": "Account Created!",
+      "accountCreatedDesc": "You can now start recording your emotions securely.",
+      "welcomeBack": "Welcome Back!",
+      "welcomeBackDesc": "Successfully signed in."
+    }
+  },
+  "wallet": {
+    "connectTitle": "Connect Sui Wallet",
+    "connectDesc": "Connect your wallet to start recording emotions and minting NFTs on Sui blockchain.",
+    "connectButton": "Connect Wallet",
+    "disconnected": "Wallet Disconnected",
+    "disconnectedDesc": "Come back anytime to continue your journey.",
+    "supports": "Supports Sui Wallet, Suiet, Ethos & more",
+    "learnMore": "Learn how to set up"
+  },
+  "notFound": {
+    "title": "404",
+    "message": "Oops! Page not found",
+    "returnHome": "Return to Home"
+  },
+  "emotions": {
+    "joy": "😊 Joy",
+    "sadness": "😢 Sadness",
+    "anger": "😠 Anger",
+    "anxiety": "😰 Anxiety",
+    "confusion": "🤔 Confusion",
+    "peace": "✨ Peace"
+  }
+}
+

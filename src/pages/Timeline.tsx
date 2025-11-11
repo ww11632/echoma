@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ArrowLeft, Home, Sparkles, Shield, Clock, Lock, Unlock, Loader2 } from "lucide-react";
@@ -7,6 +8,7 @@ import { useCurrentAccount } from "@mysten/dapp-kit";
 import { supabase } from "@/integrations/supabase/client";
 import { listEmotionRecords } from "@/lib/localIndex";
 import { getEmotions } from "@/lib/api";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 interface EmotionRecord {
   id: string;
@@ -22,18 +24,19 @@ interface EmotionRecord {
   created_at: string;
 }
 
-const emotionLabels = {
-  joy: { label: "Joy", emoji: "😊", gradient: "from-yellow-400 to-orange-400" },
-  sadness: { label: "Sadness", emoji: "😢", gradient: "from-blue-400 to-indigo-400" },
-  anger: { label: "Anger", emoji: "😠", gradient: "from-red-400 to-rose-400" },
-  anxiety: { label: "Anxiety", emoji: "😰", gradient: "from-purple-400 to-pink-400" },
-  confusion: { label: "Confusion", emoji: "🤔", gradient: "from-gray-400 to-slate-400" },
-  peace: { label: "Peace", emoji: "✨", gradient: "from-green-400 to-teal-400" },
-};
-
 const Timeline = () => {
   const navigate = useNavigate();
   const currentAccount = useCurrentAccount();
+  const { t, i18n } = useTranslation();
+
+  const emotionLabels = {
+    joy: { label: t("emotions.joy"), emoji: "😊", gradient: "from-yellow-400 to-orange-400" },
+    sadness: { label: t("emotions.sadness"), emoji: "😢", gradient: "from-blue-400 to-indigo-400" },
+    anger: { label: t("emotions.anger"), emoji: "😠", gradient: "from-red-400 to-rose-400" },
+    anxiety: { label: t("emotions.anxiety"), emoji: "😰", gradient: "from-purple-400 to-pink-400" },
+    confusion: { label: t("emotions.confusion"), emoji: "🤔", gradient: "from-gray-400 to-slate-400" },
+    peace: { label: t("emotions.peace"), emoji: "✨", gradient: "from-green-400 to-teal-400" },
+  };
   const [records, setRecords] = useState<EmotionRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -126,11 +129,14 @@ const Timeline = () => {
         <div className="flex items-center justify-between mb-8">
           <Button variant="ghost" onClick={() => navigate("/")} className="text-muted-foreground">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            返回
+            {t("common.back")}
           </Button>
-          <Button variant="ghost" onClick={() => navigate("/")} className="text-muted-foreground">
-            <Home className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <LanguageSwitcher />
+            <Button variant="ghost" onClick={() => navigate("/")} className="text-muted-foreground">
+              <Home className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         <div className="glass-card rounded-2xl p-8">
@@ -138,21 +144,21 @@ const Timeline = () => {
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full gradient-emotion glow-primary mb-4">
               <Clock className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-3xl font-bold">情緒時間軸</h1>
-            <p className="text-muted-foreground">您個人的情緒歷程記錄</p>
+            <h1 className="text-3xl font-bold">{t("timeline.title")}</h1>
+            <p className="text-muted-foreground">{t("timeline.subtitle")}</p>
           </div>
 
           {isLoading ? (
             <div className="text-center py-12">
               <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
-              <p className="mt-4 text-muted-foreground">載入中...</p>
+              <p className="mt-4 text-muted-foreground">{t("common.loading")}</p>
             </div>
           ) : records.length === 0 ? (
             <Card className="p-8 text-center border-dashed">
               <Sparkles className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-lg font-semibold mb-2">尚未記錄任何情緒</h3>
-              <p className="text-muted-foreground mb-4">開始記錄您的情緒旅程</p>
-              <Button onClick={() => navigate("/record")} className="gradient-emotion">記錄第一個情緒</Button>
+              <h3 className="text-lg font-semibold mb-2">{t("timeline.noRecords")}</h3>
+              <p className="text-muted-foreground mb-4">{t("timeline.noRecordsDesc")}</p>
+              <Button onClick={() => navigate("/record")} className="gradient-emotion">{t("timeline.recordFirst")}</Button>
             </Card>
           ) : (
             <div className="space-y-4">
@@ -174,20 +180,20 @@ const Timeline = () => {
                         <div className="flex items-start justify-between mb-2">
                           <div>
                             <h3 className="font-semibold text-lg">{emotionConfig.label}</h3>
-                            <p className="text-sm text-muted-foreground">強度: {record.intensity}%</p>
+                            <p className="text-sm text-muted-foreground">{t("timeline.intensityValue", { value: record.intensity })}</p>
                           </div>
-                          <span className="text-xs text-muted-foreground">{new Date(record.created_at).toLocaleDateString('zh-TW')}</span>
+                          <span className="text-xs text-muted-foreground">{new Date(record.created_at).toLocaleDateString(i18n.language === 'zh-TW' ? 'zh-TW' : 'en-US')}</span>
                         </div>
                         <div className="mb-2">
                           {record.is_public ? (
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                               <Unlock className="w-3 h-3" />
-                              <span>公開記錄</span>
+                              <span>{t("timeline.publicRecord")}</span>
                             </div>
                           ) : (
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                               <Lock className="w-3 h-3" />
-                              <span>🔒 已加密保存</span>
+                              <span>{t("timeline.privateRecord")}</span>
                             </div>
                           )}
                         </div>
@@ -202,7 +208,7 @@ const Timeline = () => {
                         {!record.is_public && (
                           <div className="mb-3 p-3 rounded-lg bg-muted/10 border border-border/30">
                             <p className="text-sm text-muted-foreground italic">
-                              🔒 此記錄已加密，描述內容受保護
+                              {t("timeline.encryptedContent")}
                             </p>
                           </div>
                         )}
@@ -215,13 +221,13 @@ const Timeline = () => {
                           )}
                           <div className="flex items-center gap-2 flex-wrap">
                             {record.proof_status === "confirmed" ? (
-                              <span className="px-2 py-1 rounded-full bg-green-500/10 text-green-500 text-xs">✓ 已驗證</span>
+                              <span className="px-2 py-1 rounded-full bg-green-500/10 text-green-500 text-xs">{t("timeline.verified")}</span>
                             ) : record.proof_status === "pending" ? (
-                              <span className="px-2 py-1 rounded-full bg-yellow-500/10 text-yellow-500 text-xs">⏳ 等待中</span>
+                              <span className="px-2 py-1 rounded-full bg-yellow-500/10 text-yellow-500 text-xs">{t("timeline.pending")}</span>
                             ) : (
-                              <span className="px-2 py-1 rounded-full bg-red-500/10 text-red-500 text-xs">❌ 失敗</span>
+                              <span className="px-2 py-1 rounded-full bg-red-500/10 text-red-500 text-xs">{t("timeline.failed")}</span>
                             )}
-                            {record.sui_ref && <span className="px-2 py-1 rounded-full bg-primary/10 text-primary text-xs">🔗 已上鏈</span>}
+                            {record.sui_ref && <span className="px-2 py-1 rounded-full bg-primary/10 text-primary text-xs">{t("timeline.onChain")}</span>}
                           </div>
                         </div>
                       </div>

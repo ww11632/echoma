@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -17,15 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { addEmotionRecord } from "@/lib/localIndex";
 import type { EmotionRecord } from "@/lib/dataSchema";
 import { postEmotion } from "@/lib/api";
-
-const emotionTags = [
-  { label: "😊 Joy", value: "joy", color: "from-yellow-400 to-orange-400" },
-  { label: "😢 Sadness", value: "sadness", color: "from-blue-400 to-indigo-400" },
-  { label: "😠 Anger", value: "anger", color: "from-red-400 to-rose-400" },
-  { label: "😰 Anxiety", value: "anxiety", color: "from-purple-400 to-pink-400" },
-  { label: "🤔 Confusion", value: "confusion", color: "from-gray-400 to-slate-400" },
-  { label: "✨ Peace", value: "peace", color: "from-green-400 to-teal-400" },
-];
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 const isBackendUnavailable = (error: unknown) => {
   if (!(error instanceof Error)) return false;
@@ -42,8 +35,18 @@ const isBackendUnavailable = (error: unknown) => {
 const Record = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const currentAccount = useCurrentAccount();
   const { currentWallet } = useCurrentWallet();
+
+  const emotionTags = [
+    { label: t("emotions.joy"), value: "joy", color: "from-yellow-400 to-orange-400" },
+    { label: t("emotions.sadness"), value: "sadness", color: "from-blue-400 to-indigo-400" },
+    { label: t("emotions.anger"), value: "anger", color: "from-red-400 to-rose-400" },
+    { label: t("emotions.anxiety"), value: "anxiety", color: "from-purple-400 to-pink-400" },
+    { label: t("emotions.confusion"), value: "confusion", color: "from-gray-400 to-slate-400" },
+    { label: t("emotions.peace"), value: "peace", color: "from-green-400 to-teal-400" },
+  ];
   const [selectedEmotion, setSelectedEmotion] = useState<string>("");
   const [intensity, setIntensity] = useState([50]);
   const [description, setDescription] = useState("");
@@ -82,8 +85,8 @@ const Record = () => {
   const handleSubmit = async () => {
     if (!selectedEmotion || !description.trim()) {
       toast({
-        title: "Missing Information",
-        description: "Please select an emotion and add a description.",
+        title: t("record.errors.missingInfo"),
+        description: t("record.errors.missingInfoDesc"),
         variant: "destructive",
       });
       return;
@@ -118,8 +121,8 @@ const Record = () => {
           setUploadStatus("success");
           
           toast({
-            title: "情緒已記錄（本地儲存）",
-            description: "資料已保存到本地瀏覽器。",
+            title: t("record.success.recordedLocal"),
+            description: t("record.success.recordedLocalDesc"),
             variant: "default",
           });
           setTimeout(() => navigate("/timeline"), 1200);
@@ -155,14 +158,14 @@ const Record = () => {
           // Show warning if Walrus upload failed
           if (apiRes.warning) {
             toast({
-              title: "情緒已記錄（本地儲存）",
-              description: "Walrus 服務暫時無法使用，資料已儲存到本地伺服器。",
+              title: t("record.success.recordedLocal"),
+              description: t("record.success.recordedLocalServer"),
               variant: "default",
             });
           } else {
             toast({
-              title: "情緒已記錄！✨",
-              description: `已儲存至 Walrus: ${apiRes.record.blobId.slice(0, 8)}...`,
+              title: t("record.success.recorded"),
+              description: t("record.success.recordedWalrus", { blobId: apiRes.record.blobId.slice(0, 8) }),
             });
           }
           setTimeout(() => navigate("/timeline"), 1200);
@@ -176,8 +179,8 @@ const Record = () => {
             setUploadStatus("success");
             
             toast({
-              title: "情緒已記錄（本地儲存）",
-              description: "後端未連線，資料已暫存於本地瀏覽器。",
+              title: t("record.success.recordedLocal"),
+              description: t("record.success.recordedLocalDesc"),
               variant: "default",
             });
             setTimeout(() => navigate("/timeline"), 1200);
@@ -225,8 +228,8 @@ const Record = () => {
       // Step 6: Upload to Walrus (only if saveLocally is false)
       setUploadStatus("uploading");
       toast({
-        title: "上傳中...",
-        description: "正在加密並儲存您的情緒快照",
+        title: t("record.success.uploading"),
+        description: t("record.success.uploadingDesc"),
       });
 
       // Try SDK method first if wallet is connected (this will trigger transaction popup)
@@ -245,8 +248,8 @@ const Record = () => {
           
           setUploadStatus("success");
           toast({
-            title: "情緒已記錄！✨",
-            description: `已使用 SDK 儲存至 Walrus: ${sdkResult.blobId.slice(0, 8)}...`,
+            title: t("record.success.recorded"),
+            description: t("record.success.recordedSDK", { blobId: sdkResult.blobId.slice(0, 8) }),
           });
           
           // Try to save metadata to backend (optional)
@@ -269,22 +272,22 @@ const Record = () => {
           console.warn("[Record] SDK upload failed, falling back to HTTP API:", sdkError);
           
           // Show specific error message for SDK failures
-          if (sdkError.message.includes("餘額不足")) {
+          if (sdkError.message.includes("餘額不足") || sdkError.message.includes("Insufficient balance") || sdkError.message.toLowerCase().includes("insufficient")) {
             toast({
-              title: "餘額不足",
-              description: "請確保你有足夠的 SUI 和 WAL 測試網代幣。",
+              title: t("record.wallet.insufficientBalance"),
+              description: t("record.wallet.insufficientBalanceDesc"),
               variant: "destructive",
             });
-          } else if (sdkError.message.includes("簽名失敗")) {
+          } else if (sdkError.message.includes("簽名失敗") || sdkError.message.includes("Sign failed") || sdkError.message.toLowerCase().includes("sign")) {
             toast({
-              title: "簽名失敗",
-              description: "錢包簽名失敗，請重試。",
+              title: t("record.wallet.signFailed"),
+              description: t("record.wallet.signFailedDesc"),
               variant: "destructive",
             });
-          } else if (sdkError.message.includes("交易已取消")) {
+          } else if (sdkError.message.includes("交易已取消") || sdkError.message.includes("Transaction cancelled") || sdkError.message.toLowerCase().includes("cancelled")) {
             toast({
-              title: "交易已取消",
-              description: "您已取消交易。",
+              title: t("record.wallet.transactionCancelled"),
+              description: t("record.wallet.transactionCancelledDesc"),
               variant: "default",
             });
             setIsSubmitting(false);
@@ -312,14 +315,14 @@ const Record = () => {
           // Show warning if Walrus upload failed
           if (apiRes.warning) {
             toast({
-              title: "情緒已記錄（本地儲存）",
-              description: "Walrus 服務暫時無法使用，資料已儲存到本地伺服器。",
+              title: t("record.success.recordedLocal"),
+              description: t("record.success.recordedLocalServer"),
               variant: "default",
             });
           } else {
             toast({
-              title: "情緒已記錄！✨",
-              description: `已儲存至 Walrus: ${apiRes.record.blobId.slice(0, 8)}...`,
+              title: t("record.success.recorded"),
+              description: t("record.success.recordedWalrus", { blobId: apiRes.record.blobId.slice(0, 8) }),
             });
           }
           setTimeout(() => navigate("/timeline"), 1200);
@@ -333,8 +336,8 @@ const Record = () => {
             setUploadStatus("success");
             
             toast({
-              title: "情緒已記錄（本地儲存）",
-              description: "無法連接到伺服器，資料已保存到本地瀏覽器。",
+              title: t("record.success.recordedLocal"),
+              description: t("record.success.recordedLocalDesc"),
               variant: "default",
             });
             setTimeout(() => navigate("/timeline"), 1200);
@@ -366,8 +369,8 @@ const Record = () => {
       setUploadStatus("success");
       
       toast({
-        title: "情緒已記錄！✨",
-        description: `已儲存至 Walrus: ${result.record.blobId.slice(0, 8)}...`,
+        title: t("record.success.recorded"),
+        description: t("record.success.recordedWalrus", { blobId: result.record.blobId.slice(0, 8) }),
       });
 
       // Navigate to timeline
@@ -376,8 +379,8 @@ const Record = () => {
       console.error("[INTERNAL] Error recording emotion:", error);
       
       // Show user-friendly error messages
-      let errorMessage = "請稍後再試。";
-      let errorTitle = "記錄失敗";
+      let errorMessage = t("record.errors.tryAgain");
+      let errorTitle = t("record.errors.recordFailed");
       
       if (error instanceof Error) {
         const msg = error.message;
@@ -392,34 +395,34 @@ const Record = () => {
         // Check for Walrus service errors
         else if (msg.includes("Walrus service endpoint not found") ||
                  msg.includes("Walrus service error")) {
-          errorTitle = "儲存服務暫時無法使用";
-          errorMessage = "Walrus 儲存服務目前無法連接。請稍後再試，或檢查網路連線。";
+          errorTitle = t("record.errors.serviceUnavailable");
+          errorMessage = t("record.errors.serviceUnavailableDesc");
         } 
         // Check for network errors
         else if (msg.includes("Network error") ||
                  msg.includes("connection") ||
                  msg.includes("Failed to connect")) {
-          errorTitle = "網路連線錯誤";
-          errorMessage = "無法連接到伺服器。請檢查您的網路連線後再試。";
+          errorTitle = t("record.errors.networkError");
+          errorMessage = t("record.errors.networkErrorDesc");
         } 
         // Check for storage/upload errors
         else if (msg.includes("Storage") ||
                  msg.includes("upload") ||
                  msg.includes("Walrus upload failed")) {
-          errorTitle = "上傳失敗";
-          errorMessage = "無法將資料上傳到儲存服務。請稍後再試。";
+          errorTitle = t("record.errors.uploadFailed");
+          errorMessage = t("record.errors.uploadFailedDesc");
         } 
         // Check for encryption errors
         else if (msg.includes("encrypt") ||
                  msg.includes("decrypt")) {
-          errorTitle = "加密錯誤";
-          errorMessage = "資料加密時發生錯誤。請重新嘗試。";
+          errorTitle = t("record.errors.encryptionError");
+          errorMessage = t("record.errors.encryptionErrorDesc");
         }
         // Check for data size errors
         else if (msg.includes("Data too large") ||
                  msg.includes("Maximum size")) {
-          errorTitle = "資料過大";
-          errorMessage = "您輸入的內容過長。請縮短描述後再試。";
+          errorTitle = t("record.errors.dataTooLarge");
+          errorMessage = t("record.errors.dataTooLargeDesc");
         }
         // Use the error message directly if it's already user-friendly
         else if (msg.length > 0 && msg.length < 200) {
@@ -441,30 +444,33 @@ const Record = () => {
   return (
     <div className="min-h-screen p-6">
       <div className="max-w-2xl mx-auto">
-        <Button
-          variant="ghost"
-          onClick={() => navigate("/")}
-          className="mb-6 text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
-        </Button>
+        <div className="flex items-center justify-between mb-6">
+          <Button
+            variant="ghost"
+            onClick={() => navigate("/")}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            {t("common.back")}
+          </Button>
+          <LanguageSwitcher />
+        </div>
 
         <div className="glass-card rounded-2xl p-8 space-y-8">
           <div className="text-center space-y-2">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full gradient-emotion glow-primary mb-4">
               <Sparkles className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-3xl font-bold">Record Your Emotion</h1>
+            <h1 className="text-3xl font-bold">{t("record.title")}</h1>
             <p className="text-muted-foreground">
-              Capture this moment, encrypted and verified on-chain
+              {t("record.subtitle")}
             </p>
           </div>
 
           <div className="space-y-6">
             {/* Emotion Tag Selection */}
             <div className="space-y-3">
-              <Label className="text-base font-semibold">How are you feeling?</Label>
+              <Label className="text-base font-semibold">{t("record.howAreYouFeeling")}</Label>
               <div className="grid grid-cols-2 gap-3">
                 {emotionTags.map((emotion) => (
                   <button
@@ -489,7 +495,7 @@ const Record = () => {
             {/* Intensity Slider */}
             <div className="space-y-3">
               <Label className="text-base font-semibold">
-                Intensity: {intensity[0]}%
+                {t("record.intensityValue", { value: intensity[0] })}
               </Label>
               <Slider
                 value={intensity}
@@ -499,20 +505,20 @@ const Record = () => {
                 className="py-4"
               />
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Subtle</span>
-                <span>Moderate</span>
-                <span>Intense</span>
+                <span>{t("record.subtle")}</span>
+                <span>{t("record.moderate")}</span>
+                <span>{t("record.intense")}</span>
               </div>
             </div>
 
             {/* Description */}
             <div className="space-y-3">
               <Label htmlFor="description" className="text-base font-semibold">
-                發生了什麼事？
+                {t("record.whatHappened")}
               </Label>
               <Textarea
                 id="description"
-                placeholder="描述觸發這個情緒的事件...（將被加密）"
+                placeholder={t("record.descriptionPlaceholder")}
                 value={description}
                 onChange={(e) => {
                   // Limit input length client-side
@@ -526,10 +532,10 @@ const Record = () => {
               />
               <div className="flex justify-between items-center">
                 <p className="text-xs text-muted-foreground">
-                  🔒 您的描述在儲存前會在客戶端加密
+                  {t("record.descriptionHint")}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {description.length}/5000 字元
+                  {t("record.characters", { count: description.length })}
                 </p>
               </div>
             </div>
@@ -545,12 +551,12 @@ const Record = () => {
                   )}
                   <div>
                     <Label htmlFor="privacy" className="text-sm font-semibold cursor-pointer">
-                      {isPublic ? "公開分享" : "私人記錄"}
+                      {isPublic ? t("record.privacy.public") : t("record.privacy.private")}
                     </Label>
                     <p className="text-xs text-muted-foreground">
                       {isPublic 
-                        ? "任何人都可以看到 blob_id 和驗證狀態" 
-                        : "🔒 已加密保存（需授權存取）"}
+                        ? t("record.privacy.publicDesc")
+                        : t("record.privacy.privateDesc")}
                     </p>
                   </div>
                 </div>
@@ -571,12 +577,12 @@ const Record = () => {
                   </div>
                   <div>
                     <Label htmlFor="saveLocally" className="text-sm font-semibold cursor-pointer">
-                      保存到本地
+                      {t("record.storage.title")}
                     </Label>
                     <p className="text-xs text-muted-foreground">
                       {saveLocally 
-                        ? "✅ 僅保存到本地瀏覽器，不上傳到 Walrus" 
-                        : "⚠️ 僅嘗試上傳到 Walrus，失敗時不會保存"}
+                        ? t("record.storage.localOnly")
+                        : t("record.storage.walrusOnly")}
                     </p>
                   </div>
                 </div>
@@ -595,23 +601,23 @@ const Record = () => {
                   {uploadStatus === "encrypting" && (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>正在加密...</span>
+                      <span>{t("record.status.encrypting")}</span>
                     </>
                   )}
                   {uploadStatus === "uploading" && (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>{saveLocally ? "上傳至 Walrus（失敗時將保存到本地）..." : "上傳至 Walrus..."}</span>
+                      <span>{saveLocally ? t("record.status.uploadingWithFallback") : t("record.status.uploading")}</span>
                     </>
                   )}
                   {uploadStatus === "saving" && (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>儲存記錄到本地...</span>
+                      <span>{t("record.status.saving")}</span>
                     </>
                   )}
                   {uploadStatus === "error" && (
-                    <span className="text-destructive">❌ 上傳失敗</span>
+                    <span className="text-destructive">{t("record.status.error")}</span>
                   )}
                 </div>
               </Card>
@@ -627,14 +633,14 @@ const Record = () => {
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  處理中...
+                  {t("common.processing")}
                 </>
               ) : (
                 <>
                   <Sparkles className="mr-2 h-5 w-5" />
                   {saveLocally 
-                    ? (currentAccount ? "記錄情緒（保存到本地）" : "記錄情緒（保存到本地）")
-                    : (currentAccount ? "記錄情緒並鑄造 NFT" : "記錄情緒（上傳 Walrus）")
+                    ? t("record.submit.local")
+                    : (currentAccount ? t("record.submit.nft") : t("record.submit.walrus"))
                   }
                 </>
               )}
@@ -643,9 +649,9 @@ const Record = () => {
             <Card className="p-4 bg-secondary/10 border-secondary/20">
               <p className="text-xs text-center text-muted-foreground">
                 {saveLocally ? (
-                  "💾 您的情緒快照將被加密並僅保存到本地瀏覽器，不會上傳到 Walrus"
+                  t("record.hint.local")
                 ) : (
-                  "💡 您的情緒快照將被加密並儲存在 Walrus 上，同時在 Sui 上鑄造 NFT 作為證明"
+                  t("record.hint.walrus")
                 )}
               </p>
             </Card>
