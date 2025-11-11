@@ -99,11 +99,17 @@ Deno.serve(async (req) => {
     console.log('Encrypted data type:', typeof encryptedData);
     console.log('Encrypted data length:', encryptedData.length);
     
+    // Convert JSON string to binary data (Uint8Array) for Walrus
+    // Walrus expects binary data, not JSON strings
+    const encoder = new TextEncoder();
+    const binaryData = encoder.encode(encryptedData);
+    console.log('Binary data length:', binaryData.length);
+    
     const walrusResponse = await fetch(
       'https://upload-relay.testnet.walrus.space/v1/store?epochs=5',
       {
         method: 'PUT',
-        body: encryptedData,
+        body: binaryData,
         headers: {
           'Content-Type': 'application/octet-stream',
         },
