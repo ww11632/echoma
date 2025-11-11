@@ -117,12 +117,20 @@ Deno.serve(async (req) => {
     );
 
     if (!walrusResponse.ok) {
-      const errorText = await walrusResponse.text();
+      let errorText = '';
+      try {
+        errorText = await walrusResponse.text();
+      } catch (e) {
+        console.error('[INTERNAL] Failed to read error response:', e);
+      }
+      
       console.error('[INTERNAL] Walrus upload error:', {
         status: walrusResponse.status,
         statusText: walrusResponse.statusText,
         error: errorText,
         dataLength: encryptedData.length,
+        binaryDataLength: binaryData.length,
+        headers: Object.fromEntries(walrusResponse.headers.entries()),
       });
       
       // Provide more specific error messages
@@ -130,13 +138,16 @@ Deno.serve(async (req) => {
       if (walrusResponse.status === 404) {
         errorMessage = 'Walrus service endpoint not found. The service may be temporarily unavailable.';
       } else if (walrusResponse.status === 400) {
-        errorMessage = `Invalid data format sent to storage service. ${errorText ? `Details: ${errorText.substring(0, 100)}` : ''}`;
+        // Include more details for 400 errors to help debug
+        const details = errorText ? ` Details: ${errorText.substring(0, 200)}` : '';
+        errorMessage = `Invalid data format sent to storage service.${details}`;
       } else if (walrusResponse.status === 413) {
         errorMessage = 'Data too large for storage service.';
       } else if (walrusResponse.status >= 500) {
         errorMessage = 'Storage service error. Please try again later.';
       } else {
-        errorMessage = `Storage upload failed (${walrusResponse.status}). ${errorText ? errorText.substring(0, 100) : ''}`;
+        const details = errorText ? ` ${errorText.substring(0, 200)}` : '';
+        errorMessage = `Storage upload failed (${walrusResponse.status}).${details}`;
       }
       
       throw new Error(errorMessage);
