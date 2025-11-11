@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { uploadEmotionRequestSchema } from '../_shared/validation.ts';
+import { checkRateLimit } from '../_shared/rateLimit.ts';
 
 console.log('Upload emotion function started');
 
@@ -38,6 +39,33 @@ Deno.serve(async (req) => {
     }
 
     console.log('User authenticated:', user.id);
+
+    // Check rate limit before processing
+    const rateLimitCheck = await checkRateLimit(supabase, user.id);
+    if (!rateLimitCheck.allowed) {
+      console.warn(`Rate limit exceeded for user ${user.id}`);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Rate limit exceeded',
+          message: `Too many requests. Please try again in ${Math.ceil((rateLimitCheck.resetAt.getTime() - Date.now()) / 1000)} seconds.`,
+          retryAfter: Math.ceil((rateLimitCheck.resetAt.getTime() - Date.now()) / 1000),
+        }),
+        {
+          status: 429,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+            'Retry-After': Math.ceil((rateLimitCheck.resetAt.getTime() - Date.now()) / 1000).toString(),
+            'X-RateLimit-Limit': '10',
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': rateLimitCheck.resetAt.toISOString(),
+          },
+        }
+      );
+    }
+
+    console.log(`Rate limit check passed. Remaining: ${rateLimitCheck.remaining} requests`);
 
     // Parse and validate request body
     let body: unknown;

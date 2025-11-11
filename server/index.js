@@ -63,6 +63,76 @@ const WALRUS_AGGREGATOR_URL = process.env.WALRUS_AGGREGATOR_URL || "https://aggr
 const DEFAULT_EPOCHS = Number(process.env.WALRUS_EPOCHS || 5);
 const WALRUS_ENABLED = process.env.WALRUS_ENABLED !== "false"; // Default to true, can be disabled via env var
 
+// Rate limiting configuration
+const RATE_LIMIT_MAX_REQUESTS = 10; // Maximum requests per window
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute window
+
+// In-memory rate limit store: Map<userId, Array<timestamp>>
+const rateLimitStore = new Map();
+
+/**
+ * Rate limiting middleware
+ * Tracks requests per user and blocks if limit exceeded
+ */
+function rateLimitMiddleware(req, res, next) {
+  // Only apply rate limiting to authenticated routes
+  if (!req.user || !req.user.id) {
+    return next();
+  }
+
+  const userId = req.user.id;
+  const now = Date.now();
+  const windowStart = now - RATE_LIMIT_WINDOW_MS;
+
+  // Get or initialize user's request timestamps
+  let userRequests = rateLimitStore.get(userId) || [];
+  
+  // Filter out requests outside the current window
+  userRequests = userRequests.filter(timestamp => timestamp > windowStart);
+  
+  // Check if limit exceeded
+  if (userRequests.length >= RATE_LIMIT_MAX_REQUESTS) {
+    const oldestRequest = userRequests[0];
+    const resetAt = oldestRequest + RATE_LIMIT_WINDOW_MS;
+    const retryAfter = Math.ceil((resetAt - now) / 1000);
+    
+    console.warn(`[Rate Limit] User ${userId} exceeded rate limit. Retry after ${retryAfter}s`);
+    
+    return res.status(429).json({
+      success: false,
+      error: 'Rate limit exceeded',
+      message: `Too many requests. Please try again in ${retryAfter} seconds.`,
+      retryAfter,
+    });
+  }
+
+  // Add current request timestamp
+  userRequests.push(now);
+  rateLimitStore.set(userId, userRequests);
+
+  // Set rate limit headers
+  res.set({
+    'X-RateLimit-Limit': RATE_LIMIT_MAX_REQUESTS.toString(),
+    'X-RateLimit-Remaining': (RATE_LIMIT_MAX_REQUESTS - userRequests.length).toString(),
+    'X-RateLimit-Reset': new Date(now + RATE_LIMIT_WINDOW_MS).toISOString(),
+  });
+
+  // Clean up old entries periodically (every 5 minutes)
+  if (Math.random() < 0.01) { // 1% chance on each request
+    const cutoff = Date.now() - RATE_LIMIT_WINDOW_MS;
+    for (const [uid, timestamps] of rateLimitStore.entries()) {
+      const filtered = timestamps.filter(ts => ts > cutoff);
+      if (filtered.length === 0) {
+        rateLimitStore.delete(uid);
+      } else {
+        rateLimitStore.set(uid, filtered);
+      }
+    }
+  }
+
+  next();
+}
+
 // Simple health and root routes for quick checks
 app.get("/", (_req, res) => {
   res.type("text/plain").send("Walrus API server is running. Try GET /api/emotions or POST /api/emotion");
@@ -161,7 +231,7 @@ async function uploadToWalrus(encryptedData, epochs = DEFAULT_EPOCHS) {
   }
 }
 
-app.post("/api/emotion", requireAuth, async (req, res) => {
+app.post("/api/emotion", requireAuth, rateLimitMiddleware, async (req, res) => {
   try {
     console.log(`[API] POST /api/emotion - Authenticated request from user: ${req.user.id}`);
     const { emotion, intensity, description, encryptedData, isPublic = false, walletAddress = null } = req.body || {};
