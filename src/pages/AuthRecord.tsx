@@ -106,29 +106,51 @@ const AuthRecord = () => {
       const encrypted = await encryptData(JSON.stringify(snapshot), userKey);
       const encryptedData = JSON.stringify(encrypted);
 
-      // Call Supabase edge function to upload
-      const { data: result, error } = await supabase.functions.invoke('upload-emotion', {
-        body: {
-          emotion: selectedEmotion,
-          intensity: intensity[0],
-          description: sanitizedDescription,
-          encryptedData: encryptedData,
-          isPublic: isPublic,
-        },
-      });
+      // Call Supabase edge function to upload using fetch for better error handling
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const session = await supabase.auth.getSession();
+      
+      if (!session.data.session) {
+        throw new Error('Not authenticated');
+      }
 
-      // Handle Supabase function invocation errors
-      if (error) {
-        throw new Error(error.message || 'Failed to invoke upload function');
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/upload-emotion`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.data.session.access_token}`,
+            'apikey': supabaseAnonKey,
+          },
+          body: JSON.stringify({
+            emotion: selectedEmotion,
+            intensity: intensity[0],
+            description: sanitizedDescription,
+            encryptedData: encryptedData,
+            isPublic: isPublic,
+          }),
+        }
+      );
+
+      // Parse response body regardless of status code
+      let result;
+      try {
+        const responseText = await response.text();
+        result = responseText ? JSON.parse(responseText) : null;
+      } catch (parseError) {
+        throw new Error('Invalid response from server');
       }
 
       // Check if the function returned an error response
-      if (result && !result.success) {
-        throw new Error(result.error || 'Upload failed');
+      if (!response.ok || !result || !result.success) {
+        const errorMessage = result?.error || result?.message || `Server error (${response.status})`;
+        throw new Error(errorMessage);
       }
 
       // Verify we have a valid result
-      if (!result || !result.record) {
+      if (!result.record) {
         throw new Error('Invalid response from server');
       }
 
