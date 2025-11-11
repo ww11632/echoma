@@ -190,10 +190,26 @@ Deno.serve(async (req) => {
     );
   } catch (error) {
     console.error('Error in upload-emotion:', error);
+    
+    // Extract error message safely
+    let errorMessage = 'Upload failed';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    } else if (typeof error === 'string') {
+      errorMessage = error;
+    } else if (error && typeof error === 'object' && 'message' in error) {
+      errorMessage = String(error.message);
+    }
+    
+    // Ensure error message is not too long and is safe for JSON
+    if (errorMessage.length > 500) {
+      errorMessage = errorMessage.substring(0, 500) + '...';
+    }
+    
     return new Response(
       JSON.stringify({
         success: false,
-        error: error instanceof Error ? error.message : 'Upload failed',
+        error: errorMessage,
       }),
       {
         status: 400,

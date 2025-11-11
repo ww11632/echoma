@@ -117,7 +117,20 @@ const AuthRecord = () => {
         },
       });
 
-      if (error) throw error;
+      // Handle Supabase function invocation errors
+      if (error) {
+        throw new Error(error.message || 'Failed to invoke upload function');
+      }
+
+      // Check if the function returned an error response
+      if (result && !result.success) {
+        throw new Error(result.error || 'Upload failed');
+      }
+
+      // Verify we have a valid result
+      if (!result || !result.record) {
+        throw new Error('Invalid response from server');
+      }
 
       toast({
         title: "Success!",
@@ -136,9 +149,28 @@ const AuthRecord = () => {
       }, 1500);
     } catch (error: any) {
       console.error("Upload error:", error);
+      
+      // Extract error message from various possible formats
+      let errorMessage = "Failed to record emotion. Please try again.";
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.error) {
+        errorMessage = error.error;
+      }
+      
+      // Truncate very long error messages to prevent UI issues
+      if (errorMessage.length > 200) {
+        errorMessage = errorMessage.substring(0, 200) + "...";
+      }
+      
       toast({
         title: "Upload Failed",
-        description: error.message || "Failed to record emotion. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
