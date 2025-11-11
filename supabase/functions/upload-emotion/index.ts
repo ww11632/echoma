@@ -96,6 +96,9 @@ Deno.serve(async (req) => {
 
     // Upload to Walrus
     console.log('Uploading to Walrus...');
+    console.log('Encrypted data type:', typeof encryptedData);
+    console.log('Encrypted data length:', encryptedData.length);
+    
     const walrusResponse = await fetch(
       'https://upload-relay.testnet.walrus.space/v1/store?epochs=5',
       {
@@ -111,9 +114,26 @@ Deno.serve(async (req) => {
       const errorText = await walrusResponse.text();
       console.error('[INTERNAL] Walrus upload error:', {
         status: walrusResponse.status,
+        statusText: walrusResponse.statusText,
         error: errorText,
+        dataLength: encryptedData.length,
       });
-      throw new Error('Storage upload failed');
+      
+      // Provide more specific error messages
+      let errorMessage = 'Storage upload failed';
+      if (walrusResponse.status === 404) {
+        errorMessage = 'Walrus service endpoint not found. The service may be temporarily unavailable.';
+      } else if (walrusResponse.status === 400) {
+        errorMessage = `Invalid data format sent to storage service. ${errorText ? `Details: ${errorText.substring(0, 100)}` : ''}`;
+      } else if (walrusResponse.status === 413) {
+        errorMessage = 'Data too large for storage service.';
+      } else if (walrusResponse.status >= 500) {
+        errorMessage = 'Storage service error. Please try again later.';
+      } else {
+        errorMessage = `Storage upload failed (${walrusResponse.status}). ${errorText ? errorText.substring(0, 100) : ''}`;
+      }
+      
+      throw new Error(errorMessage);
     }
 
     const walrusResult = await walrusResponse.json();

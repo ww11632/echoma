@@ -138,14 +138,23 @@ const AuthRecord = () => {
       let result;
       try {
         const responseText = await response.text();
+        console.log('[AuthRecord] Response status:', response.status);
+        console.log('[AuthRecord] Response text:', responseText);
         result = responseText ? JSON.parse(responseText) : null;
+        console.log('[AuthRecord] Parsed result:', result);
       } catch (parseError) {
+        console.error('[AuthRecord] Parse error:', parseError);
         throw new Error('Invalid response from server');
       }
 
       // Check if the function returned an error response
       if (!response.ok || !result || !result.success) {
         const errorMessage = result?.error || result?.message || `Server error (${response.status})`;
+        console.error('[AuthRecord] Upload failed:', {
+          status: response.status,
+          result,
+          errorMessage,
+        });
         throw new Error(errorMessage);
       }
 
