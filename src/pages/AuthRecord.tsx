@@ -239,7 +239,7 @@ const AuthRecord = () => {
 
         <Card className="glass-card p-8 space-y-8">
           <div className="text-center space-y-2">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full gradient-emotion glow-primary animate-float mb-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full gradient-emotion shadow-md animate-float mb-4">
               <Lock className="w-8 h-8 text-white" />
             </div>
             <h1 className="text-3xl font-bold">Record Your Emotion</h1>
@@ -309,7 +309,7 @@ const AuthRecord = () => {
             <Button
               onClick={handleSubmit}
               disabled={isSubmitting || !selectedEmotion || !description.trim()}
-              className="w-full h-14 text-lg font-semibold gradient-emotion glow-primary"
+              className="w-full h-14 text-lg font-semibold gradient-emotion shadow-md"
             >
               {isSubmitting ? (
                 <>

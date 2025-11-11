@@ -8,52 +8,53 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Deep cosmic background with subtle gradient */
-    --background: 250 24% 9%;
-    --foreground: 210 40% 98%;
+    /* Warm, comforting background - soft beige/cream tones */
+    --background: 30 20% 96%;
+    --foreground: 30 15% 25%;
 
-    /* Glass card surfaces */
-    --card: 250 20% 12%;
-    --card-foreground: 210 40% 98%;
+    /* Soft card surfaces with gentle warmth */
+    --card: 30 25% 98%;
+    --card-foreground: 30 15% 25%;
 
-    --popover: 250 20% 12%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 30 25% 98%;
+    --popover-foreground: 30 15% 25%;
 
-    /* Primary: Deep purple-blue (emotion depth) */
-    --primary: 243 75% 59%;
-    --primary-foreground: 210 40% 98%;
+    /* Primary: Soft sage green (calming, therapeutic) */
+    --primary: 150 30% 50%;
+    --primary-foreground: 30 20% 98%;
 
-    /* Secondary: Clear cyan (transparency, verification) */
-    --secondary: 187 85% 43%;
-    --secondary-foreground: 210 40% 98%;
+    /* Secondary: Gentle sky blue (peace, tranquility) */
+    --secondary: 200 50% 65%;
+    --secondary-foreground: 30 20% 98%;
 
-    /* Muted glass surfaces */
-    --muted: 250 18% 16%;
-    --muted-foreground: 215 20.2% 65.1%;
+    /* Muted soft surfaces */
+    --muted: 30 15% 92%;
+    --muted-foreground: 30 10% 45%;
 
-    /* Accent: Warm pink-orange (positive emotions) */
-    --accent: 330 81% 70%;
-    --accent-foreground: 250 24% 9%;
+    /* Accent: Warm peach (warmth, comfort) */
+    --accent: 25 60% 75%;
+    --accent-foreground: 30 15% 25%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 60% 55%;
+    --destructive-foreground: 30 20% 98%;
 
-    /* Glass borders */
-    --border: 250 15% 22%;
-    --input: 250 15% 22%;
-    --ring: 243 75% 59%;
+    /* Soft borders */
+    --border: 30 20% 85%;
+    --input: 30 20% 85%;
+    --ring: 150 30% 50%;
 
-    --radius: 1rem;
+    --radius: 1.25rem;
 
-    /* Custom Echoma variables */
-    --glass-bg: 250 20% 12% / 0.6;
-    --glass-border: 250 30% 30% / 0.3;
-    --gradient-emotion: linear-gradient(135deg, hsl(243 75% 59%), hsl(261 75% 63%));
-    --gradient-warmth: linear-gradient(135deg, hsl(330 81% 70%), hsl(24 95% 68%));
-    --gradient-cool: linear-gradient(135deg, hsl(187 85% 43%), hsl(243 75% 59%));
-    --shadow-glow: 0 0 40px hsl(243 75% 59% / 0.3);
-    --shadow-glow-accent: 0 0 30px hsl(330 81% 70% / 0.3);
-    --transition-smooth: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Custom Echoma variables - counseling center style */
+    --glass-bg: 30 25% 98% / 0.85;
+    --glass-border: 30 20% 88% / 0.5;
+    --gradient-emotion: linear-gradient(135deg, hsl(150 30% 50%), hsl(160 35% 55%));
+    --gradient-warmth: linear-gradient(135deg, hsl(25 60% 75%), hsl(35 65% 80%));
+    --gradient-cool: linear-gradient(135deg, hsl(200 50% 65%), hsl(150 30% 50%));
+    --shadow-glow: 0 4px 20px hsl(150 30% 50% / 0.15);
+    --shadow-glow-accent: 0 4px 20px hsl(25 60% 75% / 0.15);
+    --shadow-soft: 0 2px 12px hsl(30 15% 40% / 0.08);
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 }
 
@@ -64,7 +65,7 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
-    background: linear-gradient(135deg, hsl(250 24% 9%), hsl(250 28% 6%));
+    background: linear-gradient(135deg, hsl(30 20% 96%), hsl(35 25% 98%));
     min-height: 100vh;
   }
 }
@@ -72,14 +73,16 @@ All colors MUST be HSL.
 @layer utilities {
   .glass-card {
     background: hsl(var(--glass-bg));
-    backdrop-filter: blur(20px);
+    backdrop-filter: blur(12px);
     border: 1px solid hsl(var(--glass-border));
+    box-shadow: var(--shadow-soft);
   }
 
   .glass-input {
-    background: hsl(250 18% 14% / 0.5);
-    backdrop-filter: blur(10px);
+    background: hsl(30 25% 99% / 0.9);
+    backdrop-filter: blur(8px);
     border: 1px solid hsl(var(--glass-border));
+    box-shadow: 0 1px 3px hsl(30 15% 40% / 0.05);
   }
 
   .gradient-emotion {
@@ -103,20 +106,20 @@ All colors MUST be HSL.
   }
 
   .animate-float {
-    animation: float 3s ease-in-out infinite;
+    animation: float 4s ease-in-out infinite;
   }
 
   @keyframes float {
     0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-10px); }
+    50% { transform: translateY(-6px); }
   }
 
   .animate-pulse-glow {
-    animation: pulse-glow 2s ease-in-out infinite;
+    animation: pulse-glow 3s ease-in-out infinite;
   }
 
   @keyframes pulse-glow {
-    0%, 100% { opacity: 1; filter: brightness(1); }
-    50% { opacity: 0.8; filter: brightness(1.2); }
+    0%, 100% { opacity: 0.6; filter: brightness(1); }
+    50% { opacity: 0.8; filter: brightness(1.05); }
   }
 }

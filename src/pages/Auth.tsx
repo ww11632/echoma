@@ -156,7 +156,7 @@ const Auth = () => {
 
         <Card className="glass-card p-8 space-y-6">
           <div className="text-center space-y-2">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full gradient-emotion glow-primary mb-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full gradient-emotion shadow-md mb-4">
               <Lock className="w-8 h-8 text-white" />
             </div>
             <h1 className="text-3xl font-bold">{t("auth.title")}</h1>
@@ -207,7 +207,7 @@ const Auth = () => {
 
                 <Button
                   type="submit"
-                  className="w-full gradient-emotion glow-primary"
+                  className="w-full gradient-emotion shadow-md"
                   disabled={isLoading}
                 >
                   {isLoading ? (
@@ -261,7 +261,7 @@ const Auth = () => {
 
                 <Button
                   type="submit"
-                  className="w-full gradient-emotion glow-primary"
+                  className="w-full gradient-emotion shadow-md"
                   disabled={isLoading}
                 >
                   {isLoading ? (

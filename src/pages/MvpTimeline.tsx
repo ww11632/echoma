@@ -44,7 +44,7 @@ const MvpTimeline = () => {
 
         <div className="glass-card rounded-2xl p-8">
           <div className="text-center space-y-2 mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full gradient-emotion glow-primary mb-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full gradient-emotion shadow-md mb-4">
               <Clock className="w-8 h-8 text-white" />
             </div>
             <h1 className="text-3xl font-bold">MVP 本機時間軸</h1>

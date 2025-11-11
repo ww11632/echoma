@@ -459,7 +459,7 @@ const Record = () => {
 
         <div className="glass-card rounded-2xl p-8 space-y-8">
           <div className="text-center space-y-2">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full gradient-emotion glow-primary mb-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full gradient-emotion shadow-md mb-4">
               <Sparkles className="w-8 h-8 text-white" />
             </div>
             <h1 className="text-3xl font-bold">{t("record.title")}</h1>
@@ -488,10 +488,10 @@ const Record = () => {
                       p-4 rounded-xl border-2 transition-all duration-300
                       ${
                         selectedEmotion === emotion.value
-                          ? "border-primary bg-primary/10 scale-105"
+                          ? "border-primary bg-primary/10 scale-[1.02] shadow-sm"
                           : !selectedEmotion
-                          ? "border-destructive/50 hover:border-destructive"
-                          : "border-border hover:border-primary/50"
+                          ? "border-border/50 hover:border-primary/30 bg-card"
+                          : "border-border hover:border-primary/30 bg-card"
                       }
                     `}
                   >
@@ -688,7 +688,7 @@ const Record = () => {
             <Button
               onClick={handleSubmit}
               disabled={isSubmitting || !selectedEmotion || !description.trim()}
-              className="w-full h-12 text-base font-semibold gradient-emotion hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full h-12 text-base font-semibold gradient-emotion hover:opacity-95 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
               size="lg"
             >
               {isSubmitting ? (

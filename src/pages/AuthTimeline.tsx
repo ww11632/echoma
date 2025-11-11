@@ -190,8 +190,8 @@ const AuthTimeline = () => {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
-      <div className="absolute top-20 left-10 w-64 h-64 bg-primary/20 rounded-full blur-3xl animate-pulse-glow" />
-      <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent/20 rounded-full blur-3xl animate-pulse-glow" style={{ animationDelay: '1s' }} />
+      <div className="absolute top-20 left-10 w-64 h-64 bg-primary/10 rounded-full blur-3xl animate-pulse-glow" />
+      <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent/10 rounded-full blur-3xl animate-pulse-glow" style={{ animationDelay: '1s' }} />
       
       <div className="relative z-10 max-w-4xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between mb-6">
@@ -209,7 +209,7 @@ const AuthTimeline = () => {
         </div>
 
         <div className="text-center space-y-4 mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full gradient-emotion glow-primary animate-float">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full gradient-emotion shadow-md animate-float">
             <Lock className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold">Your Emotion Timeline</h1>
@@ -324,7 +324,7 @@ const AuthTimeline = () => {
         <div className="mt-8 text-center">
           <Button
             onClick={() => navigate("/auth-record")}
-            className="gradient-emotion glow-primary"
+            className="gradient-emotion shadow-md"
           >
             Record New Emotion
           </Button>

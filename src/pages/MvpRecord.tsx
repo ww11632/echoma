@@ -66,7 +66,7 @@ const MvpRecord = () => {
 
         <div className="glass-card rounded-2xl p-8 space-y-8">
           <div className="text-center space-y-2">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full gradient-emotion glow-primary mb-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full gradient-emotion shadow-md mb-4">
               <Sparkles className="w-8 h-8 text-white" />
             </div>
             <h1 className="text-3xl font-bold">MVP 情緒記錄（本機）</h1>

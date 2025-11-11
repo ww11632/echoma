@@ -40,14 +40,14 @@ const Index = () => {
       
       {/* Hero Section */}
       <div className="relative overflow-hidden">
-        {/* Animated background orbs */}
-        <div className="absolute top-20 left-10 w-64 h-64 bg-primary/20 rounded-full blur-3xl animate-pulse-glow" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent/20 rounded-full blur-3xl animate-pulse-glow" style={{ animationDelay: '1s' }} />
+        {/* Animated background orbs - soft and gentle */}
+        <div className="absolute top-20 left-10 w-64 h-64 bg-primary/10 rounded-full blur-3xl animate-pulse-glow" />
+        <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent/10 rounded-full blur-3xl animate-pulse-glow" style={{ animationDelay: '1s' }} />
         
         <div className="relative z-10 max-w-6xl mx-auto px-6 py-20">
           <div className="text-center space-y-8 mb-16">
             {/* Logo */}
-            <div className="inline-flex items-center justify-center w-24 h-24 rounded-full gradient-emotion glow-primary animate-float mb-6">
+            <div className="inline-flex items-center justify-center w-24 h-24 rounded-full gradient-emotion shadow-md animate-float mb-6">
               <Sparkles className="w-12 h-12 text-white" />
             </div>
 
@@ -66,7 +66,7 @@ const Index = () => {
             {/* Mode Selection Cards */}
             <div className="grid md:grid-cols-2 gap-6 pt-4 max-w-4xl mx-auto">
               {/* Anonymous Mode */}
-              <Card className="glass-card p-6 space-y-4 hover:scale-105 transition-all duration-300">
+              <Card className="glass-card p-6 space-y-4 hover:scale-[1.02] transition-all duration-300">
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-secondary/30">
                   <Unlock className="w-6 h-6 text-secondary" />
                 </div>
@@ -77,7 +77,7 @@ const Index = () => {
                 <div className="space-y-2">
                   <Button
                     onClick={() => navigate("/record")}
-                    className="w-full gradient-emotion hover:opacity-90 glow-primary"
+                    className="w-full gradient-emotion hover:opacity-95 shadow-md"
                   >
                     <Sparkles className="mr-2 h-4 w-4" />
                     {t("index.startRecording")}
@@ -93,7 +93,7 @@ const Index = () => {
               </Card>
 
               {/* Secure Mode */}
-              <Card className="glass-card p-6 space-y-4 hover:scale-105 transition-all duration-300">
+              <Card className="glass-card p-6 space-y-4 hover:scale-[1.02] transition-all duration-300">
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/30">
                   <Lock className="w-6 h-6 text-primary" />
                 </div>
@@ -104,7 +104,7 @@ const Index = () => {
                 <div className="space-y-2">
                   <Button
                     onClick={() => navigate("/auth")}
-                    className="w-full gradient-cool hover:opacity-90 glow-secondary"
+                    className="w-full gradient-cool hover:opacity-95 shadow-md"
                   >
                     <Lock className="mr-2 h-4 w-4" />
                     {t("index.signInSignUp")}

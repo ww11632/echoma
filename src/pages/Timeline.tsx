@@ -253,7 +253,7 @@ const Timeline = () => {
         {/* Header */}
         <div className="glass-card rounded-2xl p-8 mb-6">
           <div className="text-center space-y-2 mb-6">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full gradient-emotion glow-primary mb-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full gradient-emotion shadow-md mb-4">
               <BookOpen className="w-8 h-8 text-white" />
             </div>
             <h1 className="text-4xl font-bold">{t("timeline.title")}</h1>
@@ -404,7 +404,7 @@ const Timeline = () => {
                 return (
                   <Card key={record.id} className="p-6 hover:border-primary/50 transition-all">
                     <div className="flex items-start gap-4">
-                      <div className={`w-16 h-16 rounded-full flex items-center justify-center bg-gradient-to-br ${emotionConfig.gradient} glow-primary flex-shrink-0`}>
+                      <div className={`w-16 h-16 rounded-full flex items-center justify-center bg-gradient-to-br ${emotionConfig.gradient} shadow-md flex-shrink-0`}>
                         <span className="text-2xl">{emotionConfig.emoji}</span>
                       </div>
                       <div className="flex-1">
