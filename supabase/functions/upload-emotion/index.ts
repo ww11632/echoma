@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
+import { uploadEmotionRequestSchema } from '../_shared/validation.ts';
 
 console.log('Upload emotion function started');
 
@@ -38,15 +39,32 @@ Deno.serve(async (req) => {
 
     console.log('User authenticated:', user.id);
 
-    const body = await req.json();
-    const { emotion, intensity, description, encryptedData, isPublic } = body;
-
-    console.log('Request data:', { emotion, intensity, isPublic, descriptionLength: description?.length });
-
-    // Validate inputs
-    if (!emotion || !intensity || !description || !encryptedData) {
-      throw new Error('Missing required fields');
+    // Parse and validate request body
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch (error) {
+      throw new Error('Invalid JSON in request body');
     }
+
+    // Comprehensive validation using Zod
+    const validationResult = uploadEmotionRequestSchema.safeParse(body);
+    if (!validationResult.success) {
+      const errors = validationResult.error.errors.map((err) => 
+        `${err.path.join('.')}: ${err.message}`
+      ).join('; ');
+      console.error('Validation errors:', errors);
+      throw new Error(`Validation failed: ${errors}`);
+    }
+
+    const { emotion, intensity, description, encryptedData, isPublic } = validationResult.data;
+
+    console.log('Request data validated:', { 
+      emotion, 
+      intensity, 
+      isPublic, 
+      descriptionLength: description.length 
+    });
 
     // Upload to Walrus
     console.log('Uploading to Walrus...');
