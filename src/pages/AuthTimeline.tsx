@@ -1,19 +1,25 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Loader2, LogOut, Lock } from "lucide-react";
+import { ArrowLeft, Loader2, LogOut, Lock, Unlock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { decryptData } from "@/lib/encryption";
+import { generateUserKeyFromId } from "@/lib/encryption";
+import { readFromWalrus } from "@/lib/walrus";
 import type { User, Session } from "@supabase/supabase-js";
+import type { EncryptedData } from "@/lib/encryption";
 
 interface EmotionRecord {
   id: string;
   created_at: string;
   emotion: string;
   intensity: number;
-  description: string;
+  description: string | null;
   is_public: boolean;
+  walrus_url?: string;
+  blob_id?: string;
 }
 
 const emotionEmojis: Record<string, string> = {
@@ -32,6 +38,10 @@ const AuthTimeline = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [records, setRecords] = useState<EmotionRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // Store decrypted descriptions by record ID
+  const [decryptedDescriptions, setDecryptedDescriptions] = useState<Record<string, string>>({});
+  // Track which records are being decrypted
+  const [decryptingRecords, setDecryptingRecords] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -58,12 +68,34 @@ const AuthTimeline = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  // Auto-decrypt records when user and records are available
+  useEffect(() => {
+    if (!user || records.length === 0) return;
+    
+    // Decrypt records that don't have plaintext description
+    records.forEach(record => {
+      if (!record.description && record.blob_id) {
+        // Check state using functional updates to avoid stale closures
+        setDecryptedDescriptions(current => {
+          setDecryptingRecords(decrypting => {
+            // Only decrypt if not already decrypted and not currently decrypting
+            if (!current[record.id] && !decrypting.has(record.id)) {
+              decryptDescription(record.id, record.blob_id!);
+            }
+            return decrypting;
+          });
+          return current;
+        });
+      }
+    });
+  }, [user, records, decryptDescription]);
+
   const loadRecords = async () => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from('emotion_records')
-        .select('*')
+        .select('id, created_at, emotion, intensity, description, is_public, walrus_url, blob_id')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -80,6 +112,64 @@ const AuthTimeline = () => {
       setIsLoading(false);
     }
   };
+
+  const decryptDescription = useCallback(async (recordId: string, blobId: string) => {
+    if (!user) return;
+    
+    // Mark as decrypting
+    setDecryptingRecords(prev => {
+      if (prev.has(recordId)) {
+        return prev; // Already decrypting
+      }
+      return new Set(prev).add(recordId);
+    });
+
+    try {
+      // Fetch encrypted data from Walrus
+      const encryptedDataString = await readFromWalrus(blobId);
+      
+      // Parse the encrypted data JSON
+      const encryptedData: EncryptedData = JSON.parse(encryptedDataString);
+      
+      // Generate user key for decryption
+      const userKey = await generateUserKeyFromId(user.id);
+      
+      // Decrypt the data
+      const decryptedString = await decryptData(encryptedData, userKey);
+      
+      // Parse the decrypted JSON to get the snapshot
+      const snapshot = JSON.parse(decryptedString);
+      
+      // Store the decrypted description
+      setDecryptedDescriptions(prev => {
+        if (prev[recordId]) {
+          return prev; // Already decrypted
+        }
+        return {
+          ...prev,
+          [recordId]: snapshot.description || '',
+        };
+      });
+    } catch (error: any) {
+      console.error(`Failed to decrypt record ${recordId}:`, error);
+      toast({
+        title: "Decryption Failed",
+        description: "Could not decrypt this record. It may have expired or been corrupted.",
+        variant: "destructive",
+      });
+      // Store error message instead
+      setDecryptedDescriptions(prev => ({
+        ...prev,
+        [recordId]: '[Decryption failed]',
+      }));
+    } finally {
+      setDecryptingRecords(prev => {
+        const next = new Set(prev);
+        next.delete(recordId);
+        return next;
+      });
+    }
+  }, [user, toast]);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -159,7 +249,68 @@ const AuthTimeline = () => {
                     {new Date(record.created_at).toLocaleString()}
                   </div>
                 </div>
-                <p className="text-foreground/90 leading-relaxed">{record.description}</p>
+                {(() => {
+                  // Check if we have a decrypted description
+                  const decryptedDesc = decryptedDescriptions[record.id];
+                  const isDecrypting = decryptingRecords.has(record.id);
+                  
+                  if (record.description) {
+                    // Plaintext description (legacy records)
+                    return <p className="text-foreground/90 leading-relaxed">{record.description}</p>;
+                  } else if (decryptedDesc) {
+                    // Successfully decrypted
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Unlock className="w-3 h-3 text-green-500" />
+                          <span>Decrypted from secure storage</span>
+                        </div>
+                        <p className="text-foreground/90 leading-relaxed">{decryptedDesc}</p>
+                      </div>
+                    );
+                  } else if (isDecrypting) {
+                    // Currently decrypting
+                    return (
+                      <div className="p-4 rounded-lg bg-muted/30 border border-border/50">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Decrypting from secure storage...</span>
+                        </div>
+                      </div>
+                    );
+                  } else if (record.blob_id) {
+                    // Has blob_id but not decrypted yet - show decrypt button
+                    return (
+                      <div className="p-4 rounded-lg bg-muted/30 border border-border/50">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Lock className="w-4 h-4" />
+                            <span>Description is encrypted</span>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => decryptDescription(record.id, record.blob_id!)}
+                            disabled={isDecrypting}
+                          >
+                            <Unlock className="w-3 h-3 mr-2" />
+                            Decrypt
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  } else {
+                    // No blob_id - cannot decrypt
+                    return (
+                      <div className="p-4 rounded-lg bg-muted/30 border border-border/50">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Lock className="w-4 h-4" />
+                          <span>Encrypted data not available</span>
+                        </div>
+                      </div>
+                    );
+                  }
+                })()}
                 {record.is_public && (
                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-primary/20 text-primary">
                     Public

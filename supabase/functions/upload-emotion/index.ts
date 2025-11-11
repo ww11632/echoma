@@ -141,13 +141,19 @@ Deno.serve(async (req) => {
     console.log('Storing in database...');
 
     // Store in database
+    // Security: Do not store plaintext description
+    // Description is encrypted in encryptedData (stored in Walrus)
+    // All sensitive data should be decrypted client-side from Walrus
+    // This ensures encryption-at-rest for all mental health data
     const { data: record, error: dbError } = await supabase
       .from('emotion_records')
       .insert({
         user_id: user.id,
         emotion,
         intensity,
-        description,
+        // Do not store plaintext description - it's encrypted in Walrus
+        // Frontend must decrypt from encryptedData for display
+        description: null,
         blob_id: blobId,
         walrus_url: walrusUrl,
         payload_hash: payloadHash,
