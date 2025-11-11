@@ -164,6 +164,59 @@ export async function generateUserKey(
 }
 
 /**
+ * Generate a secure encryption key from user ID
+ * Uses PBKDF2 key derivation with user ID as input
+ * 
+ * @param userId - Supabase user ID (UUID format)
+ * @returns A secure key derived from user ID
+ */
+export async function generateUserKeyFromId(
+  userId: string
+): Promise<string> {
+  // Validate UUID format
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(userId)) {
+    throw new Error("Invalid user ID format");
+  }
+
+  // Create application-specific salt
+  const appSalt = new TextEncoder().encode("echoma_encryption_salt_v1");
+  
+  // Encode user ID
+  const encoder = new TextEncoder();
+  const userIdBytes = encoder.encode(userId);
+  
+  // Combine user ID with app salt
+  const keyMaterial = new Uint8Array(userIdBytes.length + appSalt.length);
+  keyMaterial.set(userIdBytes, 0);
+  keyMaterial.set(appSalt, userIdBytes.length);
+
+  // Use PBKDF2 to derive secure key
+  const keyMaterialKey = await crypto.subtle.importKey(
+    "raw",
+    keyMaterial.buffer as ArrayBuffer,
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
+
+  // Derive 256 bits (32 bytes)
+  const derivedBits = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt: appSalt,
+      iterations: 100000,
+      hash: "SHA-256",
+    },
+    keyMaterialKey,
+    256
+  );
+
+  // Convert to base64
+  return bufferToBase64(derivedBits);
+}
+
+/**
  * Generate a user key synchronously (for backward compatibility)
  * NOTE: This is less secure than the async version with signature
  * @deprecated Use generateUserKey() with signature instead

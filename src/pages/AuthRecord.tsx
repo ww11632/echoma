@@ -10,7 +10,7 @@ import { Sparkles, ArrowLeft, Loader2, Lock, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { validateAndSanitizeDescription } from "@/lib/validation";
-import { encryptData, generateUserKey } from "@/lib/encryption";
+import { encryptData, generateUserKeyFromId } from "@/lib/encryption";
 import type { User, Session } from "@supabase/supabase-js";
 
 const emotionTags = [
@@ -100,7 +100,7 @@ const AuthRecord = () => {
       };
 
       // Generate encryption key from user ID (secure key derivation using PBKDF2)
-      const userKey = await generateUserKey(user.id);
+      const userKey = await generateUserKeyFromId(user.id);
 
       // Properly encrypt the data using AES-GCM
       const encrypted = await encryptData(JSON.stringify(snapshot), userKey);
