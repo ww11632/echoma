@@ -9,8 +9,10 @@ Echoma 是一個基於 Web3 的情感記錄應用，結合了客戶端加密、�
 - 🔒 **客戶端加密** - 使用 AES-GCM 加密，數據在離開設備前就已加密
 - 🌊 **Walrus 儲存** - 去中心化、可驗證的儲存方案
 - ⛓️ **Sui 區塊鏈** - NFT 形式的鏈上驗證證明
-- 🤖 **AI 輔助分析** - 智能情感分析和分類
+- 🤖 **AI 輔助分析** - 智能情感分析和溫暖回應（支持中英文）
 - 📊 **時間線視圖** - 可視化你的情感歷程
+- 🌍 **多語言支持** - 支持繁體中文和英文切換
+- 👤 **多種模式** - 匿名模式、認證模式和 MVP 本地模式
 
 ## 📱 iOS App 支持
 
@@ -105,30 +107,61 @@ npm run cap:build:ios
 - **@mysten/sui** - Sui SDK
 - **@mysten/walrus** - Walrus 儲存 SDK
 
+### 後端服務
+- **Supabase** - 用戶認證和雲端存儲
+- **Supabase Edge Functions** - AI 情感分析服務
+- **Express** - 本地開發伺服器
+
 ### 其他工具
 - **React Router** - 路由管理
 - **TanStack Query** - 數據獲取和狀態管理
 - **React Hook Form** - 表單處理
 - **Zod** - 數據驗證
+- **i18next** - 國際化支持
+- **Capacitor** - 跨平台原生應用框架
+- **date-fns** - 日期處理
 
 ## 📁 項目結構
 
 ```
-src/
-├── components/          # React 組件
-│   ├── ui/             # shadcn/ui 組件
-│   └── WalletConnect.tsx
-├── hooks/              # 自定義 React Hooks
-├── lib/                # 工具函數和核心邏輯
-│   ├── encryption.ts   # 客戶端加密功能
-│   ├── walrus.ts       # Walrus 儲存集成
-│   └── utils.ts        # 通用工具函數
-├── pages/              # 頁面組件
-│   ├── Index.tsx       # 首頁
-│   ├── Record.tsx      # 情感記錄頁面
-│   ├── Timeline.tsx    # 時間線頁面
-│   └── NotFound.tsx   # 404 頁面
-└── App.tsx             # 應用入口
+echoma/
+├── src/
+│   ├── components/          # React 組件
+│   │   ├── ui/             # shadcn/ui 組件
+│   │   ├── WalletConnect.tsx
+│   │   └── LanguageSwitcher.tsx
+│   ├── hooks/              # 自定義 React Hooks
+│   ├── lib/                # 工具函數和核心邏輯
+│   │   ├── encryption.ts   # 客戶端加密功能
+│   │   ├── walrus.ts       # Walrus 儲存集成
+│   │   ├── storageService.ts  # 存儲服務抽象層
+│   │   ├── localIndex.ts   # 本地索引服務
+│   │   └── utils.ts        # 通用工具函數
+│   ├── pages/              # 頁面組件
+│   │   ├── Index.tsx       # 首頁
+│   │   ├── Record.tsx      # 匿名模式記錄頁面
+│   │   ├── Timeline.tsx    # 匿名模式時間線
+│   │   ├── Auth.tsx        # 認證頁面
+│   │   ├── AuthRecord.tsx  # 認證模式記錄頁面
+│   │   ├── AuthTimeline.tsx # 認證模式時間線
+│   │   ├── MvpRecord.tsx   # MVP 本地記錄頁面
+│   │   ├── MvpTimeline.tsx # MVP 本地時間線
+│   │   └── NotFound.tsx   # 404 頁面
+│   ├── i18n/               # 國際化配置
+│   │   ├── config.ts
+│   │   └── locales/        # 語言文件
+│   ├── integrations/       # 第三方集成
+│   │   └── supabase/       # Supabase 客戶端
+│   └── App.tsx             # 應用入口
+├── server/                 # 本地開發伺服器
+│   └── index.js
+├── supabase/               # Supabase 配置
+│   ├── functions/          # Edge Functions
+│   │   ├── ai-emotion-response/  # AI 情感分析
+│   │   ├── get-emotions/   # 獲取情感記錄
+│   │   └── upload-emotion/ # 上傳情感記錄
+│   └── migrations/         # 數據庫遷移
+└── public/                 # 靜態資源
 ```
 
 ## 🔐 安全特性
@@ -175,29 +208,75 @@ src/
 
 ## 📝 使用說明
 
-### 記錄情感
+### 三種使用模式
 
-1. 連接 Sui 錢包
-2. 選擇情感類型（喜悅、悲傷、憤怒等）
-3. 調整強度滑塊（0-100%）
-4. 輸入描述文字
-5. 點擊「記錄並鑄造 NFT」
+Echoma 提供三種不同的使用模式，滿足不同需求：
+
+#### 1. 匿名模式（Wallet Mode）
+- **路由**: `/record` 和 `/timeline`
+- **特點**: 使用 Sui 錢包連接，數據加密後上傳到 Walrus
+- **適用**: 想要去中心化存儲，不需要登入的用戶
+- **步驟**:
+  1. 連接 Sui 錢包
+  2. 選擇情感類型和強度
+  3. 輸入描述文字
+  4. 點擊「記錄並鑄造 NFT」
+
+#### 2. 認證模式（Secure Mode）
+- **路由**: `/auth-record` 和 `/auth-timeline`
+- **特點**: 需要 Supabase 帳號登入，支持雲端備份和 AI 情感分析
+- **適用**: 需要跨設備訪問和 AI 輔助分析的用戶
+- **步驟**:
+  1. 在首頁點擊「登入 / 註冊」
+  2. 創建或登入 Supabase 帳號
+  3. 記錄情感時可獲取 AI 回應
+  4. 數據會同步到雲端
+
+#### 3. MVP 模式（Local Mode）
+- **路由**: `/mvp` 和 `/mvp-timeline`
+- **特點**: 完全本地存儲，無需錢包或登入，適合快速測試
+- **適用**: 想要快速體驗或離線使用的用戶
+- **步驟**:
+  1. 直接訪問 `/mvp` 頁面
+  2. 選擇情感和輸入描述
+  3. 數據保存在瀏覽器本地存儲
 
 ### 查看時間線
 
 在時間線頁面可以查看所有已記錄的情感快照，包括：
 - 情感類型和強度
 - 記錄時間
-- Walrus 儲存 ID
+- Walrus 儲存 ID（匿名模式）
 - 區塊鏈驗證狀態
+- AI 回應（認證模式）
+
+### AI 情感分析
+
+在認證模式下，輸入情感描述後可以獲取 AI 回應：
+- 溫暖、同理心的情感支持
+- 適度的開放式問題引導
+- 支持繁體中文和英文
+- 基於 Lovable API 實現
 
 ## 🚧 開發計劃
 
+### ✅ 已完成
+- [x] MVP 核心功能（本地存儲模式）
+- [x] 客戶端加密功能
+- [x] Walrus 儲存集成
+- [x] Supabase 認證和雲端存儲
+- [x] AI 情感分析功能
+- [x] 多語言支持（繁體中文/英文）
+- [x] iOS 應用支持（Capacitor）
+- [x] 多種使用模式（匿名/認證/MVP）
+
+### 🚧 進行中 / 計劃中
 - [ ] 實現 Sui Move 合約用於 NFT 鑄造
 - [ ] 添加情感數據解密和查看功能
 - [ ] 實現數據導出功能
 - [ ] 添加情感趨勢分析圖表
 - [ ] 支持多鏈網路切換
+- [ ] 完善錯誤處理和用戶體驗優化
 
 ## 🤝 貢獻
 
@@ -213,6 +292,21 @@ src/
 - [Walrus 儲存文檔](https://docs.walrus.space/)
 - [shadcn/ui 文檔](https://ui.shadcn.com/)
 
+## 🔧 環境變數配置
+
+如需使用認證模式和 AI 功能，需要配置以下環境變數：
+
+```env
+# Supabase 配置
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_key
+
+# Supabase Edge Functions 需要配置
+LOVABLE_API_KEY=your_lovable_api_key  # 用於 AI 情感分析
+```
+
+詳細配置說明請查看相關文檔。
+
 ---
 
-**注意**: 本項目目前處於開發階段，部分功能（如 NFT 鑄造）尚未完全實現。
+**注意**: 本項目目前處於開發階段，部分功能（如 NFT 鑄造）尚未完全實現。MVP 核心功能已完全可用。
