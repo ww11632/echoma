@@ -20,6 +20,7 @@ interface EmotionRecord {
   is_public: boolean;
   walrus_url?: string;
   blob_id?: string;
+  encrypted_data?: string | null;
 }
 
 const emotionEmojis: Record<string, string> = {
@@ -74,13 +75,13 @@ const AuthTimeline = () => {
     
     // Decrypt records that don't have plaintext description
     records.forEach(record => {
-      if (!record.description && record.blob_id) {
+      if (!record.description && (record.blob_id || record.encrypted_data)) {
         // Check state using functional updates to avoid stale closures
         setDecryptedDescriptions(current => {
           setDecryptingRecords(decrypting => {
             // Only decrypt if not already decrypted and not currently decrypting
             if (!current[record.id] && !decrypting.has(record.id)) {
-              decryptDescription(record.id, record.blob_id!);
+              decryptDescription(record.id, record.blob_id, record.encrypted_data);
             }
             return decrypting;
           });
@@ -88,14 +89,14 @@ const AuthTimeline = () => {
         });
       }
     });
-  }, [user, records, decryptDescription]);
+  }, [user, records]);
 
   const loadRecords = async () => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from('emotion_records')
-        .select('id, created_at, emotion, intensity, description, is_public, walrus_url, blob_id')
+        .select('id, created_at, emotion, intensity, description, is_public, walrus_url, blob_id, encrypted_data')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -113,7 +114,7 @@ const AuthTimeline = () => {
     }
   };
 
-  const decryptDescription = useCallback(async (recordId: string, blobId: string) => {
+  const decryptDescription = useCallback(async (recordId: string, blobId?: string | null, encryptedDataFromDb?: string | null) => {
     if (!user) return;
     
     // Mark as decrypting
@@ -125,8 +126,18 @@ const AuthTimeline = () => {
     });
 
     try {
-      // Fetch encrypted data from Walrus
-      const encryptedDataString = await readFromWalrus(blobId);
+      let encryptedDataString: string;
+      
+      // Try database fallback first, then Walrus
+      if (encryptedDataFromDb) {
+        console.log(`Using encrypted data from database for record ${recordId}`);
+        encryptedDataString = encryptedDataFromDb;
+      } else if (blobId) {
+        console.log(`Fetching encrypted data from Walrus for record ${recordId}`);
+        encryptedDataString = await readFromWalrus(blobId);
+      } else {
+        throw new Error('No encrypted data source available');
+      }
       
       // Parse the encrypted data JSON
       const encryptedData: EncryptedData = JSON.parse(encryptedDataString);
@@ -278,8 +289,8 @@ const AuthTimeline = () => {
                         </div>
                       </div>
                     );
-                  } else if (record.blob_id) {
-                    // Has blob_id but not decrypted yet - show decrypt button
+                  } else if (record.blob_id || record.encrypted_data) {
+                    // Has blob_id or encrypted_data but not decrypted yet - show decrypt button
                     return (
                       <div className="p-4 rounded-lg bg-muted/30 border border-border/50">
                         <div className="flex items-center justify-between">
@@ -290,7 +301,7 @@ const AuthTimeline = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => decryptDescription(record.id, record.blob_id!)}
+                            onClick={() => decryptDescription(record.id, record.blob_id, record.encrypted_data)}
                             disabled={isDecrypting}
                           >
                             <Unlock className="w-3 h-3 mr-2" />

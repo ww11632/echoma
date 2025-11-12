@@ -105,82 +105,94 @@ Deno.serve(async (req) => {
     const binaryData = encoder.encode(encryptedData);
     console.log('Binary data length:', binaryData.length);
     
-    const walrusResponse = await fetch(
-      'https://upload-relay.testnet.walrus.space/v1/store?epochs=5',
-      {
-        method: 'PUT',
-        body: binaryData,
-        headers: {
-          'Content-Type': 'application/octet-stream',
-        },
-      }
-    );
-
-    if (!walrusResponse.ok) {
-      let errorText = '';
-      try {
-        errorText = await walrusResponse.text();
-      } catch (e) {
-        console.error('[INTERNAL] Failed to read error response:', e);
-      }
-      
-      console.error('[INTERNAL] Walrus upload error:', {
-        status: walrusResponse.status,
-        statusText: walrusResponse.statusText,
-        error: errorText,
-        dataLength: encryptedData.length,
-        binaryDataLength: binaryData.length,
-        headers: Object.fromEntries(walrusResponse.headers.entries()),
-      });
-      
-      // Provide more specific error messages
-      let errorMessage = 'Storage upload failed';
-      if (walrusResponse.status === 404) {
-        errorMessage = 'Walrus service endpoint not found. The service may be temporarily unavailable.';
-      } else if (walrusResponse.status === 400) {
-        // Include more details for 400 errors to help debug
-        const details = errorText ? ` Details: ${errorText.substring(0, 200)}` : '';
-        errorMessage = `Invalid data format sent to storage service.${details}`;
-      } else if (walrusResponse.status === 413) {
-        errorMessage = 'Data too large for storage service.';
-      } else if (walrusResponse.status >= 500) {
-        errorMessage = 'Storage service error. Please try again later.';
-      } else {
-        const details = errorText ? ` ${errorText.substring(0, 200)}` : '';
-        errorMessage = `Storage upload failed (${walrusResponse.status}).${details}`;
-      }
-      
-      throw new Error(errorMessage);
-    }
-
-    const walrusResult = await walrusResponse.json();
-    console.log('Walrus upload successful');
-    
-    // Extract blob ID
-    let blobId: string;
-    if (walrusResult.alreadyCertified) {
-      blobId = walrusResult.alreadyCertified.blobId;
-    } else if (walrusResult.newlyCreated) {
-      blobId = walrusResult.newlyCreated.blobObject.blobId;
-    } else {
-      throw new Error('Unexpected storage response format');
-    }
-
-    const walrusUrl = `https://aggregator.testnet.walrus.space/v1/${blobId}`;
-
-    // Calculate payload hash
-    const encoder = new TextEncoder();
-    const data = encoder.encode(encryptedData);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    // Calculate payload hash (before Walrus upload)
+    const hashBuffer = await crypto.subtle.digest('SHA-256', binaryData);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const payloadHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    
+    let blobId: string | null = null;
+    let walrusUrl: string | null = null;
+    let suiRef: string | null = null;
+    let useDbFallback = false;
+    
+    try {
+      const walrusResponse = await fetch(
+        'https://publisher.testnet.walrus.space/v1/store?epochs=5',
+        {
+          method: 'PUT',
+          body: binaryData,
+          headers: {
+            'Content-Type': 'application/octet-stream',
+          },
+        }
+      );
+
+      if (!walrusResponse.ok) {
+        let errorText = '';
+        try {
+          errorText = await walrusResponse.text();
+        } catch (e) {
+          console.error('[INTERNAL] Failed to read error response:', e);
+        }
+        
+        console.error('[INTERNAL] Walrus upload error:', {
+          status: walrusResponse.status,
+          statusText: walrusResponse.statusText,
+          error: errorText,
+          dataLength: encryptedData.length,
+          binaryDataLength: binaryData.length,
+          headers: Object.fromEntries(walrusResponse.headers.entries()),
+        });
+        
+        // If Walrus is unavailable (404) or has server error (5xx), use database fallback
+        if (walrusResponse.status === 404 || walrusResponse.status >= 500) {
+          console.warn('Walrus unavailable, using database fallback for encrypted data storage');
+          useDbFallback = true;
+        } else if (walrusResponse.status === 400) {
+          const details = errorText ? ` Details: ${errorText.substring(0, 200)}` : '';
+          throw new Error(`Invalid data format sent to storage service.${details}`);
+        } else if (walrusResponse.status === 413) {
+          throw new Error('Data too large for storage service.');
+        } else {
+          const details = errorText ? ` ${errorText.substring(0, 200)}` : '';
+          throw new Error(`Storage upload failed (${walrusResponse.status}).${details}`);
+        }
+      } else {
+        const walrusResult = await walrusResponse.json();
+        console.log('Walrus upload successful');
+        
+        // Extract blob ID
+        if (walrusResult.alreadyCertified) {
+          blobId = walrusResult.alreadyCertified.blobId;
+        } else if (walrusResult.newlyCreated) {
+          blobId = walrusResult.newlyCreated.blobObject.blobId;
+        } else {
+          throw new Error('Unexpected storage response format');
+        }
+
+        walrusUrl = `https://aggregator.testnet.walrus.space/v1/${blobId}`;
+        suiRef = walrusResult.newlyCreated?.blobObject?.id || null;
+      }
+    } catch (error) {
+      // If it's a network error or timeout, use database fallback
+      if (error instanceof TypeError) {
+        console.warn('Network error connecting to Walrus, using database fallback:', error);
+        useDbFallback = true;
+      } else if (error instanceof Error && error.message?.includes('fetch')) {
+        console.warn('Fetch error connecting to Walrus, using database fallback:', error);
+        useDbFallback = true;
+      } else {
+        // Re-throw other errors (validation errors, etc.)
+        throw error;
+      }
+    }
 
     console.log('Storing in database...');
 
     // Store in database
     // Security: Do not store plaintext description
-    // Description is encrypted in encryptedData (stored in Walrus)
-    // All sensitive data should be decrypted client-side from Walrus
+    // Description is encrypted in encryptedData (stored in Walrus or database fallback)
+    // All sensitive data should be decrypted client-side
     // This ensures encryption-at-rest for all mental health data
     const { data: record, error: dbError } = await supabase
       .from('emotion_records')
@@ -188,15 +200,16 @@ Deno.serve(async (req) => {
         user_id: user.id,
         emotion,
         intensity,
-        // Do not store plaintext description - it's encrypted in Walrus
-        // Frontend must decrypt from encryptedData for display
+        // Do not store plaintext description - it's encrypted in Walrus or database
         description: null,
         blob_id: blobId,
         walrus_url: walrusUrl,
         payload_hash: payloadHash,
         is_public: isPublic || false,
         proof_status: 'confirmed',
-        sui_ref: walrusResult.newlyCreated?.blobObject?.id || null,
+        sui_ref: suiRef,
+        // Fallback: Store encrypted data in database if Walrus is unavailable
+        encrypted_data: useDbFallback ? encryptedData : null,
       })
       .select()
       .single();
@@ -207,6 +220,9 @@ Deno.serve(async (req) => {
     }
 
     console.log('Record created successfully:', record.id);
+    if (useDbFallback) {
+      console.log('Encrypted data stored in database (Walrus unavailable)');
+    }
 
     return new Response(
       JSON.stringify({
@@ -217,8 +233,9 @@ Deno.serve(async (req) => {
           walrusUrl,
           payloadHash,
           proofStatus: 'confirmed',
-          suiRef: walrusResult.newlyCreated?.blobObject?.id || null,
+          suiRef,
           timestamp: record.created_at,
+          fallbackUsed: useDbFallback,
         },
       }),
       {
