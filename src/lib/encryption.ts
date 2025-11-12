@@ -1081,11 +1081,15 @@ function validateBase64URL(s: string): void {
 }
 
 function base64ToBuffer(base64: string): ArrayBuffer {
+  // 清理字符串：移除所有空白字符（空格、換行符、製表符等）
+  // 這可以處理從外部源（如 Walrus、數據庫）讀取時可能包含的空白字符
+  const cleanedBase64 = base64.replace(/\s/g, '');
+  
   // Base64URL 嚴格驗證（正則+拒絕 padding）
-  validateBase64URL(base64);
+  validateBase64URL(cleanedBase64);
   
   // 轉換 Base64URL 回標準 Base64
-  const standardBase64 = base64
+  const standardBase64 = cleanedBase64
     .replace(/-/g, '+')
     .replace(/_/g, '/');
   

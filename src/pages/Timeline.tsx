@@ -767,9 +767,9 @@ const Timeline = () => {
             <div className="grid md:grid-cols-2 gap-4 mb-6">
               {/* Emotion Distribution Pie Chart */}
               {emotionChartData.length > 0 && (
-                <Card className="p-6 glass-card">
+                <Card className="p-6 glass-card overflow-hidden">
                   <h3 className="text-lg font-semibold mb-4">{t("timeline.chart.emotionDistribution")}</h3>
-                  <ChartContainer config={chartConfig} className="h-[250px]">
+                  <ChartContainer config={chartConfig} className="h-[250px] w-full overflow-hidden">
                     <PieChart>
                       <Pie
                         data={emotionChartData}
@@ -777,7 +777,7 @@ const Timeline = () => {
                         cy="50%"
                         labelLine={false}
                         label={({ name, value, emoji }) => `${emoji} ${value}`}
-                        outerRadius={80}
+                        outerRadius={70}
                         fill="#8884d8"
                         dataKey="value"
                       >
@@ -793,9 +793,9 @@ const Timeline = () => {
 
               {/* Storage Distribution Pie Chart */}
               {storageChartData.some(d => d.value > 0) && (
-                <Card className="p-6 glass-card">
+                <Card className="p-6 glass-card overflow-hidden">
                   <h3 className="text-lg font-semibold mb-4">{t("timeline.chart.storageDistribution")}</h3>
-                  <ChartContainer config={chartConfig} className="h-[250px]">
+                  <ChartContainer config={chartConfig} className="h-[250px] w-full overflow-hidden">
                     <PieChart>
                       <Pie
                         data={storageChartData}
@@ -803,7 +803,7 @@ const Timeline = () => {
                         cy="50%"
                         labelLine={false}
                         label={({ name, value }) => `${name}: ${value}`}
-                        outerRadius={80}
+                        outerRadius={70}
                         fill="#8884d8"
                         dataKey="value"
                       >
@@ -821,10 +821,10 @@ const Timeline = () => {
 
           {/* Timeline Chart */}
           {records.length > 0 && timelineChartData.some(d => d.count > 0) && (
-            <Card className="p-6 glass-card mb-6">
+            <Card className="p-6 glass-card mb-6 overflow-hidden">
               <h3 className="text-lg font-semibold mb-4">{t("timeline.chart.timelineChart")}</h3>
-              <ChartContainer config={chartConfig} className="h-[200px]">
-                <BarChart data={timelineChartData}>
+              <ChartContainer config={chartConfig} className="h-[200px] w-full overflow-hidden">
+                <BarChart data={timelineChartData} margin={{ left: 0, right: 0 }}>
                   <XAxis dataKey="date" />
                   <YAxis />
                   <ChartTooltip content={<ChartTooltipContent />} />

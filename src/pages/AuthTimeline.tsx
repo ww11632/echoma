@@ -362,9 +362,9 @@ const AuthTimeline = () => {
             <div className="grid md:grid-cols-2 gap-4 mb-6">
               {/* Emotion Distribution Pie Chart */}
               {emotionChartData.length > 0 && (
-                <Card className="p-6 glass-card">
+                <Card className="p-6 glass-card overflow-hidden">
                   <h3 className="text-lg font-semibold mb-4">Emotion Distribution</h3>
-                  <ChartContainer config={chartConfig} className="h-[250px]">
+                  <ChartContainer config={chartConfig} className="h-[250px] w-full overflow-hidden">
                     <PieChart>
                       <Pie
                         data={emotionChartData}
@@ -372,7 +372,7 @@ const AuthTimeline = () => {
                         cy="50%"
                         labelLine={false}
                         label={({ name, value, emoji }) => `${emoji} ${value}`}
-                        outerRadius={80}
+                        outerRadius={70}
                         fill="#8884d8"
                         dataKey="value"
                       >
@@ -388,10 +388,10 @@ const AuthTimeline = () => {
 
               {/* Timeline Chart */}
               {timelineChartData.some(d => d.count > 0) && (
-                <Card className="p-6 glass-card">
+                <Card className="p-6 glass-card overflow-hidden">
                   <h3 className="text-lg font-semibold mb-4">Last 7 Days</h3>
-                  <ChartContainer config={chartConfig} className="h-[250px]">
-                    <BarChart data={timelineChartData}>
+                  <ChartContainer config={chartConfig} className="h-[250px] w-full overflow-hidden">
+                    <BarChart data={timelineChartData} margin={{ left: 0, right: 0 }}>
                       <XAxis dataKey="date" />
                       <YAxis />
                       <ChartTooltip content={<ChartTooltipContent />} />
