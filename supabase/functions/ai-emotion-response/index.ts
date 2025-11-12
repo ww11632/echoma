@@ -43,7 +43,9 @@ Deno.serve(async (req) => {
     );
 
     // Verify user authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    const user = authData?.user;
+    
     if (authError || !user) {
       console.error('Auth error:', authError);
       return new Response(
