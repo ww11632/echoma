@@ -81,16 +81,19 @@ export const walletAddressSchema = z
 
 /**
  * Sanitize user input by removing potentially dangerous content
+ * Supports international characters (Unicode) while protecting against XSS
  */
 export function sanitizeInput(input: string): string {
-  // Remove null bytes and control characters (except newlines and tabs)
-  // Use character code filtering to avoid regex control character issues
+  // Remove null bytes and dangerous control characters
   let sanitized = input
     .split("")
     .filter((char) => {
       const code = char.charCodeAt(0);
-      // Allow printable ASCII characters (32-126), newlines (10), and tabs (9)
-      return (code >= 32 && code <= 126) || code === 9 || code === 10;
+      // Allow:
+      // - Printable ASCII (32-126)
+      // - Tabs (9) and newlines (10)
+      // - Unicode characters (>= 128) for international text
+      return (code >= 32 && code <= 126) || code === 9 || code === 10 || code >= 128;
     })
     .join("");
   
