@@ -177,7 +177,9 @@ export function isValidBlobId(blobId: string): boolean {
 export async function readFromWalrus(blobId: string): Promise<string> {
   // Validate blob ID format
   if (!isValidBlobId(blobId)) {
-    throw new Error("Invalid blob ID format");
+    const error: any = new Error("Invalid blob ID format");
+    error.status = 400;
+    throw error;
   }
 
   // Sanitize blob ID to prevent URL manipulation
@@ -195,20 +197,32 @@ export async function readFromWalrus(blobId: string): Promise<string> {
         error: errorText,
       });
 
+      // Create error with status code for detailed diagnostics
+      const error: any = new Error();
+      error.status = response.status;
+      error.response = { status: response.status };
+
       // Show generic error to user
       if (response.status === 404) {
-        throw new Error("Data not found. It may have expired or been removed.");
+        error.message = "Data not found. It may have expired or been removed.";
       } else if (response.status >= 500) {
-        throw new Error("Storage service temporarily unavailable. Please try again later.");
+        error.message = `Storage service temporarily unavailable (${response.status}). Please try again later.`;
       } else {
-        throw new Error("Failed to retrieve data. Please try again.");
+        error.message = `Failed to retrieve data (${response.status}). Please try again.`;
       }
+      
+      throw error;
     }
 
     return await response.text();
   } catch (error) {
     // Don't expose internal errors
     if (error instanceof Error) {
+      // If it's already a user-friendly error with status, re-throw it
+      if ((error as any).status) {
+        throw error;
+      }
+      
       // If it's already a user-friendly error, re-throw it
       if (error.message.includes("Invalid blob ID") || 
           error.message.includes("not found") ||
@@ -217,14 +231,18 @@ export async function readFromWalrus(blobId: string): Promise<string> {
         throw error;
       }
       
-      // Network errors
-      if (error.message.includes("fetch") || error.message.includes("network")) {
-        throw new Error("Network error. Check your connection and try again.");
+      // Network errors - create error with network type
+      if (error.message.includes("fetch") || error.message.includes("network") || error.name === "TypeError") {
+        const networkError: any = new Error("Network error. Check your connection and try again.");
+        networkError.status = 0; // 0 indicates network error
+        throw networkError;
       }
     }
     
     // Generic fallback
-    throw new Error("Failed to retrieve data. Please try again later.");
+    const genericError: any = new Error("Failed to retrieve data. Please try again later.");
+    genericError.status = 0;
+    throw genericError;
   }
 }
 
