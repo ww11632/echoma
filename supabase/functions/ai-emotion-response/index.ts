@@ -1,22 +1,34 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { corsHeaders } from '../_shared/cors.ts';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+console.log('AI emotion response function started');
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    console.log('Processing AI emotion response request');
+    
+    // Get auth header first
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      throw new Error('No authorization header');
+      console.error('No authorization header provided');
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'No authorization header',
+          errorCode: 'UNAUTHORIZED'
+        }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
+    // Create Supabase client with user's auth context
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -30,18 +42,97 @@ serve(async (req) => {
       }
     );
 
+    // Verify user authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      throw new Error('Unauthorized');
+      console.error('Auth error:', authError);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Unauthorized',
+          errorCode: 'UNAUTHORIZED'
+        }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
-    const { emotion, intensity, description, language = 'zh-TW' } = await req.json();
+    console.log('User authenticated:', user.id);
 
-    console.log('[AI Response] Request:', { emotion, intensity, language });
+    // Parse and validate request body
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch (error) {
+      console.error('Failed to parse request body:', error);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Invalid JSON in request body',
+          errorCode: 'INVALID_REQUEST'
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Validate required fields
+    if (!body || typeof body !== 'object') {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Invalid request body',
+          errorCode: 'INVALID_REQUEST'
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    const { emotion, intensity, description, language = 'zh-TW' } = body as {
+      emotion?: string;
+      intensity?: number;
+      description?: string;
+      language?: string;
+    };
+
+    // Validate required fields
+    if (!emotion || !description || typeof intensity !== 'number') {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Missing required fields: emotion, intensity, and description are required',
+          errorCode: 'INVALID_REQUEST'
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    console.log('[AI Response] Request:', { emotion, intensity, language, descriptionLength: description.length });
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
+      console.error('LOVABLE_API_KEY not configured');
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'AI service is not configured. Please contact support.',
+          errorCode: 'SERVICE_UNAVAILABLE'
+        }),
+        {
+          status: 503,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     // Build system prompt based on language
@@ -90,75 +181,172 @@ Please respond in English.`
 
     const systemPrompt = systemPrompts[language as keyof typeof systemPrompts] || systemPrompts['zh-TW'];
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: description }
-        ],
-        temperature: 0.8,
-        max_tokens: 300,
-      }),
-    });
+    // Call AI service
+    console.log('[AI Response] Calling AI service...');
+    let response: Response;
+    try {
+      response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: description }
+          ],
+          temperature: 0.8,
+          max_tokens: 300,
+        }),
+      });
+    } catch (fetchError) {
+      console.error('[AI Response] Network error calling AI service:', fetchError);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Failed to connect to AI service. Please try again later.',
+          errorCode: 'NETWORK_ERROR'
+        }),
+        {
+          status: 503,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
 
     if (!response.ok) {
+      let errorText = '';
+      try {
+        errorText = await response.text();
+      } catch (e) {
+        console.error('[AI Response] Failed to read error response:', e);
+      }
+
+      console.error('[AI Response] API error:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText.substring(0, 500)
+      });
+
       if (response.status === 429) {
-        console.error('[AI Response] Rate limit exceeded');
-        return new Response(JSON.stringify({ 
-          error: 'AI service is busy. Please try again in a moment.',
-          errorCode: 'RATE_LIMIT'
-        }), {
-          status: 429,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'AI service is busy. Please try again in a moment.',
+            errorCode: 'RATE_LIMIT'
+          }),
+          {
+            status: 429,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
       }
       if (response.status === 402) {
-        console.error('[AI Response] Payment required');
-        return new Response(JSON.stringify({ 
-          error: 'AI service requires credits. Please contact support.',
-          errorCode: 'PAYMENT_REQUIRED'
-        }), {
-          status: 402,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'AI service requires credits. Please contact support.',
+            errorCode: 'PAYMENT_REQUIRED'
+          }),
+          {
+            status: 402,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
       }
       
-      const errorText = await response.text();
-      console.error('[AI Response] API error:', response.status, errorText);
-      throw new Error('AI service error');
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'AI service error. Please try again later.',
+          errorCode: 'AI_SERVICE_ERROR'
+        }),
+        {
+          status: 502,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
-    const data = await response.json();
-    const aiResponse = data.choices?.[0]?.message?.content;
+    // Parse AI response
+    let data: unknown;
+    try {
+      data = await response.json();
+    } catch (parseError) {
+      console.error('[AI Response] Failed to parse AI response:', parseError);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Invalid response from AI service.',
+          errorCode: 'INVALID_RESPONSE'
+        }),
+        {
+          status: 502,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Extract AI response content
+    const aiResponse = (data as { choices?: Array<{ message?: { content?: string } }> })?.choices?.[0]?.message?.content;
 
     if (!aiResponse) {
-      throw new Error('No response from AI');
+      console.error('[AI Response] No response content in AI response:', JSON.stringify(data).substring(0, 500));
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'No response from AI. Please try again.',
+          errorCode: 'NO_RESPONSE'
+        }),
+        {
+          status: 502,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
-    console.log('[AI Response] Success');
+    console.log('[AI Response] Success, response length:', aiResponse.length);
 
-    return new Response(JSON.stringify({ 
-      success: true, 
-      response: aiResponse 
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({
+        success: true,
+        response: aiResponse
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
 
   } catch (error) {
-    console.error('[AI Response] Error:', error);
-    return new Response(JSON.stringify({ 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      errorCode: 'INTERNAL_ERROR'
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.error('[AI Response] Unexpected error:', error);
+    
+    // Extract error message safely
+    let errorMessage = 'An unexpected error occurred';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    } else if (typeof error === 'string') {
+      errorMessage = error;
+    } else if (error && typeof error === 'object' && 'message' in error) {
+      errorMessage = String(error.message);
+    }
+    
+    // Ensure error message is not too long
+    if (errorMessage.length > 500) {
+      errorMessage = errorMessage.substring(0, 500) + '...';
+    }
+    
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: errorMessage,
+        errorCode: 'INTERNAL_ERROR'
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
   }
 });
