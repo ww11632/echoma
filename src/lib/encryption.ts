@@ -557,8 +557,8 @@ function migrateLegacyFormat(data: any): EncryptedData {
         iterations: DEFAULT_PBKDF2_ITERATIONS,
         hash: "SHA-256",
       },
-      salt: bufferToBase64(saltArray.buffer),
-      iv: bufferToBase64(ivArray.buffer),
+      salt: bufferToBase64(saltArray.buffer as ArrayBuffer),
+      iv: bufferToBase64(ivArray.buffer as ArrayBuffer),
     };
     
     return {

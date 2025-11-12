@@ -19,14 +19,40 @@ export const EMOTION_TYPES = [
 ] as const;
 
 /**
- * Encrypted data structure validation
- * encryptedData should be a JSON string containing ciphertext, iv, and salt
+ * Encryption header validation (versioned format)
  */
-const encryptedDataSchema = z.object({
-  ciphertext: z.string().min(1, "Ciphertext cannot be empty"),
-  iv: z.string().min(1, "IV cannot be empty"),
+const encryptionHeaderSchema = z.object({
+  v: z.number(),
+  kdf: z.enum(["argon2id", "pbkdf2"]),
+  kdfParams: z.object({
+    iterations: z.number().optional(),
+    hash: z.string().optional(),
+    time: z.number().optional(),
+    mem: z.number().optional(),
+    parallelism: z.number().optional(),
+  }),
   salt: z.string().min(1, "Salt cannot be empty"),
+  iv: z.string().min(1, "IV cannot be empty"),
 });
+
+/**
+ * Encrypted data structure validation
+ * encryptedData should be a JSON string containing header and ciphertext (versioned format)
+ * Also supports legacy format with ciphertext, iv, and salt for backward compatibility
+ */
+const encryptedDataSchema = z.union([
+  // New versioned format
+  z.object({
+    header: encryptionHeaderSchema,
+    ciphertext: z.string().min(1, "Ciphertext cannot be empty"),
+  }),
+  // Legacy format (backward compatibility)
+  z.object({
+    ciphertext: z.string().min(1, "Ciphertext cannot be empty"),
+    iv: z.string().min(1, "IV cannot be empty"),
+    salt: z.string().min(1, "Salt cannot be empty"),
+  }),
+]);
 
 /**
  * Upload emotion request validation schema

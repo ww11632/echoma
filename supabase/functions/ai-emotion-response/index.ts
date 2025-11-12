@@ -192,7 +192,7 @@ Deno.serve(async (req) => {
     
     // 如果从数据库获取失败，回退到环境变量
     if (!apiKey) {
-      apiKey = Deno.env.get('LOVABLE_API_KEY');
+      apiKey = Deno.env.get('LOVABLE_API_KEY') || null;
     }
     
     if (!apiKey) {
