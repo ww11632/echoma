@@ -233,69 +233,80 @@ const Record = () => {
         description: t("record.success.uploadingDesc"),
       });
 
-      // Try SDK method first if wallet is connected (this will trigger transaction popup)
-      if (currentWallet && currentAccount) {
+      // If user chose Walrus upload, wallet must be connected
+      if (!currentWallet || !currentAccount) {
+        throw new Error("Wallet connection required for Walrus upload. Please connect your wallet first.");
+      }
+
+      // Try SDK method first (this will trigger transaction popup)
+      try {
+        console.log("[Record] Attempting SDK upload with wallet - THIS WILL TRIGGER TRANSACTION POPUP");
+        console.log("[Record] Wallet:", currentWallet?.name, "Account:", currentAccount.address);
+        
+        const suiClient = new SuiClient({
+          url: getFullnodeUrl("testnet"),
+        });
+        
+        const signer = createSignerFromWallet(currentWallet, currentAccount.address, suiClient);
+        const sdkResult = await uploadToWalrusWithSDK(encryptedString, signer, 5);
+        
+        console.log("[Record] ✅ SDK upload successful:", sdkResult);
+        
+        setUploadStatus("success");
+        toast({
+          title: t("record.success.recorded"),
+          description: t("record.success.recordedSDK", { blobId: sdkResult.blobId.slice(0, 8) }),
+        });
+        
+        // Try to save metadata to backend (optional)
         try {
-          console.log("[Record] Attempting SDK upload with wallet - THIS WILL TRIGGER TRANSACTION POPUP");
-          
-          const suiClient = new SuiClient({
-            url: getFullnodeUrl("testnet"),
+          await postEmotion({
+            emotion: selectedEmotion,
+            intensity: intensityValue,
+            description: sanitizedDescription,
+            encryptedData: encryptedString,
+            isPublic,
+            walletAddress: currentAccount.address,
           });
-          
-          const signer = createSignerFromWallet(currentWallet, currentAccount.address, suiClient);
-          const sdkResult = await uploadToWalrusWithSDK(encryptedString, signer, 5);
-          
-          console.log("[Record] ✅ SDK upload successful:", sdkResult);
-          
-          setUploadStatus("success");
-          toast({
-            title: t("record.success.recorded"),
-            description: t("record.success.recordedSDK", { blobId: sdkResult.blobId.slice(0, 8) }),
-          });
-          
-          // Try to save metadata to backend (optional)
-          try {
-            await postEmotion({
-              emotion: selectedEmotion,
-              intensity: intensityValue,
-              description: sanitizedDescription,
-              encryptedData: encryptedString,
-              isPublic,
-              walletAddress: currentAccount.address,
-            });
-          } catch (metadataError) {
-            console.warn("[Record] Metadata save failed (not critical):", metadataError);
-          }
-          
-          setTimeout(() => navigate("/timeline"), 1200);
-          return;
-        } catch (sdkError: any) {
-          console.warn("[Record] SDK upload failed, falling back to HTTP API:", sdkError);
-          
-          // Show specific error message for SDK failures
-          if (sdkError.message.includes("餘額不足") || sdkError.message.includes("Insufficient balance") || sdkError.message.toLowerCase().includes("insufficient")) {
-            toast({
-              title: t("record.wallet.insufficientBalance"),
-              description: t("record.wallet.insufficientBalanceDesc"),
-              variant: "destructive",
-            });
-          } else if (sdkError.message.includes("簽名失敗") || sdkError.message.includes("Sign failed") || sdkError.message.toLowerCase().includes("sign")) {
-            toast({
-              title: t("record.wallet.signFailed"),
-              description: t("record.wallet.signFailedDesc"),
-              variant: "destructive",
-            });
-          } else if (sdkError.message.includes("交易已取消") || sdkError.message.includes("Transaction cancelled") || sdkError.message.toLowerCase().includes("cancelled")) {
-            toast({
-              title: t("record.wallet.transactionCancelled"),
-              description: t("record.wallet.transactionCancelledDesc"),
-              variant: "default",
-            });
-            setIsSubmitting(false);
-            return;
-          }
-          // Continue to HTTP API fallback below
+        } catch (metadataError) {
+          console.warn("[Record] Metadata save failed (not critical):", metadataError);
         }
+        
+        setTimeout(() => navigate("/timeline"), 1200);
+        return;
+      } catch (sdkError: any) {
+        console.error("[Record] SDK upload failed:", sdkError);
+        
+        // Show specific error message for SDK failures
+        if (sdkError.message.includes("餘額不足") || sdkError.message.includes("Insufficient balance") || sdkError.message.toLowerCase().includes("insufficient")) {
+          toast({
+            title: t("record.wallet.insufficientBalance"),
+            description: t("record.wallet.insufficientBalanceDesc"),
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
+        } else if (sdkError.message.includes("簽名失敗") || sdkError.message.includes("Sign failed") || sdkError.message.toLowerCase().includes("sign")) {
+          toast({
+            title: t("record.wallet.signFailed"),
+            description: t("record.wallet.signFailedDesc"),
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
+        } else if (sdkError.message.includes("交易已取消") || sdkError.message.includes("Transaction cancelled") || sdkError.message.toLowerCase().includes("cancelled") || sdkError.message.toLowerCase().includes("user rejected")) {
+          toast({
+            title: t("record.wallet.transactionCancelled"),
+            description: t("record.wallet.transactionCancelledDesc"),
+            variant: "default",
+          });
+          setIsSubmitting(false);
+          return;
+        }
+        
+        // For other SDK errors, throw to prevent fallback to local storage
+        // User explicitly chose Walrus upload, so we should not silently fallback to local
+        throw new Error(`Walrus SDK upload failed: ${sdkError.message || "Unknown error"}`);
       }
 
       // Get current session
@@ -329,8 +340,10 @@ const Record = () => {
           setTimeout(() => navigate("/timeline"), 1200);
           return;
         } catch (apiError) {
-          const canFallback = saveLocally || isBackendUnavailable(apiError);
-          if (canFallback) {
+          // If user chose Walrus upload (saveLocally = false), don't fallback to local storage
+          // Only fallback if user explicitly chose local storage OR backend is completely unavailable
+          if (saveLocally) {
+            // User chose local storage, so fallback is OK
             console.log("[Client] API failed, saving to local storage as fallback");
             setUploadStatus("saving");
             await saveToLocalIndex(sanitizedDescription, selectedEmotion, isPublic);
@@ -343,6 +356,10 @@ const Record = () => {
             });
             setTimeout(() => navigate("/timeline"), 1200);
             return;
+          } else if (isBackendUnavailable(apiError)) {
+            // Backend is completely unavailable, but user chose Walrus upload
+            // Still don't silently fallback - show error instead
+            throw new Error("Backend service is unavailable. Please try again later or check your network connection.");
           }
           throw apiError;
         }

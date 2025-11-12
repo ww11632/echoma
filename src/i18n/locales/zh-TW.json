@@ -148,6 +148,13 @@
     "pending": "⏳ 等待中",
     "failed": "❌ 失敗",
     "onChain": "🔗 已上鏈",
+    "walrusSaved": "這段情緒已永久保存於 Walrus，Blob ID: {{blobId}}",
+    "queryingOnChain": "正在查詢鏈上 Walrus 記錄...",
+    "queryingOnChainDesc": "正在從 Sui 區塊鏈查詢您的 Walrus 記錄，請稍候",
+    "queryCompleted": "查詢完成",
+    "queryCompletedDesc": "找到 {{count}} 筆鏈上 Walrus 記錄",
+    "queryFailed": "查詢失敗",
+    "queryFailedDesc": "無法從鏈上查詢 Walrus 記錄，請稍後再試",
     "filter": {
       "all": "全部",
       "local": "本地儲存",

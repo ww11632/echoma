@@ -236,6 +236,132 @@ export function getWalrusUrl(blobId: string): string {
 }
 
 /**
+ * Query Walrus blob objects owned by a wallet address from Sui chain
+ * Returns blob IDs and object IDs for records stored on-chain
+ */
+export async function queryWalrusBlobsByOwner(
+  ownerAddress: string
+): Promise<Array<{ blobId: string; objectId: string; createdAt?: string }>> {
+  try {
+    const client = new SuiClient({
+      url: getFullnodeUrl("testnet"),
+      network: "testnet",
+    });
+
+    console.log(`[Walrus Query] Querying Walrus blobs for owner: ${ownerAddress}`);
+
+    // Query for Walrus blob objects
+    // Walrus blob objects have a specific type structure
+    // We need to query objects owned by the address and filter for Walrus blob types
+    const walrusBlobs: Array<{ blobId: string; objectId: string; createdAt?: string }> = [];
+
+    try {
+      // Query owned objects - Walrus blob objects might be under a specific package/module
+      // Since we don't know the exact type, we'll query all owned objects and filter
+      const ownedObjects = await client.getOwnedObjects({
+        owner: ownerAddress,
+        options: {
+          showType: true,
+          showContent: true,
+          showOwner: true,
+        },
+        limit: 50, // Limit to prevent too many requests
+      });
+
+      console.log(`[Walrus Query] Found ${ownedObjects.data.length} owned objects`);
+
+      // Log all object types for debugging
+      const objectTypes = ownedObjects.data.map(obj => obj.data?.type).filter(Boolean);
+      console.log(`[Walrus Query] Object types found:`, objectTypes);
+
+      // Filter and process Walrus blob objects
+      for (const obj of ownedObjects.data) {
+        if (!obj.data) continue;
+
+        const objectId = obj.data.objectId;
+        const objectType = obj.data.type;
+
+        console.log(`[Walrus Query] Checking object ${objectId}, type: ${objectType}`);
+
+        // Check if this is a Walrus blob object
+        // Walrus blob objects typically have blobId in their content
+        if (obj.data.content && 'fields' in obj.data.content) {
+          const fields = obj.data.content.fields as any;
+          console.log(`[Walrus Query] Object ${objectId} fields:`, Object.keys(fields));
+          
+          // Look for blobId or similar fields that indicate this is a Walrus blob
+          if (fields.blobId || fields.blob_id || fields.id || fields.blob_hash) {
+            const blobId = fields.blobId || fields.blob_id || fields.id || fields.blob_hash;
+            
+            if (blobId && typeof blobId === 'string') {
+              walrusBlobs.push({
+                blobId,
+                objectId,
+                createdAt: obj.data.previousTransaction ? undefined : new Date().toISOString(),
+              });
+              console.log(`[Walrus Query] ✅ Found Walrus blob: ${blobId}, objectId: ${objectId}`);
+            }
+          }
+        }
+
+        // Also check if the object type indicates it's a Walrus blob
+        // Walrus objects might have types like "0x...::walrus::Blob" or similar
+        if (objectType && typeof objectType === 'string' && (
+          objectType.toLowerCase().includes('walrus') || 
+          objectType.toLowerCase().includes('blob')
+        )) {
+          console.log(`[Walrus Query] Object ${objectId} has walrus/blob type, fetching details...`);
+          // Try to get blobId from object details
+          try {
+            const objectDetails = await client.getObject({
+              id: objectId,
+              options: {
+                showContent: true,
+                showType: true,
+                showOwner: true,
+              },
+            });
+
+            console.log(`[Walrus Query] Object ${objectId} details:`, {
+              type: objectDetails.data?.type,
+              hasContent: !!objectDetails.data?.content,
+              owner: objectDetails.data?.owner
+            });
+
+            if (objectDetails.data?.content && 'fields' in objectDetails.data.content) {
+              const fields = (objectDetails.data.content as any).fields;
+              console.log(`[Walrus Query] Object ${objectId} content fields:`, Object.keys(fields));
+              const blobId = fields?.blobId || fields?.blob_id || fields?.id || fields?.blob_hash;
+              
+              if (blobId && typeof blobId === 'string') {
+                walrusBlobs.push({
+                  blobId,
+                  objectId,
+                  createdAt: objectDetails.data.previousTransaction ? undefined : new Date().toISOString(),
+                });
+                console.log(`[Walrus Query] ✅ Found Walrus blob from type: ${blobId}, objectId: ${objectId}`);
+              }
+            }
+          } catch (err) {
+            console.warn(`[Walrus Query] Failed to get object details for ${objectId}:`, err);
+          }
+        }
+      }
+
+      console.log(`[Walrus Query] Found ${walrusBlobs.length} Walrus blobs for owner ${ownerAddress}`);
+      return walrusBlobs;
+    } catch (error) {
+      console.error(`[Walrus Query] Error querying owned objects:`, error);
+      throw error;
+    }
+  } catch (error) {
+    console.error(`[Walrus Query] Failed to query Walrus blobs:`, error);
+    // Return empty array instead of throwing to allow timeline to still load other records
+    return [];
+  }
+}
+
+/**
  * Create Walrus client for SDK usage
  * The walrus SDK extends a SuiClient, so we need to create a SuiClient first
  */

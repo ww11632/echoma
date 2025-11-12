@@ -148,6 +148,13 @@
     "pending": "⏳ Pending",
     "failed": "❌ Failed",
     "onChain": "🔗 On-chain",
+    "walrusSaved": "This emotion has been permanently saved to Walrus, Blob ID: {{blobId}}",
+    "queryingOnChain": "Querying on-chain Walrus records...",
+    "queryingOnChainDesc": "Fetching your Walrus records from Sui blockchain, please wait",
+    "queryCompleted": "Query completed",
+    "queryCompletedDesc": "Found {{count}} on-chain Walrus records",
+    "queryFailed": "Query failed",
+    "queryFailedDesc": "Unable to query Walrus records from chain, please try again later",
     "filter": {
       "all": "All",
       "local": "Local Storage",
