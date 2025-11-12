@@ -1,0 +1,47 @@
+name: Security Flags Check
+
+on:
+  pull_request:
+    branches: [main, master, production]
+  push:
+    branches: [main, master, production]
+  workflow_dispatch:
+
+jobs:
+  check-security-flags:
+    name: Check Security Test Flags
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Check security flags
+        run: |
+          npm run ci:check-security-flags
+      
+      - name: Check .env.example
+        run: |
+          if [ -f ".env.example" ]; then
+            if grep -q "VITE.*SECURITY_TESTS" .env.example; then
+              echo "❌ 錯誤：.env.example 中包含安全測試相關的環境變數"
+              echo "請移除所有 VITE_*SECURITY_TESTS* 環境變數"
+              exit 1
+            fi
+            echo "✅ .env.example 檢查通過"
+          else
+            echo "⚠️  警告：.env.example 不存在"
+          fi
+      
+      - name: Check Dockerfile
+        run: |
+          for file in Dockerfile Dockerfile.*; do
+            if [ -f "$file" ]; then
+              if grep -qi "VITE.*SECURITY_TESTS" "$file"; then
+                echo "❌ 錯誤：$file 中包含安全測試相關的環境變數"
+                exit 1
+              fi
+            fi
+          done
+          echo "✅ Dockerfile 檢查通過"
+

@@ -1,0 +1,247 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SecurityBench.v1",
+  "type": "object",
+  "required": [
+    "runId",
+    "seed",
+    "versions",
+    "cryptoVectors",
+    "utf8Edges",
+    "paramReplay",
+    "rateProbe",
+    "jwtSmooth"
+  ],
+  "properties": {
+    "runId": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "seed": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "versions": {
+      "type": "object",
+      "required": ["app", "kdf", "schema"],
+      "properties": {
+        "app": {
+          "type": "string"
+        },
+        "kdf": {
+          "type": "string",
+          "enum": ["pbkdf2", "argon2id"]
+        },
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "cryptoVectors": {
+      "type": "object",
+      "required": ["total", "passed", "failed"],
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "passed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "utf8Edges": {
+      "type": "object",
+      "required": ["total", "passed", "failed"],
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "passed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "paramReplay": {
+      "type": "object",
+      "required": ["profiles", "crossDecryptOk"],
+      "properties": {
+        "profiles": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "crossDecryptOk": {
+          "type": "boolean"
+        }
+      }
+    },
+    "rateProbe": {
+      "type": "object",
+      "required": [
+        "requested",
+        "ok",
+        "r429",
+        "invalidResponses",
+        "p50",
+        "p95",
+        "recovery200"
+      ],
+      "properties": {
+        "requested": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "ok": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "r429": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "r401": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "others": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "invalidResponses": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "netError": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "timeout": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "corsBlocked": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "p50": {
+          "type": "number",
+          "minimum": 0
+        },
+        "p95": {
+          "type": "number",
+          "minimum": 0
+        },
+        "tailShare": {
+          "type": "string",
+          "pattern": "^0(\\.\\d+)?|1(\\.0+)?$"
+        },
+        "headersOk": {
+          "type": "boolean"
+        },
+        "replayDedupOk": {
+          "type": "boolean"
+        },
+        "dedupScope": {
+          "type": "string"
+        },
+        "dedupTtlMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "recovery200": {
+          "type": "boolean"
+        }
+      }
+    },
+    "jwtSmooth": {
+      "type": "object",
+      "required": [
+        "windowMs",
+        "durationMs",
+        "minSuccessRate",
+        "stddev",
+        "hasCliff",
+        "maxConsecutiveFails"
+      ],
+      "properties": {
+        "windowMs": {
+          "type": "integer",
+          "minimum": 10
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 1000
+        },
+        "minSuccessRate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "stddev": {
+          "type": "number",
+          "minimum": 0
+        },
+        "hasCliff": {
+          "type": "boolean"
+        },
+        "maxConsecutiveFails": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tokenRefreshObserved": {
+          "type": "boolean"
+        },
+        "recoveryGapMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "preRefreshSuccess": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "postRefreshSuccess": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "skewMs": {
+          "type": "integer"
+        },
+        "peak4xxWindow": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "peak4xxRatio": {
+          "type": "string",
+          "pattern": "^0(\\.\\d+)?|1(\\.0+)?$"
+        },
+        "retryAfterHeaders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "serverDate": {
+          "type": ["string", "null"]
+        }
+      }
+    }
+  }
+}
+

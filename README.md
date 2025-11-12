@@ -4,6 +4,12 @@
 
 Echoma 是一個基於 Web3 的情感記錄應用，結合了客戶端加密、去中心化儲存和區塊鏈驗證，為你的情感數據提供隱私保護和永久儲存。
 
+## ⚠️ 重要聲明
+
+**Echoma 僅提供情感記錄與一般性支持，不能替代專業醫療建議。**
+
+本應用程式旨在幫助用戶記錄和追蹤情感狀態，但不提供醫療診斷、治療建議或緊急醫療服務。如有心理健康或醫療需求，請尋求專業醫療人員的協助。
+
 ## ✨ 核心特性
 
 - 🔒 **客戶端加密** - 使用 AES-GCM 加密，數據在離開設備前就已加密
@@ -133,6 +139,8 @@ echoma/
 │   ├── hooks/              # 自定義 React Hooks
 │   ├── lib/                # 工具函數和核心邏輯
 │   │   ├── encryption.ts   # 客戶端加密功能
+│   │   ├── securityTests.ts # 安全測試套件
+│   │   ├── securityTests.worker.ts # Web Worker（CPU 密集型測試）
 │   │   ├── walrus.ts       # Walrus 儲存集成
 │   │   ├── storageService.ts  # 存儲服務抽象層
 │   │   ├── localIndex.ts   # 本地索引服務
@@ -146,6 +154,7 @@ echoma/
 │   │   ├── AuthTimeline.tsx # 認證模式時間線
 │   │   ├── MvpRecord.tsx   # MVP 本地記錄頁面
 │   │   ├── MvpTimeline.tsx # MVP 本地時間線
+│   │   ├── SecurityTests.tsx # 安全測試頁面（開發環境）
 │   │   └── NotFound.tsx   # 404 頁面
 │   ├── i18n/               # 國際化配置
 │   │   ├── config.ts
@@ -161,6 +170,9 @@ echoma/
 │   │   ├── get-emotions/   # 獲取情感記錄
 │   │   └── upload-emotion/ # 上傳情感記錄
 │   └── migrations/         # 數據庫遷移
+├── benchmarks/             # 測試基準數據
+│   └── schema/            # JSON Schema
+│       └── security.v1.json # 安全測試輸出 Schema
 └── public/                 # 靜態資源
 ```
 
@@ -239,6 +251,29 @@ Echoma 採用多層安全防護，保護用戶數據和隱私：
 
 詳細的安全功能說明請參閱 [SECURITY_FEATURES.md](./SECURITY_FEATURES.md)
 
+### 安全測試套件
+
+Echoma 實現了完整的安全測試套件，確保加密機制的正確性和安全性：
+
+#### 測試覆蓋範圍
+- ✅ **密碼學向量測試**：Tag 篡改、IV 重用、Header 竄改、AAD 驗證、定時側通道檢查等
+- ✅ **參數回放測試**：跨設備加密/解密兼容性驗證
+- ✅ **UTF-8 邊界測試**：Unicode 正規化、複雜字符處理
+- ✅ **Rate Limit 測試**：限流機制、429 header 驗證、Replay 防護
+- ✅ **JWT 刷新平滑度測試**：會話刷新期間的平滑過渡驗證
+
+#### 測試特性
+- 🔄 **可重現性**：支持 SEED 參數，確保測試結果可重現
+- 📊 **可量測性**：標準化 JSON 輸出，支持 CI 自動化驗收
+- 🔍 **可審計性**：完整的錯誤碼對照表、驗收標準、統計學指標
+- 🛡️ **生產級可信度**：覆蓋邊界情況、非預期成功告警、JSON Schema 驗證
+
+#### 訪問安全測試頁面
+- **開發環境**：自動啟用 `/security-tests` 路由
+- **生產環境**：需設置 `VITE_ENABLE_SECURITY_TESTS=true` 和 `VITE_FORCE_ENABLE_SECURITY_TESTS=true`（強制保護）
+
+詳細的安全測試說明請參閱 [安全測試說明.md](./安全測試說明.md)
+
 ### 安全審計
 
 詳細的安全最佳實踐檢查報告請參閱 [SECURITY_BEST_PRACTICES.md](./SECURITY_BEST_PRACTICES.md)
@@ -247,6 +282,7 @@ Echoma 採用多層安全防護，保護用戶數據和隱私：
 - ✅ 核心加密機制遵循業界最佳實踐
 - ✅ 完善的錯誤處理和向後兼容性
 - ✅ AI 安全防護機制完整實現
+- ✅ **完整的安全測試套件**：可重現、可量測、可審計
 - ⚠️ Argon2id 集成進行中（當前使用增強 PBKDF2 作為補償）
 
 ## 🌐 網路配置
@@ -344,6 +380,7 @@ Echoma 提供三種不同的使用模式，滿足不同需求：
 - [x] 多語言支持（繁體中文/英文）
 - [x] iOS 應用支持（Capacitor）
 - [x] 多種使用模式（匿名/認證/MVP）
+- [x] 完整的安全測試套件（可重現、可量測、可審計）
 
 ### 🚧 進行中 / 計劃中
 - [ ] 完整集成 Argon2id 支持（當前回退到增強 PBKDF2）
@@ -371,6 +408,7 @@ Echoma 提供三種不同的使用模式，滿足不同需求：
 - [shadcn/ui 文檔](https://ui.shadcn.com/)
 - [安全功能說明](./SECURITY_FEATURES.md) - AI 安全防護、審計日誌、API key rotation
 - [安全最佳實踐](./SECURITY_BEST_PRACTICES.md) - 加密機制安全審計報告
+- [安全測試說明](./安全測試說明.md) - 完整的安全測試套件文檔（可重現、可量測、可審計）
 
 ## 🔧 環境變數配置
 
@@ -390,6 +428,20 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key  # 用於 API key rotation 和�
 - `LOVABLE_API_KEY` 可直接從環境變數讀取（向後兼容）
 - 如需使用 API key rotation 功能，需要配置 `SUPABASE_SERVICE_ROLE_KEY`
 - 審計日誌功能需要運行數據庫遷移（見下方）
+- **安全測試頁面**：開發環境自動啟用，生產環境需設置 `VITE_ENABLE_SECURITY_TESTS=true` 和 `VITE_FORCE_ENABLE_SECURITY_TESTS=true`（強制保護）
+
+### CI 安全檢查
+
+項目包含自動化 CI 檢查，防止安全測試旗標洩漏到生產環境：
+
+- **檢查腳本**：`npm run ci:check-security-flags`
+- **檢查範圍**：
+  - `.env.example`：不應包含任何 `VITE_*SECURITY_TESTS*` 環境變數
+  - `Dockerfile` / `docker-compose.yml`：不應包含安全測試相關的環境變數
+  - 生產構建腳本：不應包含安全測試相關的環境變數
+- **GitHub Actions**：`.github/workflows/security-check.yml` 會在 PR 和 push 時自動運行檢查
+
+詳細說明請參閱 [安全測試說明.md](./安全測試說明.md) 中的「風險旗標掃描」章節。
 
 ### 數據庫遷移
 

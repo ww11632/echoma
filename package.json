@@ -13,7 +13,8 @@
     "cap:add:ios": "npx cap add ios",
     "cap:sync": "npx cap sync",
     "cap:open:ios": "npx cap open ios",
-    "cap:build:ios": "npm run build && npx cap sync ios && npx cap open ios"
+    "cap:build:ios": "npm run build && npx cap sync ios && npx cap open ios",
+    "ci:check-security-flags": "bash scripts/ci/check-security-flags.sh"
   },
   "dependencies": {
     "@capacitor/app": "^7.1.0",

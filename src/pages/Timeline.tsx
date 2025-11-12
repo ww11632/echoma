@@ -69,7 +69,7 @@ const Timeline = () => {
       const allRecords: EmotionRecord[] = [];
 
       try {
-        // 1. 尝试从本地存储加载记录
+        // 1. 嘗試從本地儲存載入記錄
         try {
           const localRecords = await listEmotionRecords();
           const convertedLocalRecords: EmotionRecord[] = localRecords.map((r) => ({
@@ -90,11 +90,11 @@ const Timeline = () => {
           console.log("[Timeline] No local records or error loading:", localError);
         }
 
-        // 2. 尝试从 API 加载记录（无论是否有钱包）
+        // 2. 嘗試從 API 載入記錄（無論是否有錢包）
         try {
           const { data: { session } } = await supabase.auth.getSession();
           if (session) {
-            // 如果有Supabase session，使用Supabase function
+            // 如果有 Supabase session，使用 Supabase function
             try {
               const response = await supabase.functions.invoke('get-emotions');
               if (!response.error && response.data?.success) {
@@ -105,7 +105,7 @@ const Timeline = () => {
                                 r.walrus_url?.startsWith("local://") || 
                                 r.blob_id?.startsWith("local_");
                   
-                  // 為沒有 Walrus 數據的記錄生成本地 ID
+                  // 為沒有 Walrus 資料的記錄生成本地 ID
                   const blobId = hasWalrusData 
                     ? r.blob_id 
                     : `local_${r.id.slice(0, 8)}`;
@@ -139,7 +139,7 @@ const Timeline = () => {
               }
             } catch (supabaseFuncError) {
               console.log("[Timeline] Supabase function error:", supabaseFuncError);
-              // 如果Supabase function失败，尝试使用直接API调用
+              // 如果 Supabase function 失敗，嘗試使用直接 API 呼叫
               try {
                 const apiRecords = await getEmotions(session.access_token);
                 const convertedApiRecords: EmotionRecord[] = apiRecords.map((r: any) => {
@@ -149,7 +149,7 @@ const Timeline = () => {
                                 r.walrus_url?.startsWith("local://") || 
                                 r.blob_id?.startsWith("local_");
                   
-                  // 為沒有 Walrus 數據的記錄生成本地 ID
+                  // 為沒有 Walrus 資料的記錄生成本地 ID
                   const blobId = hasWalrusData 
                     ? r.blob_id 
                     : `local_${r.id.slice(0, 8)}`;
@@ -179,7 +179,7 @@ const Timeline = () => {
             }
           }
           
-          // 如果有钱包连接，尝试查询链上的 Walrus blob 对象
+          // 如果有錢包連接，嘗試查詢鏈上的 Walrus blob 物件
           if (currentAccount?.address) {
             console.log("[Timeline] Wallet connected, querying on-chain blobs for:", currentAccount.address);
             try {
@@ -192,7 +192,7 @@ const Timeline = () => {
                 apiBase: import.meta.env.VITE_API_BASE || "http://localhost:3001"
               });
               
-              // 显示开始查询的 toast
+              // 顯示開始查詢的 toast
               toast({
                 title: t("timeline.queryingOnChain"),
                 description: t("timeline.queryingOnChainDesc"),
@@ -201,7 +201,7 @@ const Timeline = () => {
                 const onChainBlobs = await queryWalrusBlobsByOwner(currentAccount.address);
                 console.log(`[Timeline] Found ${onChainBlobs.length} on-chain Walrus blobs`);
                 
-                // 显示查询完成的 toast
+                // 顯示查詢完成的 toast
                 if (onChainBlobs.length > 0) {
                   toast({
                     title: t("timeline.queryCompleted"),
@@ -209,27 +209,27 @@ const Timeline = () => {
                   });
                 }
 
-                // 将链上的 blob 转换为记录
+                // 將鏈上的 blob 轉換為記錄
                 for (const blob of onChainBlobs) {
-                  // 检查是否已经存在（通过 blob_id 或 sui_ref）
+                  // 檢查是否已經存在（透過 blob_id 或 sui_ref）
                   const existing = allRecords.find(
                     r => r.blob_id === blob.blobId || r.sui_ref === blob.objectId
                   );
 
                   if (!existing) {
-                    // 创建新的链上记录
-                    // 注意：链上记录可能没有 emotion/intensity 等信息，这些在加密的 blob 中
-                    // 我们可以尝试从 blob 读取，或者使用默认值
+                    // 創建新的鏈上記錄
+                    // 注意：鏈上記錄可能沒有 emotion/intensity 等資訊，這些在加密的 blob 中
+                    // 我們可以嘗試從 blob 讀取，或使用預設值
                     const onChainRecord: EmotionRecord = {
                       id: `onchain_${blob.objectId}`,
-                      emotion: "peace", // 默认值，实际应该从 blob 读取
-                      intensity: 50, // 默认值
-                      description: "", // 加密内容，需要解密才能显示
+                      emotion: "peace", // 預設值，實際應該從 blob 讀取
+                      intensity: 50, // 預設值
+                      description: "", // 加密內容，需要解密才能顯示
                       blob_id: blob.blobId,
                       walrus_url: getWalrusUrl(blob.blobId),
                       payload_hash: "",
                       is_public: false,
-                      proof_status: "confirmed", // 链上记录肯定是已确认的
+                      proof_status: "confirmed", // 鏈上記錄肯定是已確認的
                       sui_ref: blob.objectId,
                       created_at: blob.createdAt || new Date().toISOString(),
                     };
@@ -250,13 +250,13 @@ const Timeline = () => {
                 }
               } catch (onChainError) {
                 console.error("[Timeline] Error querying on-chain Walrus blobs:", onChainError);
-                // 显示查询失败的 toast
+                // 顯示查詢失敗的 toast
                 toast({
                   title: t("timeline.queryFailed"),
                   description: t("timeline.queryFailedDesc"),
                   variant: "destructive",
                 });
-                // 不阻止其他记录的加载
+                // 不阻止其他記錄的載入
               } finally {
                 setIsQueryingOnChain(false);
               }
@@ -272,7 +272,7 @@ const Timeline = () => {
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
 
-        // 统计信息
+        // 統計資訊
         const localCount = uniqueRecords.filter(r => 
           r.blob_id?.startsWith("local_") || r.walrus_url?.startsWith("local://")
         ).length;
@@ -296,7 +296,7 @@ const Timeline = () => {
           })
         });
         
-        // 特别检查 Walrus 记录
+        // 特別檢查 Walrus 記錄
         const walrusRecords = uniqueRecords.filter(r => {
           const isLocal = r.blob_id?.startsWith("local_") || r.walrus_url?.startsWith("local://");
           return !isLocal;
@@ -327,21 +327,21 @@ const Timeline = () => {
     return `https://suiscan.xyz/testnet/object/${objectId}`;
   };
 
-  // 判断记录是否为本地存储
+  // 判斷記錄是否為本地儲存
   const isLocalRecord = (record: EmotionRecord) => {
-    // 检查 blob_id 和 walrus_url 来判断是否为本地记录
-    // 如果 blob_id 以 "local_" 开头，或者 walrus_url 以 "local://" 开头，则为本地记录
+    // 檢查 blob_id 和 walrus_url 來判斷是否為本地記錄
+    // 如果 blob_id 以 "local_" 開頭，或 walrus_url 以 "local://" 開頭，則為本地記錄
     const blobId = record.blob_id || "";
     const walrusUrl = record.walrus_url || "";
     
     const isLocalBlob = blobId.startsWith("local_");
     const isLocalUrl = walrusUrl.startsWith("local://");
     
-    // 只有当明确是本地格式时，才返回 true
-    // 其他情况（包括 walrus_url 是 https://aggregator.testnet.walrus.space 开头，或者 blob_id 是正常的 Walrus ID）都是 Walrus 记录
+    // 只有當明確是本地格式時，才返回 true
+    // 其他情況（包括 walrus_url 是 https://aggregator.testnet.walrus.space 開頭，或 blob_id 是正常的 Walrus ID）都是 Walrus 記錄
     const isLocal = isLocalBlob || isLocalUrl;
     
-    // 调试日志
+    // 除錯日誌
     if (!isLocal && (blobId || walrusUrl)) {
       console.log(`[Timeline] Walrus record detected:`, {
         id: record.id,
@@ -356,69 +356,69 @@ const Timeline = () => {
     return isLocal;
   };
 
-  // 解密记录描述
+  // 解密記錄描述
   const decryptDescription = useCallback(async (record: EmotionRecord) => {
-    // 如果正在解密，则跳过
+    // 如果正在解密，則跳過
     if (decryptingRecords.has(record.id)) {
       return;
     }
     
-    // 如果已经解密，不需要重新解密
+    // 如果已經解密，不需要重新解密
     if (decryptedDescriptions[record.id]) {
       return;
     }
 
-    // 如果是公开记录或本地记录，不需要解密
+    // 如果是公開記錄或本地記錄，不需要解密
     if (record.is_public || isLocalRecord(record)) {
       return;
     }
 
-    // 如果没有 blob_id，无法解密
+    // 如果沒有 blob_id，無法解密
     if (!record.blob_id || record.blob_id.startsWith("local_")) {
       return;
     }
 
-    // 标记为正在解密
+    // 標記為正在解密
     setDecryptingRecords(prev => new Set(prev).add(record.id));
 
     try {
-      // 从 Walrus 读取加密数据
+      // 從 Walrus 讀取加密資料
       const encryptedDataString = await readFromWalrus(record.blob_id);
       
-      // 解析加密数据
+      // 解析加密資料
       const encryptedData: EncryptedData = JSON.parse(encryptedDataString);
       
-      // 生成用户密钥
+      // 產生使用者密鑰
       let userKey: string;
       try {
-        // 优先尝试使用 Supabase 用户 ID
+        // 優先嘗試使用 Supabase 使用者 ID
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user?.id) {
           userKey = await generateUserKeyFromId(session.user.id);
         } else if (currentAccount?.address) {
-          // 如果没有 Supabase session，使用钱包地址
+          // 如果沒有 Supabase session，使用錢包位址
           userKey = await generateUserKey(currentAccount.address);
         } else {
-          throw new Error("无法生成用户密钥：需要登录或连接钱包");
+          throw new Error("無法產生使用者密鑰：需要登入或連接錢包");
         }
       } catch (keyError) {
         console.error("[Timeline] Failed to generate user key:", keyError);
-        throw new Error("无法生成解密密钥");
+        throw new Error("無法產生解密密鑰");
       }
       
-      // 解密数据（支持旧格式自动迁移）
+      // 解密資料（支援舊格式自動遷移）
       const decryptedString = await decryptDataWithMigration(encryptedData, userKey);
       
-      // 解析解密后的 JSON 获取快照
+      // 解析解密後的 JSON 獲取快照
       const snapshot = JSON.parse(decryptedString);
       
-      // 存储解密后的描述
+      // 儲存解密後的描述
       setDecryptedDescriptions(prev => ({
         ...prev,
         [record.id]: snapshot.description || '',
       }));
       
-      // 清除之前的错误信息
+      // 清除之前的錯誤資訊
       setDecryptErrors(prev => {
         const next = { ...prev };
         delete next[record.id];
@@ -442,13 +442,13 @@ const Timeline = () => {
     } catch (error: any) {
       console.error(`[Timeline] Failed to decrypt record ${record.id}:`, error);
       
-      // 提取详细错误信息
+      // 提取詳細錯誤資訊
       let errorType = "unknown";
       let errorMessage = t("timeline.decryptFailedDesc");
       let statusCode: number | undefined;
       let suggestions: string[] = [];
       
-      // 检查是否是 DecryptionError（新的错误类型）
+      // 檢查是否是 DecryptionError（新的錯誤類型）
       if (error instanceof DecryptionError) {
         switch (error.type) {
           case DecryptionErrorType.INVALID_KEY:
@@ -492,7 +492,7 @@ const Timeline = () => {
             ];
         }
       } else if (error.message) {
-        // 处理其他类型的错误（网络错误等）
+        // 處理其他類型的錯誤（網路錯誤等）
         if (error.message.includes("Network error") || error.message.includes("network") || error.message.includes("fetch")) {
           errorType = "network";
           errorMessage = t("timeline.decryptNetworkError");
@@ -518,7 +518,7 @@ const Timeline = () => {
             t("timeline.errorSuggestion.serviceMaintenance"),
             t("timeline.errorSuggestion.retryLater"),
           ];
-        } else if (error.message.includes("无法生成") || error.message.includes("密钥") || error.message.includes("key")) {
+        } else if (error.message.includes("無法產生") || error.message.includes("密鑰") || error.message.includes("key")) {
           errorType = "key_error";
           errorMessage = t("timeline.decryptKeyError");
           suggestions = [
@@ -541,14 +541,14 @@ const Timeline = () => {
         }
       }
       
-      // 尝试从错误对象中提取状态码
+      // 嘗試從錯誤物件中提取狀態碼
       if (error.status) {
         statusCode = error.status;
       } else if (error.response?.status) {
         statusCode = error.response.status;
       }
       
-      // 存储详细错误信息
+      // 儲存詳細錯誤資訊
       const errorDetail = {
         type: errorType,
         message: errorMessage,
@@ -571,13 +571,13 @@ const Timeline = () => {
         variant: "destructive",
       });
       
-      // 存储错误消息（不显示解密内容，只显示错误）
+      // 儲存錯誤訊息（不顯示解密內容，只顯示錯誤）
       setDecryptErrors(prev => ({
         ...prev,
         [record.id]: errorMessage,
       }));
     } finally {
-      // 移除解密中标记
+      // 移除解密中標記
       setDecryptingRecords(prev => {
         const next = new Set(prev);
         next.delete(record.id);
@@ -586,7 +586,7 @@ const Timeline = () => {
     }
   }, [decryptedDescriptions, decryptingRecords, currentAccount, toast, t, isLocalRecord]);
 
-  // 筛选后的记录
+  // 篩選後的記錄
   const filteredRecords = useMemo(() => {
     if (filter === "all") return records;
     if (filter === "local") return records.filter(isLocalRecord);
@@ -594,7 +594,7 @@ const Timeline = () => {
     return records;
   }, [records, filter]);
 
-  // 统计数据
+  // 統計資料
   const stats = useMemo(() => {
     const total = records.length;
     const local = records.filter(isLocalRecord).length;
@@ -626,7 +626,7 @@ const Timeline = () => {
     };
   }, [records]);
 
-  // 情绪分布图表数据
+  // 情緒分布圖表資料
   const emotionChartData = useMemo(() => {
     return Object.entries(stats.emotionCounts).map(([emotion, count]) => {
       const config = emotionLabels[emotion as keyof typeof emotionLabels];
@@ -639,7 +639,7 @@ const Timeline = () => {
     });
   }, [stats.emotionCounts]);
 
-  // 存储方式分布图表数据
+  // 儲存方式分布圖表資料
   const storageChartData = useMemo(() => {
     return [
       {
@@ -655,7 +655,7 @@ const Timeline = () => {
     ];
   }, [stats.local, stats.walrus, t]);
 
-  // 时间趋势数据（最近7天）
+  // 時間趨勢資料（最近7天）
   const timelineChartData = useMemo(() => {
     const days = 7;
     const data = [];
@@ -907,7 +907,7 @@ const Timeline = () => {
                         {!record.is_public && (
                           <div className="mb-3 space-y-2">
                             {decryptedDescriptions[record.id] ? (
-                              // 已解密，显示内容
+                              // 已解密，顯示內容
                               <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
                                 <div className="flex items-center justify-between mb-2">
                                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -918,13 +918,13 @@ const Timeline = () => {
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => {
-                                      // 隐藏解密内容
+                                      // 隱藏解密內容
                                       setDecryptedDescriptions(prev => {
                                         const next = { ...prev };
                                         delete next[record.id];
                                         return next;
                                       });
-                                      // 清除错误信息
+                                      // 清除錯誤資訊
                                       setDecryptErrors(prev => {
                                         const next = { ...prev };
                                         delete next[record.id];
@@ -942,7 +942,7 @@ const Timeline = () => {
                                 </p>
                               </div>
                             ) : decryptErrors[record.id] ? (
-                              // 解密失败，显示错误信息和重试按钮
+                              // 解密失敗，顯示錯誤資訊和重試按鈕
                               <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
                                 <div className="flex items-start justify-between mb-2">
                                   <div className="flex-1">
@@ -954,7 +954,7 @@ const Timeline = () => {
                                       {decryptErrors[record.id]}
                                     </p>
                                     
-                                    {/* 详细错误信息（可展开） */}
+                                    {/* 詳細錯誤資訊（可展開） */}
                                     {decryptErrorDetails[record.id] && (
                                       <div className="mt-2">
                                         <Button
@@ -1067,7 +1067,7 @@ const Timeline = () => {
                                       variant="outline"
                                       size="sm"
                                       onClick={() => {
-                                        // 清除错误信息并重试
+                                        // 清除錯誤資訊並重試
                                         setDecryptErrors(prev => {
                                           const next = { ...prev };
                                           delete next[record.id];
@@ -1104,7 +1104,7 @@ const Timeline = () => {
                                 </div>
                               </div>
                             ) : (
-                              // 未解密，显示加密提示和解密按钮
+                              // 未解密，顯示加密提示和解密按鈕
                               <div className="p-3 rounded-lg bg-muted/10 border border-border/30">
                                 <div className="flex items-center justify-between">
                                   <p className="text-sm text-muted-foreground italic">

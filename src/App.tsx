@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { SuiClientProvider, WalletProvider } from "@mysten/dapp-kit";
 import { getFullnodeUrl } from "@mysten/sui/client";
 import { createNetworkConfig } from "@mysten/dapp-kit";
+import React, { lazy, Suspense } from "react";
 import Index from "./pages/Index";
 import Record from "./pages/Record";
 import Timeline from "./pages/Timeline";
@@ -15,10 +16,20 @@ import AuthTimeline from "./pages/AuthTimeline";
 import NotFound from "./pages/NotFound";
 import MvpRecord from "./pages/MvpRecord";
 import MvpTimeline from "./pages/MvpTimeline";
-import SecurityTests from "./pages/SecurityTests";
+import { MedicalDisclaimer } from "@/components/MedicalDisclaimer";
 import "@mysten/dapp-kit/dist/index.css";
 
 const queryClient = new QueryClient();
+
+// 條件載入安全測試頁面（只在開發環境或特定環境變數下可用）
+// 生產環境必須顯式允許，防止誤上線
+const isSecurityTestsEnabled = 
+  import.meta.env.DEV || 
+  (import.meta.env.VITE_ENABLE_SECURITY_TESTS === "true" && !import.meta.env.PROD) ||
+  (import.meta.env.VITE_ENABLE_SECURITY_TESTS === "true" && import.meta.env.PROD && import.meta.env.VITE_FORCE_ENABLE_SECURITY_TESTS === "true");
+const SecurityTests = isSecurityTestsEnabled
+  ? lazy(() => import("./pages/SecurityTests"))
+  : null;
 
 // Configure Sui network
 const { networkConfig } = createNetworkConfig({
@@ -33,6 +44,7 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
+          <MedicalDisclaimer />
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Index />} />
@@ -46,8 +58,17 @@ const App = () => (
               {/* MVP local-only flow */}
               <Route path="/mvp" element={<MvpRecord />} />
               <Route path="/mvp-timeline" element={<MvpTimeline />} />
-              {/* Security Tests */}
-              <Route path="/security-tests" element={<SecurityTests />} />
+              {/* Security Tests - 只在开发环境或 VITE_ENABLE_SECURITY_TESTS=true 时可用 */}
+              {SecurityTests && (
+                <Route 
+                  path="/security-tests" 
+                  element={
+                    <Suspense fallback={<div>Loading...</div>}>
+                      <SecurityTests />
+                    </Suspense>
+                  } 
+                />
+              )}
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

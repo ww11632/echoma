@@ -17,6 +17,12 @@
     "connected": "Connected",
     "disconnected": "Disconnected"
   },
+  "disclaimer": {
+    "title": "Important Notice",
+    "message": "Echoma provides emotion recording and general support only, and cannot replace professional medical advice.",
+    "acknowledge": "I understand and agree",
+    "continue": "Continue"
+  },
   "nav": {
     "language": "Language"
   },

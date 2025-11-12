@@ -75,7 +75,7 @@ const AuthRecord = () => {
   const getAiResponse = async () => {
     if (!user) return;
 
-    // 检查是否有输入描述
+    // 檢查是否有輸入描述
     if (!description.trim()) {
       toast({
         title: t("authRecord.errors.missingDescription"),

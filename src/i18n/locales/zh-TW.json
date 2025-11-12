@@ -17,6 +17,12 @@
     "connected": "已連接",
     "disconnected": "已斷開"
   },
+  "disclaimer": {
+    "title": "重要聲明",
+    "message": "Echoma 僅提供情感記錄與一般性支持，不能替代專業醫療建議。",
+    "acknowledge": "我已了解並同意",
+    "continue": "繼續使用"
+  },
   "nav": {
     "language": "語言"
   },

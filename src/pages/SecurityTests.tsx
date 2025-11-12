@@ -3,7 +3,7 @@
  * 提供 UI 來運行和查看安全測試結果
  */
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +11,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   runAllSecurityTests,
   type TestSuiteResult,
-  type RotationScenario,
 } from "@/lib/securityTests";
 import { AlertCircle, CheckCircle2, XCircle, Loader2, Play } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,63 +28,75 @@ export default function SecurityTests() {
     };
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // 清理 AbortController
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   const handleRunTests = async () => {
     setIsRunning(true);
     setError(null);
     setResults(null);
 
+    // 創建新的 AbortController
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
-      // 获取 Supabase URL 和认证信息
+      // 獲取 Supabase URL 和認證資訊
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       
-      // 获取当前会话（用于 Rate Limit 测试）
+      // 獲取當前會話（用於 Rate Limit 和 JWT 刷新測試）
       const { data: session } = await supabase.auth.getSession();
       
-      // AI 端点（Supabase Edge Function）
+      // AI 端點（Supabase Edge Function）
       const rateLimitEndpoint = supabaseUrl 
         ? `${supabaseUrl}/functions/v1/ai-emotion-response`
         : undefined;
       
-      // 准备认证头
+      // 準備認證頭（使用 JWT，不是 API Key）
       const rateLimitAuthHeaders: HeadersInit | undefined = session?.session
         ? {
             Authorization: `Bearer ${session.session.access_token}`,
-            apikey: supabaseAnonKey || "",
+            apikey: supabaseAnonKey || "", // anon key 是公開的，可以放在 header
           }
         : undefined;
 
-      // Key Rotation 测试场景（示例）
-      const keyRotationScenario: RotationScenario = {
-        name: "API Key 轮换测试",
-        oldKey: "old-key-example",
-        newKey: "new-key-example",
-        transitionDuration: 5000, // 5 秒
-      };
-
-      // Key Rotation 测试端点（示例 - 实际应该调用真实的 API）
-      const keyRotationTestEndpoint = async (key: string) => {
-        // 这里应该调用实际的 API 端点
-        // 为了演示，我们模拟一个测试
+      // JWT 刷新測試端點（使用當前會話的 JWT）
+      const jwtRefreshTestEndpoint = async () => {
         if (!rateLimitEndpoint) {
           return { success: false, status: 0 };
         }
         
         try {
+          // 獲取最新會話（可能已刷新）
+          const { data: currentSession } = await supabase.auth.getSession();
+          
+          if (!currentSession?.session) {
+            return { success: false, status: 401 };
+          }
+
           const response = await fetch(rateLimitEndpoint, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${key}`,
+              Authorization: `Bearer ${currentSession.session.access_token}`, // 使用 JWT
               apikey: supabaseAnonKey || "",
             },
             body: JSON.stringify({
               emotion: "happy",
               intensity: 50,
-              description: "Key rotation test",
+              description: "JWT refresh test",
               language: "zh-TW",
             }),
+            signal: controller.signal,
           });
 
           return {
@@ -93,6 +104,9 @@ export default function SecurityTests() {
             status: response.status,
           };
         } catch (err) {
+          if (err instanceof Error && err.name === 'AbortError') {
+            throw err; // 重新拋出 AbortError
+          }
           return {
             success: false,
             status: 0,
@@ -103,15 +117,21 @@ export default function SecurityTests() {
       const testResults = await runAllSecurityTests(
         rateLimitEndpoint,
         rateLimitAuthHeaders,
-        keyRotationScenario,
-        keyRotationTestEndpoint
+        jwtRefreshTestEndpoint,
+        controller.signal
       );
 
       setResults(testResults);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      if (err instanceof Error && err.name === 'AbortError') {
+        // 使用者取消了測試
+        setError("測試已取消");
+      } else {
+        setError(err instanceof Error ? err.message : String(err));
+      }
     } finally {
       setIsRunning(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -124,7 +144,7 @@ export default function SecurityTests() {
         </p>
       </div>
 
-      <div className="mb-6">
+      <div className="mb-6 flex gap-2">
         <Button
           onClick={handleRunTests}
           disabled={isRunning}
@@ -143,6 +163,19 @@ export default function SecurityTests() {
             </>
           )}
         </Button>
+        {isRunning && (
+          <Button
+            onClick={() => {
+              if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+              }
+            }}
+            variant="outline"
+            size="lg"
+          >
+            取消測試
+          </Button>
+        )}
       </div>
 
       {error && (
