@@ -64,6 +64,19 @@ const Timeline = () => {
   const [expandedErrorDetails, setExpandedErrorDetails] = useState<Set<string>>(new Set());
 
   useEffect(() => {
+    // Redirect authenticated users to AuthTimeline
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        navigate("/auth-timeline");
+        return;
+      }
+    };
+    
+    checkAuth();
+  }, [navigate]);
+
+  useEffect(() => {
     const loadRecords = async () => {
       setIsLoading(true);
       const allRecords: EmotionRecord[] = [];
@@ -373,8 +386,16 @@ const Timeline = () => {
       return;
     }
 
-    // 如果没有 blob_id，无法解密
+    // 如果没有 blob_id，或者是本地记录，跳过解密
     if (!record.blob_id || record.blob_id.startsWith("local_")) {
+      console.log(`[Timeline] Skipping decryption for local/missing blob_id:`, record.id);
+      return;
+    }
+    
+    // 确保是真实的 Walrus blob ID (通常是长的数字字符串或特定格式)
+    // 如果 walrus_url 是 local:// 开头，也跳过
+    if (record.walrus_url?.startsWith("local://")) {
+      console.log(`[Timeline] Skipping decryption for local walrus_url:`, record.id);
       return;
     }
 
