@@ -589,8 +589,16 @@ const Timeline = () => {
   // 篩選後的記錄
   const filteredRecords = useMemo(() => {
     if (filter === "all") return records;
-    if (filter === "local") return records.filter(isLocalRecord);
-    if (filter === "walrus") return records.filter(r => !isLocalRecord(r));
+    
+    // 內聯 isLocalRecord 邏輯以確保正確過濾
+    const isLocal = (record: EmotionRecord) => {
+      const blobId = record.blob_id || "";
+      const walrusUrl = record.walrus_url || "";
+      return blobId.startsWith("local_") || walrusUrl.startsWith("local://");
+    };
+    
+    if (filter === "local") return records.filter(isLocal);
+    if (filter === "walrus") return records.filter(r => !isLocal(r));
     return records;
   }, [records, filter]);
 

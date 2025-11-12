@@ -1,15 +1,17 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Loader2, LogOut, Lock, Unlock } from "lucide-react";
+import { ArrowLeft, Loader2, LogOut, Lock, Unlock, BookOpen } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { decryptData, decryptDataWithMigration, DecryptionError, DecryptionErrorType } from "@/lib/encryption";
+import { decryptDataWithMigration, DecryptionError, DecryptionErrorType } from "@/lib/encryption";
 import { generateUserKeyFromId } from "@/lib/encryption";
 import { readFromWalrus } from "@/lib/walrus";
 import type { User, Session } from "@supabase/supabase-js";
 import type { EncryptedData } from "@/lib/encryption";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis } from "recharts";
 
 interface EmotionRecord {
   id: string;
@@ -30,6 +32,15 @@ const emotionEmojis: Record<string, string> = {
   anxiety: "😰",
   confusion: "🤔",
   peace: "✨",
+};
+
+const emotionLabels = {
+  joy: { label: "Joy", emoji: "😊", gradient: "from-yellow-400 to-orange-400", color: "#fbbf24" },
+  sadness: { label: "Sadness", emoji: "😢", gradient: "from-blue-400 to-indigo-400", color: "#60a5fa" },
+  anger: { label: "Anger", emoji: "😠", gradient: "from-red-400 to-rose-400", color: "#f87171" },
+  anxiety: { label: "Anxiety", emoji: "😰", gradient: "from-purple-400 to-pink-400", color: "#a78bfa" },
+  confusion: { label: "Confusion", emoji: "🤔", gradient: "from-gray-400 to-slate-400", color: "#94a3b8" },
+  peace: { label: "Peace", emoji: "✨", gradient: "from-green-400 to-teal-400", color: "#34d399" },
 };
 
 const AuthTimeline = () => {
@@ -213,6 +224,82 @@ const AuthTimeline = () => {
     navigate("/");
   };
 
+  // 統計資料
+  const stats = useMemo(() => {
+    const total = records.length;
+    
+    const emotionCounts: Record<string, number> = {};
+    records.forEach(r => {
+      emotionCounts[r.emotion] = (emotionCounts[r.emotion] || 0) + 1;
+    });
+
+    const totalIntensity = records.reduce((sum, r) => sum + r.intensity, 0);
+    const avgIntensity = total > 0 ? Math.round(totalIntensity / total) : 0;
+
+    const now = new Date();
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    
+    const thisWeek = records.filter(r => new Date(r.created_at) >= weekAgo).length;
+    const thisMonth = records.filter(r => new Date(r.created_at) >= monthAgo).length;
+
+    return {
+      total,
+      emotionCounts,
+      avgIntensity,
+      thisWeek,
+      thisMonth,
+    };
+  }, [records]);
+
+  // 情緒分布圖表資料
+  const emotionChartData = useMemo(() => {
+    return Object.entries(stats.emotionCounts).map(([emotion, count]) => {
+      const config = emotionLabels[emotion as keyof typeof emotionLabels];
+      return {
+        name: config?.label || emotion,
+        value: count,
+        color: config?.color || "#94a3b8",
+        emoji: config?.emoji || "😊",
+      };
+    });
+  }, [stats.emotionCounts]);
+
+  // 時間趨勢資料（最近7天）
+  const timelineChartData = useMemo(() => {
+    const days = 7;
+    const data = [];
+    const now = new Date();
+    
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+      date.setHours(0, 0, 0, 0);
+      
+      const nextDate = new Date(date);
+      nextDate.setDate(nextDate.getDate() + 1);
+      
+      const count = records.filter(r => {
+        const recordDate = new Date(r.created_at);
+        return recordDate >= date && recordDate < nextDate;
+      }).length;
+      
+      data.push({
+        date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        count,
+      });
+    }
+    
+    return data;
+  }, [records]);
+
+  const chartConfig = {
+    count: {
+      label: "Records",
+      color: "hsl(var(--chart-1))",
+    },
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -243,11 +330,79 @@ const AuthTimeline = () => {
 
         <div className="text-center space-y-4 mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full gradient-emotion shadow-md animate-float">
-            <Lock className="w-8 h-8 text-white" />
+            <BookOpen className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold">Your Emotion Timeline</h1>
           <p className="text-muted-foreground">Securely stored emotion records</p>
         </div>
+
+        {/* Statistics Cards */}
+        {records.length > 0 && (
+          <Card className="glass-card rounded-2xl p-8 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <Card className="p-4 glass-card">
+                <div className="text-2xl font-bold">{stats.total}</div>
+                <div className="text-xs text-muted-foreground">Total Records</div>
+              </Card>
+              <Card className="p-4 glass-card">
+                <div className="text-2xl font-bold">{stats.thisWeek}</div>
+                <div className="text-xs text-muted-foreground">This Week</div>
+              </Card>
+              <Card className="p-4 glass-card">
+                <div className="text-2xl font-bold">{stats.thisMonth}</div>
+                <div className="text-xs text-muted-foreground">This Month</div>
+              </Card>
+              <Card className="p-4 glass-card">
+                <div className="text-2xl font-bold">{stats.avgIntensity}%</div>
+                <div className="text-xs text-muted-foreground">Avg Intensity</div>
+              </Card>
+            </div>
+
+            {/* Charts */}
+            <div className="grid md:grid-cols-2 gap-4 mb-6">
+              {/* Emotion Distribution Pie Chart */}
+              {emotionChartData.length > 0 && (
+                <Card className="p-6 glass-card">
+                  <h3 className="text-lg font-semibold mb-4">Emotion Distribution</h3>
+                  <ChartContainer config={chartConfig} className="h-[250px]">
+                    <PieChart>
+                      <Pie
+                        data={emotionChartData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, value, emoji }) => `${emoji} ${value}`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {emotionChartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                    </PieChart>
+                  </ChartContainer>
+                </Card>
+              )}
+
+              {/* Timeline Chart */}
+              {timelineChartData.some(d => d.count > 0) && (
+                <Card className="p-6 glass-card">
+                  <h3 className="text-lg font-semibold mb-4">Last 7 Days</h3>
+                  <ChartContainer config={chartConfig} className="h-[250px]">
+                    <BarChart data={timelineChartData}>
+                      <XAxis dataKey="date" />
+                      <YAxis />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Bar dataKey="count" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
+                    </BarChart>
+                  </ChartContainer>
+                </Card>
+              )}
+            </div>
+          </Card>
+        )}
 
         {isLoading ? (
           <div className="flex justify-center py-12">
