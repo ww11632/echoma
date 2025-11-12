@@ -15,7 +15,8 @@ import { AlertTriangle } from "lucide-react";
 const DISCLAIMER_STORAGE_KEY = "echoma_disclaimer_acknowledged";
 
 export const MedicalDisclaimer = () => {
-  const { t } = useTranslation();
+  // Force English language for disclaimer regardless of user's language setting
+  const { t } = useTranslation('translation', { lng: 'en' });
   const [open, setOpen] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
 
