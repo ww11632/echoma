@@ -69,51 +69,7 @@ const AuthTimeline = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  // Auto-decrypt records when user and records are available
-  useEffect(() => {
-    if (!user || records.length === 0) return;
-    
-    // Decrypt records that don't have plaintext description
-    records.forEach(record => {
-      if (!record.description && (record.blob_id || record.encrypted_data)) {
-        // Check state using functional updates to avoid stale closures
-        setDecryptedDescriptions(current => {
-          setDecryptingRecords(decrypting => {
-            // Only decrypt if not already decrypted and not currently decrypting
-            if (!current[record.id] && !decrypting.has(record.id)) {
-              decryptDescription(record.id, record.blob_id, record.encrypted_data);
-            }
-            return decrypting;
-          });
-          return current;
-        });
-      }
-    });
-  }, [user, records]);
-
-  const loadRecords = async () => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('emotion_records')
-        .select('id, created_at, emotion, intensity, description, is_public, walrus_url, blob_id, encrypted_data')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      setRecords(data || []);
-    } catch (error: any) {
-      console.error("Load records error:", error);
-      toast({
-        title: "Failed to Load",
-        description: "Could not load your emotion records.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Decrypt description function - defined before use
   const decryptDescription = useCallback(async (recordId: string, blobId?: string | null, encryptedDataFromDb?: string | null) => {
     if (!user) return;
     
@@ -181,6 +137,51 @@ const AuthTimeline = () => {
       });
     }
   }, [user, toast]);
+
+  // Auto-decrypt records when user and records are available
+  useEffect(() => {
+    if (!user || records.length === 0) return;
+    
+    // Decrypt records that don't have plaintext description
+    records.forEach(record => {
+      if (!record.description && (record.blob_id || record.encrypted_data)) {
+        // Check state using functional updates to avoid stale closures
+        setDecryptedDescriptions(current => {
+          setDecryptingRecords(decrypting => {
+            // Only decrypt if not already decrypted and not currently decrypting
+            if (!current[record.id] && !decrypting.has(record.id)) {
+              decryptDescription(record.id, record.blob_id, record.encrypted_data);
+            }
+            return decrypting;
+          });
+          return current;
+        });
+      }
+    });
+  }, [user, records]);
+
+  const loadRecords = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('emotion_records')
+        .select('id, created_at, emotion, intensity, description, is_public, walrus_url, blob_id, encrypted_data')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      setRecords(data || []);
+    } catch (error: any) {
+      console.error("Load records error:", error);
+      toast({
+        title: "Failed to Load",
+        description: "Could not load your emotion records.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();

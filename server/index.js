@@ -448,7 +448,7 @@ app.post("/api/emotion", requireAuth, rateLimitMiddleware, async (req, res) => {
   }
 });
 
-app.get("/api/emotions", requireAuth, async (req, res) => {
+app.get("/api/emotions", requireAuth, rateLimitMiddleware, async (req, res) => {
   try {
     console.log(`[API] GET /api/emotions - Authenticated request from user: ${req.user.id}`);
     const list = await readAll();
