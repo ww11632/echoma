@@ -16,52 +16,52 @@ export type Database = {
     Tables: {
       emotion_records: {
         Row: {
-          blob_id: string
+          blob_id: string | null
           created_at: string
-          description: string
+          description: string | null
           emotion: Database["public"]["Enums"]["emotion_type"]
           encrypted_data: string | null
           id: string
           intensity: number
           is_public: boolean
-          payload_hash: string
+          payload_hash: string | null
           proof_status: Database["public"]["Enums"]["proof_status"]
           sui_ref: string | null
           updated_at: string
           user_id: string
-          walrus_url: string
+          walrus_url: string | null
         }
         Insert: {
-          blob_id: string
+          blob_id?: string | null
           created_at?: string
-          description: string
+          description?: string | null
           emotion: Database["public"]["Enums"]["emotion_type"]
           encrypted_data?: string | null
           id?: string
           intensity: number
           is_public?: boolean
-          payload_hash: string
+          payload_hash?: string | null
           proof_status?: Database["public"]["Enums"]["proof_status"]
           sui_ref?: string | null
           updated_at?: string
           user_id: string
-          walrus_url: string
+          walrus_url?: string | null
         }
         Update: {
-          blob_id?: string
+          blob_id?: string | null
           created_at?: string
-          description?: string
+          description?: string | null
           emotion?: Database["public"]["Enums"]["emotion_type"]
           encrypted_data?: string | null
           id?: string
           intensity?: number
           is_public?: boolean
-          payload_hash?: string
+          payload_hash?: string | null
           proof_status?: Database["public"]["Enums"]["proof_status"]
           sui_ref?: string | null
           updated_at?: string
           user_id?: string
-          walrus_url?: string
+          walrus_url?: string | null
         }
         Relationships: []
       }
