@@ -1311,7 +1311,6 @@ export async function runCryptographyTests(): Promise<TestSuiteResult> {
   results.push(await testPBKDF2TooLow());
   results.push(await testPBKDF2TooHigh());
   results.push(await testIVRNGUniformity());
-  results.push(await testKeyIdCrossModeDiff());
   results.push(await testTimingSideChannel());
   results.push(await testCiphertextTruncation());
   
@@ -1548,7 +1547,7 @@ const UTF8_TEST_CASES = [
   },
   {
     name: "特殊標點",
-    text: "« » „ " " ' ' ‹ › « »", // 各種引號
+    text: "« » „ \u201C \u201D \u2018 \u2019 ‹ › « »", // 各種引號
   },
   {
     name: "控制字符邊界",

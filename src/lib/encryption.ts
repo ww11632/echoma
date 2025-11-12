@@ -141,7 +141,7 @@ function bufToHex(buffer: ArrayBuffer): string {
  * Throws an error with code 'IV_REUSE_BLOCKED' if IV is reused
  */
 async function assertIvFresh(keyId: string, iv: Uint8Array): Promise<void> {
-  const ivHex = bufToHex(iv.buffer);
+  const ivHex = bufToHex(iv.buffer as ArrayBuffer);
   const registryKey = `${keyId}:${ivHex}`;
   
   if (ivRegistry.has(registryKey)) {
