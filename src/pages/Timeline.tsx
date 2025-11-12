@@ -166,12 +166,16 @@ const Timeline = () => {
                 console.log("[Timeline] API error (expected if server not running):", apiError);
               }
             }
-          } else {
-            // 没有Supabase session，但可能有钱包连接，尝试使用钱包地址查询
-            if (currentAccount?.address) {
-              // 尝试从 API 获取记录（如果后端可用）
+          }
+          
+          // 无论是否有 Supabase session，如果有钱包连接，都尝试查询链上的 Walrus blob 对象
+          // 这样可以补充从链上获取的记录，即使数据库中没有
+          if (currentAccount?.address) {
+            console.log("[Timeline] Wallet connected, address:", currentAccount.address);
+            // 尝试从 API 获取记录（如果后端可用，仅在无 session 时）
+            if (!session) {
               try {
-                console.log("[Timeline] Fetching records by wallet address:", currentAccount.address);
+                console.log("[Timeline] Fetching records by wallet address from API:", currentAccount.address);
                 const apiRecords = await getEmotionsByWallet(currentAccount.address);
                 const convertedApiRecords: EmotionRecord[] = apiRecords.map((r: any) => {
                   // 判断是否为本地记录
@@ -215,16 +219,22 @@ const Timeline = () => {
                 // API 失败不影响链上查询
               }
 
-              // 无论 API 是否成功，都尝试查询链上的 Walrus blob 对象
-              try {
-                setIsQueryingOnChain(true);
-                console.log("[Timeline] Querying on-chain Walrus blobs for address:", currentAccount.address);
-                
-                // 显示开始查询的 toast
-                toast({
-                  title: t("timeline.queryingOnChain"),
-                  description: t("timeline.queryingOnChainDesc"),
-                });
+            // 无论 API 是否成功，都尝试查询链上的 Walrus blob 对象
+            try {
+              setIsQueryingOnChain(true);
+              console.log("[Timeline] Querying on-chain Walrus blobs for address:", currentAccount.address);
+              console.log("[Timeline] Environment check:", {
+                hasSession: !!session,
+                hasWallet: !!currentAccount,
+                walletAddress: currentAccount.address,
+                apiBase: import.meta.env.VITE_API_BASE || "http://localhost:3001"
+              });
+              
+              // 显示开始查询的 toast
+              toast({
+                title: t("timeline.queryingOnChain"),
+                description: t("timeline.queryingOnChainDesc"),
+              });
                 
                 const onChainBlobs = await queryWalrusBlobsByOwner(currentAccount.address);
                 console.log(`[Timeline] Found ${onChainBlobs.length} on-chain Walrus blobs`);
