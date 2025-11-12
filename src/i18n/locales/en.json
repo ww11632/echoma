@@ -251,6 +251,8 @@
       "notAuthenticatedDesc": "Please sign in to record emotions.",
       "aiError": "Error",
       "aiErrorDesc": "Unable to get AI response, please try again later",
+      "missingDescription": "Missing Description",
+      "missingDescriptionDesc": "Please describe your feelings first",
       "uploadFailed": "Upload Failed",
       "uploadFailedDesc": "Failed to record emotion. Please try again."
     },

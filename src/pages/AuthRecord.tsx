@@ -73,7 +73,17 @@ const AuthRecord = () => {
   };
 
   const getAiResponse = async () => {
-    if (!description.trim() || !user) return;
+    if (!user) return;
+
+    // 检查是否有输入描述
+    if (!description.trim()) {
+      toast({
+        title: t("authRecord.errors.missingDescription"),
+        description: t("authRecord.errors.missingDescriptionDesc"),
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsAiLoading(true);
     setAiResponse("");
@@ -342,42 +352,44 @@ const AuthRecord = () => {
               </p>
 
               {/* AI Response Button */}
-              {description.trim() && !aiResponse && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={getAiResponse}
-                  disabled={isAiLoading || !selectedEmotion}
-                  className="w-full mt-2"
-                >
-                  {isAiLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {t("authRecord.aiThinking")}
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="mr-2 h-4 w-4" />
-                      {t("authRecord.getAiResponse")}
-                    </>
-                  )}
-                </Button>
-              )}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={getAiResponse}
+                disabled={isAiLoading || !selectedEmotion}
+                className="w-full mt-2"
+              >
+                {isAiLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {t("authRecord.aiThinking")}
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    {t("authRecord.getAiResponse")}
+                  </>
+                )}
+              </Button>
 
-              {/* AI Response Display */}
-              {aiResponse && (
-                <div className="mt-4 p-4 rounded-lg bg-primary/5 border border-primary/20 animate-in fade-in-50 slide-in-from-bottom-2">
-                  <div className="flex items-start gap-3">
-                    <Sparkles className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-primary mb-2">{t("authRecord.aiResponse")}</p>
+              {/* AI Response Display - 默认显示 */}
+              <div className="mt-4 p-4 rounded-lg bg-primary/5 border border-primary/20 animate-in fade-in-50 slide-in-from-bottom-2">
+                <div className="flex items-start gap-3">
+                  <Sparkles className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-primary mb-2">{t("authRecord.aiResponse")}</p>
+                    {aiResponse ? (
                       <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
                         {aiResponse}
                       </p>
-                    </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">
+                        {t("authRecord.getAiResponse")}
+                      </p>
+                    )}
                   </div>
                 </div>
-              )}
+              </div>
             </div>
 
             <div className="flex items-center justify-between glass-card p-4 rounded-lg">

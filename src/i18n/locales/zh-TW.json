@@ -251,6 +251,8 @@
       "notAuthenticatedDesc": "請登入以記錄情緒。",
       "aiError": "錯誤",
       "aiErrorDesc": "無法取得 AI 回應，請稍後再試",
+      "missingDescription": "缺少描述",
+      "missingDescriptionDesc": "必須先描述感受",
       "uploadFailed": "上傳失敗",
       "uploadFailedDesc": "無法記錄情緒。請稍後再試。"
     },
