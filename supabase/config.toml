@@ -1,1 +1,7 @@
 project_id = "xafoyjtagyqljqbpcepv"
+
+[functions.upload-emotion]
+verify_jwt = true
+
+[functions.ai-emotion-response]
+verify_jwt = true

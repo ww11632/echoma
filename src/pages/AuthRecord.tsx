@@ -32,6 +32,8 @@ const AuthRecord = () => {
   const [description, setDescription] = useState("");
   const [isPublic, setIsPublic] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [aiResponse, setAiResponse] = useState<string>("");
+  const [isAiLoading, setIsAiLoading] = useState(false);
 
   useEffect(() => {
     // Check authentication
@@ -65,6 +67,41 @@ const AuthRecord = () => {
       description: "You have been signed out successfully.",
     });
     navigate("/");
+  };
+
+  const getAiResponse = async () => {
+    if (!description.trim() || !user) return;
+
+    setIsAiLoading(true);
+    setAiResponse("");
+
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-emotion-response', {
+        body: {
+          emotion: selectedEmotion,
+          intensity: intensity[0],
+          description,
+          language: 'zh-TW',
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.success && data?.response) {
+        setAiResponse(data.response);
+      } else {
+        throw new Error(data?.error || 'Failed to get AI response');
+      }
+    } catch (error: any) {
+      console.error('AI response error:', error);
+      toast({
+        title: "錯誤",
+        description: "無法取得 AI 回應，請稍後再試",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAiLoading(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -173,6 +210,7 @@ const AuthRecord = () => {
       setIntensity([50]);
       setDescription("");
       setIsPublic(false);
+      setAiResponse("");
 
       // Navigate to timeline
       setTimeout(() => {
@@ -294,6 +332,44 @@ const AuthRecord = () => {
               <p className="text-sm text-muted-foreground">
                 {description.length} / 5000 characters
               </p>
+
+              {/* AI Response Button */}
+              {description.trim() && !aiResponse && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={getAiResponse}
+                  disabled={isAiLoading || !selectedEmotion}
+                  className="w-full mt-2"
+                >
+                  {isAiLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      AI 正在思考中...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      獲得 AI 情緒回應
+                    </>
+                  )}
+                </Button>
+              )}
+
+              {/* AI Response Display */}
+              {aiResponse && (
+                <div className="mt-4 p-4 rounded-lg bg-primary/5 border border-primary/20 animate-in fade-in-50 slide-in-from-bottom-2">
+                  <div className="flex items-start gap-3">
+                    <Sparkles className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-primary mb-2">AI 回應</p>
+                      <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
+                        {aiResponse}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-between glass-card p-4 rounded-lg">
