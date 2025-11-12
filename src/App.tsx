@@ -15,6 +15,7 @@ import AuthTimeline from "./pages/AuthTimeline";
 import NotFound from "./pages/NotFound";
 import MvpRecord from "./pages/MvpRecord";
 import MvpTimeline from "./pages/MvpTimeline";
+import SecurityTests from "./pages/SecurityTests";
 import "@mysten/dapp-kit/dist/index.css";
 
 const queryClient = new QueryClient();
@@ -45,6 +46,8 @@ const App = () => (
               {/* MVP local-only flow */}
               <Route path="/mvp" element={<MvpRecord />} />
               <Route path="/mvp-timeline" element={<MvpTimeline />} />
+              {/* Security Tests */}
+              <Route path="/security-tests" element={<SecurityTests />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
