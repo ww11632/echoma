@@ -243,8 +243,8 @@ Echoma 採用多層安全防護，保護用戶數據和隱私：
 
 詳細的安全最佳實踐檢查報告請參閱 [SECURITY_BEST_PRACTICES.md](./SECURITY_BEST_PRACTICES.md)
 
-- ✅ **符合度：95%** - 高度符合 NIST 和 OWASP 推薦標準
-- ✅ 核心加密機制完全符合業界最佳實踐
+- ✅ **設計原則對齊 NIST/OWASP 建議，已覆蓋核心控制項**，細節見 SECURITY_BEST_PRACTICES.md
+- ✅ 核心加密機制遵循業界最佳實踐
 - ✅ 完善的錯誤處理和向後兼容性
 - ✅ AI 安全防護機制完整實現
 - ⚠️ Argon2id 集成進行中（當前使用增強 PBKDF2 作為補償）
