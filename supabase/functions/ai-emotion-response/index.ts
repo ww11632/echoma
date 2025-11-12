@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
+import { sanitizeUserInput, performSecurityCheck, cleanDescription, checkUserInputSecurity } from '../_shared/security.ts';
+import { getActiveApiKey, checkAndRotateApiKey } from '../_shared/apiKeyRotation.ts';
+import { logAuditEvent, extractTokenUsage, checkTruncation } from '../_shared/auditLogger.ts';
 
 console.log('AI emotion response function started');
 
@@ -137,8 +140,62 @@ Deno.serve(async (req) => {
 
     console.log('[AI Response] Request:', { emotion, intensity, language, descriptionLength: description.length });
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
+    // 安全检测：在发送到模型前检查用户输入
+    const inputSecurityCheck = checkUserInputSecurity(description, language);
+    if (!inputSecurityCheck.isSafe && inputSecurityCheck.riskLevel === 'high') {
+      console.warn('[AI Response] High risk detected in user input, blocking request');
+      
+      // 记录审计日志（即使被阻止）
+      await logAuditEvent(supabase, {
+        userId: user.id,
+        apiEndpoint: 'https://ai.gateway.lovable.dev/v1/chat/completions',
+        modelName: 'google/gemini-2.5-flash',
+        responseLength: 0,
+        wasTruncated: false,
+        responseCategory: 'crisis',
+        riskLevel: inputSecurityCheck.riskLevel,
+        securityCheckPassed: false,
+        detectedKeywords: inputSecurityCheck.detectedKeywords,
+        inputSummary: `情绪: ${emotion}, 强度: ${intensity}/100`,
+        inputLength: description.length,
+        language,
+        errorMessage: 'Request blocked due to high risk content'
+      });
+      
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: '检测到敏感内容，为了您的安全，我们无法处理此请求。如需帮助，请联系专业心理健康服务。',
+          errorCode: 'SECURITY_BLOCKED',
+          category: 'crisis'
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // 获取 API key（支持 rotation）
+    // 创建服务端 Supabase 客户端用于 API key 管理
+    const supabaseServiceUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    let apiKey: string | null = null;
+    
+    if (supabaseServiceUrl && supabaseServiceKey) {
+      const serviceClient = createClient(supabaseServiceUrl, supabaseServiceKey);
+      // 检查并轮换 API key
+      await checkAndRotateApiKey(serviceClient);
+      // 获取当前活跃的 API key
+      apiKey = await getActiveApiKey(serviceClient);
+    }
+    
+    // 如果从数据库获取失败，回退到环境变量
+    if (!apiKey) {
+      apiKey = Deno.env.get('LOVABLE_API_KEY');
+    }
+    
+    if (!apiKey) {
       console.error('LOVABLE_API_KEY not configured');
       return new Response(
         JSON.stringify({
@@ -153,7 +210,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Build system prompt based on language
+    // 使用最小化上下文拼接，避免暴露敏感字段
+    const sanitizedContext = sanitizeUserInput({
+      emotion,
+      intensity,
+      description
+    });
+
+    // Build system prompt based on language (不包含完整描述，只包含摘要)
     const systemPrompts = {
       'zh-TW': `你是一位充滿同理心的情緒支持夥伴。你的任務是：
 
@@ -168,11 +232,6 @@ Deno.serve(async (req) => {
 - 避免說教或給建議（除非使用者明確請求）
 - 多用「你」而不是「我」開頭
 - 適度使用表情符號增加溫度
-
-情境：
-- 情緒：${emotion}
-- 強度：${intensity}/100
-- 描述：${description}
 
 請用繁體中文回應。`,
       'en': `You are an empathetic emotional support companion. Your role is to:
@@ -189,34 +248,33 @@ Response Style:
 - Use "you" rather than "I" to start sentences
 - Use emojis moderately to add warmth
 
-Context:
-- Emotion: ${emotion}
-- Intensity: ${intensity}/100
-- Description: ${description}
-
 Please respond in English.`
     };
 
     const systemPrompt = systemPrompts[language as keyof typeof systemPrompts] || systemPrompts['zh-TW'];
+    
+    // 用户消息只包含清理后的描述（最小化上下文，防止 prompt injection）
+    const userMessage = cleanDescription(description);
 
     // Call AI service
     console.log('[AI Response] Calling AI service...');
+    const maxTokens = 300;
     let response: Response;
     try {
       response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           model: 'google/gemini-2.5-flash',
           messages: [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: description }
+            { role: 'user', content: userMessage }
           ],
           temperature: 0.8,
-          max_tokens: 300,
+          max_tokens: maxTokens,
         }),
       });
     } catch (fetchError) {
@@ -312,6 +370,23 @@ Please respond in English.`
 
     if (!aiResponse) {
       console.error('[AI Response] No response content in AI response:', JSON.stringify(data).substring(0, 500));
+      
+      // 记录错误审计日志
+      await logAuditEvent(supabase, {
+        userId: user.id,
+        apiEndpoint: 'https://ai.gateway.lovable.dev/v1/chat/completions',
+        modelName: 'google/gemini-2.5-flash',
+        responseLength: 0,
+        wasTruncated: false,
+        responseCategory: 'unknown',
+        riskLevel: 'low',
+        securityCheckPassed: true,
+        inputSummary: `情绪: ${emotion}, 强度: ${intensity}/100`,
+        inputLength: description.length,
+        language,
+        errorMessage: 'No response from AI'
+      });
+      
       return new Response(
         JSON.stringify({
           success: false,
@@ -325,12 +400,64 @@ Please respond in English.`
       );
     }
 
-    console.log('[AI Response] Success, response length:', aiResponse.length);
+    // 安全检测：检查 AI 响应
+    const securityCheck = performSecurityCheck(description, aiResponse, language);
+    
+    // 提取 token 使用信息
+    const tokenUsage = extractTokenUsage(data);
+    
+    // 检查是否被截断
+    const truncation = checkTruncation(data, maxTokens);
+    
+    // 记录审计日志
+    await logAuditEvent(supabase, {
+      userId: user.id,
+      apiEndpoint: 'https://ai.gateway.lovable.dev/v1/chat/completions',
+      modelName: 'google/gemini-2.5-flash',
+      promptTokens: tokenUsage.promptTokens,
+      completionTokens: tokenUsage.completionTokens,
+      totalTokens: tokenUsage.totalTokens,
+      responseLength: aiResponse.length,
+      wasTruncated: truncation.wasTruncated,
+      truncationReason: truncation.reason,
+      responseCategory: securityCheck.category,
+      riskLevel: securityCheck.riskLevel,
+      securityCheckPassed: securityCheck.isSafe,
+      detectedKeywords: securityCheck.detectedKeywords,
+      inputSummary: `情绪: ${emotion}, 强度: ${intensity}/100`,
+      inputLength: description.length,
+      language
+    });
+
+    // 如果检测到高风险内容，返回安全响应
+    if (!securityCheck.isSafe && securityCheck.riskLevel === 'high') {
+      console.warn('[AI Response] High risk detected in AI response');
+      
+      // 返回通用的支持性响应，不返回 AI 的原始响应
+      const safeResponse = language.startsWith('zh')
+        ? '我理解你正在经历困难。请记住，你并不孤单。如果你正在考虑伤害自己或他人，请立即联系专业心理健康服务或紧急服务。'
+        : 'I understand you are going through a difficult time. Please remember you are not alone. If you are considering harming yourself or others, please contact professional mental health services or emergency services immediately.';
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          response: safeResponse,
+          category: 'crisis',
+          securityNote: 'Response filtered for safety'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    console.log('[AI Response] Success, response length:', aiResponse.length, 'category:', securityCheck.category);
 
     return new Response(
       JSON.stringify({
         success: true,
-        response: aiResponse
+        response: aiResponse,
+        category: securityCheck.category
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -166,6 +166,8 @@ echoma/
 
 ## 🔐 安全特性
 
+Echoma 採用多層安全防護，保護用戶數據和隱私：
+
 ### 客戶端加密
 
 所有情感數據在離開設備前使用 **AES-GCM 256 位加密**，採用業界最佳實踐：
@@ -211,6 +213,32 @@ echoma/
 - 版本化加密頭確保未來算法升級時仍可解密舊數據
 - 舊數據可無縫解密，無需用戶操作
 
+### AI 安全防護
+
+針對 AI 情感分析功能，實現了完整的安全防護機制：
+
+#### Prompt Injection 防護
+- ✅ **輸入清理**：自動移除常見的 prompt injection 模式
+- ✅ **最小化上下文**：只傳遞必要的情緒信息，避免敏感字段暴露
+- ✅ **輸出分類**：自動分類 AI 響應（支持性文本、建議、危機提示）
+
+#### 危機檢測與安全卡控
+- ✅ **關鍵詞檢測**：檢測自伤/他伤相關關鍵詞（支持中英文）
+- ✅ **本地端安全卡控**：檢測到高風險內容時，不發送到模型或返回安全響應
+- ✅ **安全響應**：提供專業心理健康資源指引
+
+#### 審計日誌
+- ✅ **完整記錄**：記錄所有 AI API 調用（時間、用戶、token 花費、截斷長度）
+- ✅ **安全檢測結果**：記錄響應分類、風險等級、檢測到的關鍵詞
+- ✅ **隱私保護**：只存儲輸入摘要（情緒類型、強度），不存儲完整描述
+
+#### API Key 管理
+- ✅ **Key Rotation**：支持定期輪換 API keys（默認 90 天）
+- ✅ **安全存儲**：API keys 加密存儲在數據庫
+- ✅ **自動檢查**：自動檢查輪換時間並提醒
+
+詳細的安全功能說明請參閱 [SECURITY_FEATURES.md](./SECURITY_FEATURES.md)
+
 ### 安全審計
 
 詳細的安全最佳實踐檢查報告請參閱 [SECURITY_BEST_PRACTICES.md](./SECURITY_BEST_PRACTICES.md)
@@ -218,6 +246,7 @@ echoma/
 - ✅ **符合度：95%** - 高度符合 NIST 和 OWASP 推薦標準
 - ✅ 核心加密機制完全符合業界最佳實踐
 - ✅ 完善的錯誤處理和向後兼容性
+- ✅ AI 安全防護機制完整實現
 - ⚠️ Argon2id 集成進行中（當前使用增強 PBKDF2 作為補償）
 
 ## 🌐 網路配置
@@ -309,6 +338,9 @@ Echoma 提供三種不同的使用模式，滿足不同需求：
 - [x] Walrus 儲存集成
 - [x] Supabase 認證和雲端存儲
 - [x] AI 情感分析功能
+- [x] AI 安全防護（Prompt Injection 防護、危機檢測）
+- [x] 審計日誌系統（記錄所有 AI API 調用）
+- [x] API Key Rotation 機制
 - [x] 多語言支持（繁體中文/英文）
 - [x] iOS 應用支持（Capacitor）
 - [x] 多種使用模式（匿名/認證/MVP）
@@ -321,6 +353,8 @@ Echoma 提供三種不同的使用模式，滿足不同需求：
 - [ ] 實現數據導出功能
 - [ ] 添加情感趨勢分析圖表
 - [ ] 支持多鏈網路切換
+- [ ] 實時安全監控告警系統
+- [ ] 動態關鍵詞列表更新機制
 
 ## 🤝 貢獻
 
@@ -335,6 +369,8 @@ Echoma 提供三種不同的使用模式，滿足不同需求：
 - [Sui 區塊鏈文檔](https://docs.sui.io/)
 - [Walrus 儲存文檔](https://docs.walrus.space/)
 - [shadcn/ui 文檔](https://ui.shadcn.com/)
+- [安全功能說明](./SECURITY_FEATURES.md) - AI 安全防護、審計日誌、API key rotation
+- [安全最佳實踐](./SECURITY_BEST_PRACTICES.md) - 加密機制安全審計報告
 
 ## 🔧 環境變數配置
 
@@ -346,10 +382,28 @@ VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_key
 
 # Supabase Edge Functions 需要配置
-LOVABLE_API_KEY=your_lovable_api_key  # 用於 AI 情感分析
+LOVABLE_API_KEY=your_lovable_api_key  # 用於 AI 情感分析（向後兼容）
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key  # 用於 API key rotation 和審計日誌（可選）
 ```
 
-詳細配置說明請查看相關文檔。
+**注意**：
+- `LOVABLE_API_KEY` 可直接從環境變數讀取（向後兼容）
+- 如需使用 API key rotation 功能，需要配置 `SUPABASE_SERVICE_ROLE_KEY`
+- 審計日誌功能需要運行數據庫遷移（見下方）
+
+### 數據庫遷移
+
+啟用審計日誌和 API key rotation 功能需要運行以下遷移：
+
+```bash
+# 應用審計日誌表遷移
+supabase migration up 20250116000000_create_audit_logs
+
+# 應用 API keys 表遷移
+supabase migration up 20250116000001_create_api_keys_table
+```
+
+詳細配置說明請查看 [SECURITY_FEATURES.md](./SECURITY_FEATURES.md)
 
 ---
 
