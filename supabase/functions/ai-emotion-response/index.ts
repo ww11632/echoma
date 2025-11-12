@@ -9,12 +9,14 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('Processing AI emotion response request');
+    console.log('[AI Response] Processing request');
     
     // Get auth header first
     const authHeader = req.headers.get('Authorization');
+    console.log('[AI Response] Auth header present:', !!authHeader);
+    
     if (!authHeader) {
-      console.error('No authorization header provided');
+      console.error('[AI Response] No authorization header provided');
       return new Response(
         JSON.stringify({
           success: false,
@@ -28,10 +30,15 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Check environment variables
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY');
+    console.log('[AI Response] Env vars present:', { url: !!supabaseUrl, key: !!supabaseKey });
+
     // Create Supabase client with user's auth context
     const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      supabaseUrl ?? '',
+      supabaseKey ?? '',
       {
         global: {
           headers: { Authorization: authHeader },
@@ -42,12 +49,21 @@ Deno.serve(async (req) => {
       }
     );
 
+    console.log('[AI Response] Supabase client created, verifying user...');
+
     // Verify user authentication
     const { data: authData, error: authError } = await supabase.auth.getUser();
+    console.log('[AI Response] Auth result:', { 
+      hasData: !!authData, 
+      hasUser: !!authData?.user, 
+      hasError: !!authError,
+      errorMessage: authError?.message 
+    });
+    
     const user = authData?.user;
     
     if (authError || !user) {
-      console.error('Auth error:', authError);
+      console.error('[AI Response] Authentication failed:', authError?.message);
       return new Response(
         JSON.stringify({
           success: false,
