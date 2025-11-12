@@ -667,8 +667,10 @@ export async function generateUserKey(
     keyMaterial = addressBytes;
   }
   
-  // Use PBKDF2 with device-adaptive iterations
-  const iterations = await detectDeviceCapability();
+  // Use PBKDF2 with FIXED iterations for deterministic key derivation
+  // CRITICAL: Must use fixed iterations so the same wallet address always produces
+  // the same derived key, allowing decryption
+  const iterations = DEFAULT_PBKDF2_ITERATIONS;
   
   const keyMaterialKey = await crypto.subtle.importKey(
     "raw",
@@ -757,8 +759,10 @@ export async function generateUserKeyFromId(
     keyMaterial = userIdBytes;
   }
   
-  // Use PBKDF2 with device-adaptive iterations
-  const iterations = await detectDeviceCapability();
+  // Use PBKDF2 with FIXED iterations for deterministic key derivation
+  // CRITICAL: Must use fixed iterations so the same user ID always produces
+  // the same derived key, allowing decryption
+  const iterations = DEFAULT_PBKDF2_ITERATIONS;
   
   const keyMaterialKey = await crypto.subtle.importKey(
     "raw",
