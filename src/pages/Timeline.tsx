@@ -85,30 +85,32 @@ const Timeline = () => {
               const response = await supabase.functions.invoke('get-emotions');
               if (!response.error && response.data?.success) {
                 const convertedRecords: EmotionRecord[] = response.data.records.map((r: any) => {
-                  // 判断是否为本地记录：如果 walrus_url 以 local:// 开头，或者 blob_id 以 local_ 开头
-                  const isLocal = r.walrus_url?.startsWith("local://") || r.blob_id?.startsWith("local_");
+                  // 如果 blob_id 或 walrus_url 是 null/undefined，視為本地記錄
+                  const hasWalrusData = r.blob_id && r.walrus_url;
+                  const isLocal = !hasWalrusData || 
+                                r.walrus_url?.startsWith("local://") || 
+                                r.blob_id?.startsWith("local_");
                   
-                  // 如果是本地记录且 blob_id 为空，使用 fallback；否则保持原值（包括 null）
-                  const blobId = isLocal && !r.blob_id 
-                    ? `local_${r.id.slice(0, 8)}` 
-                    : (r.blob_id || "");
+                  // 為沒有 Walrus 數據的記錄生成本地 ID
+                  const blobId = hasWalrusData 
+                    ? r.blob_id 
+                    : `local_${r.id.slice(0, 8)}`;
                   
-                  const walrusUrl = isLocal && !r.walrus_url
-                    ? `local://${r.id}`
-                    : (r.walrus_url || "");
+                  const walrusUrl = hasWalrusData
+                    ? r.walrus_url
+                    : `local://${r.id}`;
                   
-                  console.log(`[Timeline] Supabase function record ${r.id}:`, {
-                    original_blob_id: r.blob_id,
-                    original_walrus_url: r.walrus_url,
+                  console.log(`[Timeline] Processing record ${r.id}:`, {
+                    hasWalrusData,
                     isLocal,
-                    final_blob_id: blobId,
-                    final_walrus_url: walrusUrl
+                    blob_id: blobId,
+                    walrus_url: walrusUrl
                   });
                   
                   return {
                     id: r.id,
                     emotion: r.emotion,
-                    intensity: r.intensity,
+                    intensity: r.intensity || 50,
                     description: r.description,
                     blob_id: blobId,
                     walrus_url: walrusUrl,
@@ -127,30 +129,25 @@ const Timeline = () => {
               try {
                 const apiRecords = await getEmotions(session.access_token);
                 const convertedApiRecords: EmotionRecord[] = apiRecords.map((r: any) => {
-                  // 判断是否为本地记录
-                  const isLocal = r.walrus_url?.startsWith("local://") || r.blob_id?.startsWith("local_");
+                  // 如果 blob_id 或 walrus_url 是 null/undefined，視為本地記錄
+                  const hasWalrusData = r.blob_id && r.walrus_url;
+                  const isLocal = !hasWalrusData || 
+                                r.walrus_url?.startsWith("local://") || 
+                                r.blob_id?.startsWith("local_");
                   
-                  // 如果是本地记录且 blob_id 为空，使用 fallback；否则保持原值
-                  const blobId = isLocal && !r.blob_id 
-                    ? `local_${r.id.slice(0, 8)}` 
-                    : (r.blob_id || "");
+                  // 為沒有 Walrus 數據的記錄生成本地 ID
+                  const blobId = hasWalrusData 
+                    ? r.blob_id 
+                    : `local_${r.id.slice(0, 8)}`;
                   
-                  const walrusUrl = isLocal && !r.walrus_url
-                    ? `local://${r.id}`
-                    : (r.walrus_url || "");
-                  
-                  console.log(`[Timeline] Direct API record ${r.id}:`, {
-                    original_blob_id: r.blob_id,
-                    original_walrus_url: r.walrus_url,
-                    isLocal,
-                    final_blob_id: blobId,
-                    final_walrus_url: walrusUrl
-                  });
+                  const walrusUrl = hasWalrusData
+                    ? r.walrus_url
+                    : `local://${r.id}`;
                   
                   return {
                     id: r.id,
                     emotion: r.emotion,
-                    intensity: r.intensity,
+                    intensity: r.intensity || 50,
                     description: r.description,
                     blob_id: blobId,
                     walrus_url: walrusUrl,
@@ -168,58 +165,9 @@ const Timeline = () => {
             }
           }
           
-          // 无论是否有 Supabase session，如果有钱包连接，都尝试查询链上的 Walrus blob 对象
-          // 这样可以补充从链上获取的记录，即使数据库中没有
+          // 如果有钱包连接，尝试查询链上的 Walrus blob 对象
           if (currentAccount?.address) {
-            console.log("[Timeline] Wallet connected, address:", currentAccount.address);
-            // 尝试从 API 获取记录（如果后端可用，仅在无 session 时）
-            if (!session) {
-              try {
-                console.log("[Timeline] Fetching records by wallet address from API:", currentAccount.address);
-                const apiRecords = await getEmotionsByWallet(currentAccount.address);
-                const convertedApiRecords: EmotionRecord[] = apiRecords.map((r: any) => {
-                  // 判断是否为本地记录
-                  const isLocal = r.walrus_url?.startsWith("local://") || r.blob_id?.startsWith("local_");
-                  
-                  // 如果是本地记录且 blob_id 为空，使用 fallback；否则保持原值
-                  const blobId = isLocal && !r.blob_id 
-                    ? `local_${r.id.slice(0, 8)}` 
-                    : (r.blob_id || "");
-                  
-                  const walrusUrl = isLocal && !r.walrus_url
-                    ? `local://${r.id}`
-                    : (r.walrus_url || "");
-                  
-                  console.log(`[Timeline] Wallet API record ${r.id}:`, {
-                    original_blob_id: r.blob_id,
-                    original_walrus_url: r.walrus_url,
-                    isLocal,
-                    final_blob_id: blobId,
-                    final_walrus_url: walrusUrl
-                  });
-                  
-                  return {
-                    id: r.id,
-                    emotion: r.emotion,
-                    intensity: r.intensity,
-                    description: r.description,
-                    blob_id: blobId,
-                    walrus_url: walrusUrl,
-                    payload_hash: r.payload_hash || "",
-                    is_public: r.is_public || false,
-                    proof_status: r.proof_status || "pending",
-                    sui_ref: r.sui_ref || null,
-                    created_at: r.created_at || r.timestamp,
-                  };
-                });
-                allRecords.push(...convertedApiRecords);
-                console.log(`[Timeline] Found ${convertedApiRecords.length} records for wallet from API`);
-              } catch (apiError) {
-                console.warn("[Timeline] API not available, will try on-chain query only:", apiError);
-                // API 失败不影响链上查询
-              }
-
-            // 无论 API 是否成功，都尝试查询链上的 Walrus blob 对象
+            console.log("[Timeline] Wallet connected, querying on-chain blobs for:", currentAccount.address);
             try {
               setIsQueryingOnChain(true);
               console.log("[Timeline] Querying on-chain Walrus blobs for address:", currentAccount.address);
@@ -299,8 +247,7 @@ const Timeline = () => {
                 setIsQueryingOnChain(false);
               }
             }
-          }
-        } catch (supabaseError) {
+          } catch (supabaseError) {
           console.log("[Timeline] Supabase error:", supabaseError);
         }
 
