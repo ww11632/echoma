@@ -170,6 +170,9 @@
     "decryptKeyError": "Unable to generate decryption key. Please ensure you are logged in or have a wallet connected",
     "decryptServiceUnavailable": "Storage service temporarily unavailable. Please try again later",
     "decryptInvalidData": "Invalid data format, unable to decrypt",
+    "decryptErrorInvalidKey": "Invalid key or incorrect password",
+    "decryptErrorDataCorrupted": "Data corrupted or tampered",
+    "decryptErrorUnsupportedVersion": "Unsupported encryption format version, please update the app",
     "showDetails": "Show Details",
     "hideDetails": "Hide Details",
     "errorDetail": {
@@ -187,6 +190,8 @@
       "service_unavailable": "Service Unavailable",
       "key_error": "Key Error",
       "invalid_data": "Invalid Data",
+      "data_corrupted": "Data Corrupted",
+      "unsupported_version": "Unsupported Version",
       "unknown": "Unknown Error"
     },
     "errorSuggestion": {
@@ -198,7 +203,9 @@
       "serviceMaintenance": "Service may be under maintenance",
       "checkLogin": "Please ensure you are logged in correctly",
       "checkWallet": "Please ensure your wallet is properly connected",
-      "dataCorrupted": "Data may be corrupted"
+      "checkPassword": "Please verify your password or key is correct",
+      "dataCorrupted": "Data may be corrupted",
+      "updateApp": "Please update the app to the latest version"
     },
     "filter": {
       "all": "All",

@@ -3,7 +3,7 @@
  * Encrypts sensitive data before storing in localStorage
  */
 
-import { encryptData, decryptData, type EncryptedData } from "./encryption";
+import { encryptData, decryptData, decryptDataWithMigration, type EncryptedData } from "./encryption";
 
 const STORAGE_KEY_PREFIX = "echoma_encrypted_";
 const RECORDS_KEY = "emotionRecords";
@@ -42,7 +42,8 @@ export async function getEncryptedItem(
     }
 
     const encryptedData: EncryptedData = JSON.parse(encryptedDataStr);
-    const decrypted = await decryptData(encryptedData, encryptionKey);
+    // Use decryptDataWithMigration to support legacy format
+    const decrypted = await decryptDataWithMigration(encryptedData, encryptionKey);
     return decrypted;
   } catch (error) {
     console.error("Failed to decrypt stored data:", error);

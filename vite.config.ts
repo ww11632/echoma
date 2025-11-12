@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
+import wasm from "vite-plugin-wasm";
 
 // Plugin to handle WebAssembly files with correct MIME type
 const wasmPlugin = () => ({
@@ -33,6 +34,7 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
+    wasm(), // Add WebAssembly support plugin
     wasmPlugin(), // Add WebAssembly MIME type plugin
     mode === "development" && componentTagger(),
   ].filter(Boolean),

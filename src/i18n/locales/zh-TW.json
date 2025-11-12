@@ -170,6 +170,9 @@
     "decryptKeyError": "無法生成解密密鑰，請確認已登入或連接錢包",
     "decryptServiceUnavailable": "儲存服務暫時無法使用，請稍後再試",
     "decryptInvalidData": "無效的資料格式，無法解密",
+    "decryptErrorInvalidKey": "金鑰錯誤或密碼不正確",
+    "decryptErrorDataCorrupted": "資料損毀或已被篡改",
+    "decryptErrorUnsupportedVersion": "不支援的加密格式版本，請更新應用程式",
     "showDetails": "查看詳細資訊",
     "hideDetails": "隱藏詳細資訊",
     "errorDetail": {
@@ -187,6 +190,8 @@
       "service_unavailable": "服務不可用",
       "key_error": "密鑰錯誤",
       "invalid_data": "無效資料",
+      "data_corrupted": "資料損毀",
+      "unsupported_version": "不支援的版本",
       "unknown": "未知錯誤"
     },
     "errorSuggestion": {
@@ -198,7 +203,9 @@
       "serviceMaintenance": "服務可能正在維護中",
       "checkLogin": "請確認您已正確登入",
       "checkWallet": "請確認錢包已正確連接",
-      "dataCorrupted": "資料可能已損壞"
+      "checkPassword": "請確認密碼或密鑰正確",
+      "dataCorrupted": "資料可能已損壞",
+      "updateApp": "請更新應用程式到最新版本"
     },
     "filter": {
       "all": "全部",

@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { ArrowLeft, Loader2, LogOut, Lock, Unlock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { decryptData } from "@/lib/encryption";
+import { decryptData, decryptDataWithMigration, DecryptionError, DecryptionErrorType } from "@/lib/encryption";
 import { generateUserKeyFromId } from "@/lib/encryption";
 import { readFromWalrus } from "@/lib/walrus";
 import type { User, Session } from "@supabase/supabase-js";
@@ -101,8 +101,8 @@ const AuthTimeline = () => {
       // Generate user key for decryption
       const userKey = await generateUserKeyFromId(user.id);
       
-      // Decrypt the data
-      const decryptedString = await decryptData(encryptedData, userKey);
+      // Decrypt the data (supports automatic legacy format migration)
+      const decryptedString = await decryptDataWithMigration(encryptedData, userKey);
       
       // Parse the decrypted JSON to get the snapshot
       const snapshot = JSON.parse(decryptedString);
@@ -119,9 +119,30 @@ const AuthTimeline = () => {
       });
     } catch (error: any) {
       console.error(`Failed to decrypt record ${recordId}:`, error);
+      
+      // Provide more specific error messages
+      let errorMessage = "Could not decrypt this record. It may have expired or been corrupted.";
+      if (error instanceof DecryptionError) {
+        switch (error.type) {
+          case DecryptionErrorType.INVALID_KEY:
+            errorMessage = "Decryption failed: Invalid key or incorrect password.";
+            break;
+          case DecryptionErrorType.DATA_CORRUPTED:
+            errorMessage = "Decryption failed: Data may be corrupted or tampered.";
+            break;
+          case DecryptionErrorType.UNSUPPORTED_VERSION:
+            errorMessage = "Decryption failed: Unsupported encryption format version.";
+            break;
+          default:
+            errorMessage = error.message || errorMessage;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Decryption Failed",
-        description: "Could not decrypt this record. It may have expired or been corrupted.",
+        description: errorMessage,
         variant: "destructive",
       });
       // Store error message instead

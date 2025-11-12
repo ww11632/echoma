@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { listEmotionRecords } from "@/lib/localIndex";
 import { getEmotions, getEmotionsByWallet } from "@/lib/api";
 import { queryWalrusBlobsByOwner, getWalrusUrl, readFromWalrus } from "@/lib/walrus";
-import { decryptData, generateUserKey, generateUserKeyFromId } from "@/lib/encryption";
+import { decryptData, decryptDataWithMigration, generateUserKey, generateUserKeyFromId, DecryptionError, DecryptionErrorType } from "@/lib/encryption";
 import type { EncryptedData } from "@/lib/encryption";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -406,8 +406,8 @@ const Timeline = () => {
         throw new Error("无法生成解密密钥");
       }
       
-      // 解密数据
-      const decryptedString = await decryptData(encryptedData, userKey);
+      // 解密数据（支持旧格式自动迁移）
+      const decryptedString = await decryptDataWithMigration(encryptedData, userKey);
       
       // 解析解密后的 JSON 获取快照
       const snapshot = JSON.parse(decryptedString);
@@ -448,8 +448,51 @@ const Timeline = () => {
       let statusCode: number | undefined;
       let suggestions: string[] = [];
       
-      // 分析错误类型
-      if (error.message) {
+      // 检查是否是 DecryptionError（新的错误类型）
+      if (error instanceof DecryptionError) {
+        switch (error.type) {
+          case DecryptionErrorType.INVALID_KEY:
+            errorType = "key_error";
+            errorMessage = t("timeline.decryptKeyError") + ": " + t("timeline.decryptErrorInvalidKey");
+            suggestions = [
+              t("timeline.errorSuggestion.checkPassword"),
+              t("timeline.errorSuggestion.checkLogin"),
+              t("timeline.errorSuggestion.checkWallet"),
+            ];
+            break;
+          case DecryptionErrorType.DATA_CORRUPTED:
+            errorType = "data_corrupted";
+            errorMessage = t("timeline.decryptErrorDataCorrupted");
+            suggestions = [
+              t("timeline.errorSuggestion.dataCorrupted"),
+              t("timeline.errorSuggestion.contactSupport"),
+            ];
+            break;
+          case DecryptionErrorType.UNSUPPORTED_VERSION:
+            errorType = "unsupported_version";
+            errorMessage = t("timeline.decryptErrorUnsupportedVersion");
+            suggestions = [
+              t("timeline.errorSuggestion.updateApp"),
+              t("timeline.errorSuggestion.contactSupport"),
+            ];
+            break;
+          case DecryptionErrorType.INVALID_FORMAT:
+            errorType = "invalid_data";
+            errorMessage = t("timeline.decryptInvalidData");
+            suggestions = [
+              t("timeline.errorSuggestion.dataCorrupted"),
+              t("timeline.errorSuggestion.contactSupport"),
+            ];
+            break;
+          default:
+            errorMessage = error.message || t("timeline.decryptFailedDesc");
+            suggestions = [
+              t("timeline.errorSuggestion.retryLater"),
+              t("timeline.errorSuggestion.contactSupport"),
+            ];
+        }
+      } else if (error.message) {
+        // 处理其他类型的错误（网络错误等）
         if (error.message.includes("Network error") || error.message.includes("network") || error.message.includes("fetch")) {
           errorType = "network";
           errorMessage = t("timeline.decryptNetworkError");
