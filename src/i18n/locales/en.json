@@ -218,6 +218,41 @@
     "anxiety": "😰 Anxiety",
     "confusion": "🤔 Confusion",
     "peace": "✨ Peace"
+  },
+  "authRecord": {
+    "title": "Record Your Emotion",
+    "subtitle": "Securely stored with cloud backup",
+    "backToHome": "Back to Home",
+    "signOut": "Sign Out",
+    "howAreYouFeeling": "How are you feeling?",
+    "intensity": "Intensity",
+    "intensityValue": "Intensity: {{value}}%",
+    "describeYourFeelings": "Describe your feelings",
+    "descriptionPlaceholder": "What's on your mind? Express yourself freely...",
+    "characters": "{{count}} / 5000 characters",
+    "getAiResponse": "Get AI Emotion Response",
+    "aiThinking": "AI is thinking...",
+    "aiResponse": "AI Response",
+    "makePublic": "Make Public",
+    "makePublicDesc": "Share this emotion record with others",
+    "recordEmotion": "Record Emotion",
+    "recording": "Recording...",
+    "errors": {
+      "missingInfo": "Missing Information",
+      "missingInfoDesc": "Please select an emotion and add a description.",
+      "notAuthenticated": "Not Authenticated",
+      "notAuthenticatedDesc": "Please sign in to record emotions.",
+      "aiError": "Error",
+      "aiErrorDesc": "Unable to get AI response, please try again later",
+      "uploadFailed": "Upload Failed",
+      "uploadFailedDesc": "Failed to record emotion. Please try again."
+    },
+    "success": {
+      "signedOut": "Signed Out",
+      "signedOutDesc": "You have been signed out successfully.",
+      "recorded": "Success!",
+      "recordedDesc": "Your emotion has been recorded securely."
+    }
   }
 }
 

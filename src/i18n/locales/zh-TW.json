@@ -218,6 +218,41 @@
     "anxiety": "😰 焦慮",
     "confusion": "🤔 困惑",
     "peace": "✨ 平靜"
+  },
+  "authRecord": {
+    "title": "記錄您的情緒",
+    "subtitle": "安全儲存並備份至雲端",
+    "backToHome": "返回首頁",
+    "signOut": "登出",
+    "howAreYouFeeling": "您現在感覺如何？",
+    "intensity": "強度",
+    "intensityValue": "強度：{{value}}%",
+    "describeYourFeelings": "描述您的感受",
+    "descriptionPlaceholder": "您在想什麼？自由表達...",
+    "characters": "{{count}} / 5000 字元",
+    "getAiResponse": "獲得 AI 情緒回應",
+    "aiThinking": "AI 正在思考中...",
+    "aiResponse": "AI 回應",
+    "makePublic": "設為公開",
+    "makePublicDesc": "與他人分享此情緒記錄",
+    "recordEmotion": "記錄情緒",
+    "recording": "記錄中...",
+    "errors": {
+      "missingInfo": "缺少資訊",
+      "missingInfoDesc": "請選擇情緒並添加描述。",
+      "notAuthenticated": "未登入",
+      "notAuthenticatedDesc": "請登入以記錄情緒。",
+      "aiError": "錯誤",
+      "aiErrorDesc": "無法取得 AI 回應，請稍後再試",
+      "uploadFailed": "上傳失敗",
+      "uploadFailedDesc": "無法記錄情緒。請稍後再試。"
+    },
+    "success": {
+      "signedOut": "已登出",
+      "signedOutDesc": "您已成功登出。",
+      "recorded": "成功！",
+      "recordedDesc": "您的情緒已安全記錄。"
+    }
   }
 }
 

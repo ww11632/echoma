@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -11,19 +12,21 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { validateAndSanitizeDescription } from "@/lib/validation";
 import { encryptData, generateUserKeyFromId } from "@/lib/encryption";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import type { User, Session } from "@supabase/supabase-js";
 
-const emotionTags = [
-  { label: "😊 Joy", value: "joy", color: "from-yellow-400 to-orange-400" },
-  { label: "😢 Sadness", value: "sadness", color: "from-blue-400 to-indigo-400" },
-  { label: "😠 Anger", value: "anger", color: "from-red-400 to-rose-400" },
-  { label: "😰 Anxiety", value: "anxiety", color: "from-purple-400 to-pink-400" },
-  { label: "🤔 Confusion", value: "confusion", color: "from-gray-400 to-slate-400" },
-  { label: "✨ Peace", value: "peace", color: "from-green-400 to-teal-400" },
+const emotionValues = [
+  { value: "joy", color: "from-yellow-400 to-orange-400" },
+  { value: "sadness", color: "from-blue-400 to-indigo-400" },
+  { value: "anger", color: "from-red-400 to-rose-400" },
+  { value: "anxiety", color: "from-purple-400 to-pink-400" },
+  { value: "confusion", color: "from-gray-400 to-slate-400" },
+  { value: "peace", color: "from-green-400 to-teal-400" },
 ];
 
 const AuthRecord = () => {
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation();
   const { toast } = useToast();
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -63,8 +66,8 @@ const AuthRecord = () => {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     toast({
-      title: "Signed Out",
-      description: "You have been signed out successfully.",
+      title: t("authRecord.success.signedOut"),
+      description: t("authRecord.success.signedOutDesc"),
     });
     navigate("/");
   };
@@ -81,7 +84,7 @@ const AuthRecord = () => {
           emotion: selectedEmotion,
           intensity: intensity[0],
           description,
-          language: 'zh-TW',
+          language: i18n.language === 'zh-TW' ? 'zh-TW' : 'en',
         },
       });
 
@@ -95,8 +98,8 @@ const AuthRecord = () => {
     } catch (error: any) {
       console.error('AI response error:', error);
       toast({
-        title: "錯誤",
-        description: "無法取得 AI 回應，請稍後再試",
+        title: t("authRecord.errors.aiError"),
+        description: t("authRecord.errors.aiErrorDesc"),
         variant: "destructive",
       });
     } finally {
@@ -107,8 +110,8 @@ const AuthRecord = () => {
   const handleSubmit = async () => {
     if (!selectedEmotion || !description.trim()) {
       toast({
-        title: "Missing Information",
-        description: "Please select an emotion and add a description.",
+        title: t("authRecord.errors.missingInfo"),
+        description: t("authRecord.errors.missingInfoDesc"),
         variant: "destructive",
       });
       return;
@@ -116,8 +119,8 @@ const AuthRecord = () => {
 
     if (!session) {
       toast({
-        title: "Not Authenticated",
-        description: "Please sign in to record emotions.",
+        title: t("authRecord.errors.notAuthenticated"),
+        description: t("authRecord.errors.notAuthenticatedDesc"),
         variant: "destructive",
       });
       return;
@@ -201,8 +204,8 @@ const AuthRecord = () => {
       }
 
       toast({
-        title: "Success!",
-        description: "Your emotion has been recorded securely.",
+        title: t("authRecord.success.recorded"),
+        description: t("authRecord.success.recordedDesc"),
       });
 
       // Reset form
@@ -238,8 +241,8 @@ const AuthRecord = () => {
       }
       
       toast({
-        title: "Upload Failed",
-        description: errorMessage,
+        title: t("authRecord.errors.uploadFailed"),
+        description: errorMessage || t("authRecord.errors.uploadFailedDesc"),
         variant: "destructive",
       });
     } finally {
@@ -257,6 +260,11 @@ const AuthRecord = () => {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
+      {/* Language Switcher */}
+      <div className="absolute top-4 right-4 z-20">
+        <LanguageSwitcher />
+      </div>
+      
       <div className="absolute top-20 left-10 w-64 h-64 bg-primary/20 rounded-full blur-3xl animate-pulse-glow" />
       <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent/20 rounded-full blur-3xl animate-pulse-glow" style={{ animationDelay: '1s' }} />
       
@@ -264,13 +272,13 @@ const AuthRecord = () => {
         <div className="flex items-center justify-between mb-6">
           <Button variant="ghost" onClick={() => navigate("/")}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Home
+            {t("authRecord.backToHome")}
           </Button>
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground">{user.email}</span>
             <Button variant="outline" size="sm" onClick={handleSignOut}>
               <LogOut className="mr-2 h-4 w-4" />
-              Sign Out
+              {t("authRecord.signOut")}
             </Button>
           </div>
         </div>
@@ -280,26 +288,26 @@ const AuthRecord = () => {
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full gradient-emotion shadow-md animate-float mb-4">
               <Lock className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-3xl font-bold">Record Your Emotion</h1>
-            <p className="text-muted-foreground">Securely stored with cloud backup</p>
+            <h1 className="text-3xl font-bold">{t("authRecord.title")}</h1>
+            <p className="text-muted-foreground">{t("authRecord.subtitle")}</p>
           </div>
 
           <div className="space-y-6">
             <div className="space-y-3">
-              <Label className="text-base font-semibold">How are you feeling?</Label>
+              <Label className="text-base font-semibold">{t("authRecord.howAreYouFeeling")}</Label>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {emotionTags.map((tag) => (
+                {emotionValues.map((emotion) => (
                   <Button
-                    key={tag.value}
-                    variant={selectedEmotion === tag.value ? "default" : "outline"}
+                    key={emotion.value}
+                    variant={selectedEmotion === emotion.value ? "default" : "outline"}
                     className={`h-auto py-4 text-base ${
-                      selectedEmotion === tag.value
-                        ? `bg-gradient-to-r ${tag.color} text-white hover:opacity-90`
+                      selectedEmotion === emotion.value
+                        ? `bg-gradient-to-r ${emotion.color} text-white hover:opacity-90`
                         : "glass-card"
                     }`}
-                    onClick={() => setSelectedEmotion(tag.value)}
+                    onClick={() => setSelectedEmotion(emotion.value)}
                   >
-                    {tag.label}
+                    {t(`emotions.${emotion.value}`)}
                   </Button>
                 ))}
               </div>
@@ -307,7 +315,7 @@ const AuthRecord = () => {
 
             <div className="space-y-3">
               <Label className="text-base font-semibold">
-                Intensity: {intensity[0]}%
+                {t("authRecord.intensityValue", { value: intensity[0] })}
               </Label>
               <Slider
                 value={intensity}
@@ -320,17 +328,17 @@ const AuthRecord = () => {
 
             <div className="space-y-3">
               <Label htmlFor="description" className="text-base font-semibold">
-                Describe your feelings
+                {t("authRecord.describeYourFeelings")}
               </Label>
               <Textarea
                 id="description"
-                placeholder="What's on your mind? Express yourself freely..."
+                placeholder={t("authRecord.descriptionPlaceholder")}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 className="min-h-[120px] glass-card resize-none"
               />
               <p className="text-sm text-muted-foreground">
-                {description.length} / 5000 characters
+                {t("authRecord.characters", { count: description.length })}
               </p>
 
               {/* AI Response Button */}
@@ -345,12 +353,12 @@ const AuthRecord = () => {
                   {isAiLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      AI 正在思考中...
+                      {t("authRecord.aiThinking")}
                     </>
                   ) : (
                     <>
                       <Sparkles className="mr-2 h-4 w-4" />
-                      獲得 AI 情緒回應
+                      {t("authRecord.getAiResponse")}
                     </>
                   )}
                 </Button>
@@ -362,7 +370,7 @@ const AuthRecord = () => {
                   <div className="flex items-start gap-3">
                     <Sparkles className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-primary mb-2">AI 回應</p>
+                      <p className="text-sm font-medium text-primary mb-2">{t("authRecord.aiResponse")}</p>
                       <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
                         {aiResponse}
                       </p>
@@ -374,9 +382,9 @@ const AuthRecord = () => {
 
             <div className="flex items-center justify-between glass-card p-4 rounded-lg">
               <div className="space-y-0.5">
-                <Label className="text-base font-semibold">Make Public</Label>
+                <Label className="text-base font-semibold">{t("authRecord.makePublic")}</Label>
                 <p className="text-sm text-muted-foreground">
-                  Share this emotion record with others
+                  {t("authRecord.makePublicDesc")}
                 </p>
               </div>
               <Switch checked={isPublic} onCheckedChange={setIsPublic} />
@@ -390,12 +398,12 @@ const AuthRecord = () => {
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Recording...
+                  {t("authRecord.recording")}
                 </>
               ) : (
                 <>
                   <Sparkles className="mr-2 h-5 w-5" />
-                  Record Emotion
+                  {t("authRecord.recordEmotion")}
                 </>
               )}
             </Button>
