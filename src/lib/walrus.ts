@@ -12,6 +12,16 @@ import { toBase64 } from "@mysten/sui/utils";
 import { Ed25519PublicKey } from "@mysten/sui/keypairs/ed25519";
 import type { WalrusClient } from "@mysten/walrus";
 
+// Emotion type mapping for Sui contract
+const EMOTION_TYPE_MAP: Record<string, number> = {
+  joy: 0,
+  sadness: 1,
+  anger: 2,
+  anxiety: 3,
+  confusion: 4,
+  peace: 5,
+};
+
 // Walrus testnet configuration (new upload relay + aggregator hosts)
 const WALRUS_PUBLISHER_URL = "https://upload-relay.testnet.walrus.space";
 const WALRUS_AGGREGATOR_URL = "https://aggregator.testnet.walrus.space";
@@ -1196,6 +1206,80 @@ export function prepareEmotionSnapshot(
   }
 
   return snapshot;
+}
+
+/**
+ * Upload emotion metadata to Sui blockchain
+ * Stores: blobId, payloadHash, emotion, timestamp
+ * 
+ * @param blobId - Walrus blob ID
+ * @param payloadHash - SHA-256 hash of encrypted data
+ * @param emotion - Emotion type string
+ * @param timestamp - Unix timestamp in milliseconds
+ * @param signer - Sui signer for transaction
+ * @param packageId - Deployed Sui package ID (optional, will use default if not provided)
+ * @returns Object ID of the created metadata object
+ */
+export async function uploadEmotionMetadataToSui(
+  blobId: string,
+  payloadHash: string,
+  emotion: string,
+  timestamp: number,
+  signer: Signer,
+  packageId?: string
+): Promise<string> {
+  // Use default package ID if not provided (should be set via environment variable)
+  const EMOTION_METADATA_PACKAGE_ID = packageId || import.meta.env.VITE_SUI_EMOTION_METADATA_PACKAGE_ID;
+  
+  if (!EMOTION_METADATA_PACKAGE_ID) {
+    throw new Error("Sui package ID not configured. Please set VITE_SUI_EMOTION_METADATA_PACKAGE_ID environment variable.");
+  }
+
+  // Map emotion string to number
+  const emotionType = EMOTION_TYPE_MAP[emotion.toLowerCase()];
+  if (emotionType === undefined) {
+    throw new Error(`Invalid emotion type: ${emotion}`);
+  }
+
+  // Convert strings to bytes
+  const blobIdBytes = new TextEncoder().encode(blobId);
+  const payloadHashBytes = Uint8Array.from(
+    payloadHash.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []
+  );
+
+  // Create transaction
+  const tx = new Transaction();
+  
+  // Call create_metadata function
+  tx.moveCall({
+    target: `${EMOTION_METADATA_PACKAGE_ID}::emotion_metadata::create_metadata`,
+    arguments: [
+      tx.pure(Array.from(blobIdBytes)),
+      tx.pure(Array.from(payloadHashBytes)),
+      tx.pure(emotionType),
+      tx.pure(timestamp),
+    ],
+  });
+
+  // Execute transaction
+  const result = await signer.signAndExecuteTransaction({
+    transaction: tx,
+    options: {
+      showEffects: true,
+      showEvents: true,
+    },
+  });
+
+  // Extract object ID from transaction result
+  if (!result.effects?.created || result.effects.created.length === 0) {
+    throw new Error("Failed to create metadata object on Sui");
+  }
+
+  const objectId = result.effects.created[0].reference.objectId;
+  console.log("[Sui Metadata] Created metadata object:", objectId);
+  console.log("[Sui Metadata] Transaction digest:", result.digest);
+
+  return objectId;
 }
 
 /**

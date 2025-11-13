@@ -327,7 +327,7 @@ async function uploadToWalrus(encryptedData, epochs = DEFAULT_EPOCHS) {
 app.post("/api/emotion", requireAuth, rateLimitMiddleware, async (req, res) => {
   try {
     console.log(`[API] POST /api/emotion - Authenticated request from user: ${req.user.id}`);
-    const { emotion, intensity, description, encryptedData, isPublic = false, walletAddress = null } = req.body || {};
+    const { emotion, intensity, description, encryptedData, isPublic = false, walletAddress = null, suiRef = null } = req.body || {};
     
     // Validate inputs
     if (!emotion || typeof emotion !== "string") {
@@ -410,7 +410,7 @@ app.post("/api/emotion", requireAuth, rateLimitMiddleware, async (req, res) => {
       payload_hash: payloadHash,
       is_public: !!isPublic,
       proof_status: walrusUploadFailed ? "pending" : "confirmed",
-      sui_ref: uploaded.suiRef,
+      sui_ref: suiRef || uploaded.suiRef, // Use provided suiRef (from Sui metadata) or fallback to Walrus suiRef
       wallet_address: walletAddress,
       created_at: new Date().toISOString(),
       version: "1.0.0",

@@ -12,7 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useCurrentAccount, useCurrentWallet } from "@mysten/dapp-kit";
 import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
 import { encryptData, generateUserKey } from "@/lib/encryption";
-import { prepareEmotionSnapshot, uploadToWalrusWithSDK, createSignerFromWallet } from "@/lib/walrus";
+import { prepareEmotionSnapshot, uploadToWalrusWithSDK, createSignerFromWallet, uploadEmotionMetadataToSui } from "@/lib/walrus";
+import { hashData } from "@/lib/encryption";
 import { validateAndSanitizeDescription, emotionSnapshotSchema } from "@/lib/validation";
 import { supabase } from "@/integrations/supabase/client";
 import { addEmotionRecord } from "@/lib/localIndex";
@@ -252,6 +253,24 @@ const Record = () => {
         
         console.log("[Record] ✅ SDK upload successful:", sdkResult);
         
+        // Upload metadata to Sui blockchain
+        let suiMetadataObjectId: string | null = null;
+        try {
+          const payloadHash = await hashData(encryptedString);
+          console.log("[Record] Uploading metadata to Sui blockchain...");
+          suiMetadataObjectId = await uploadEmotionMetadataToSui(
+            sdkResult.blobId,
+            payloadHash,
+            selectedEmotion,
+            snapshot.timestamp,
+            signer
+          );
+          console.log("[Record] ✅ Sui metadata uploaded:", suiMetadataObjectId);
+        } catch (suiError: any) {
+          console.warn("[Record] Sui metadata upload failed (not critical):", suiError);
+          // Don't fail the entire operation if Sui upload fails
+        }
+        
         setUploadStatus("success");
         toast({
           title: t("record.success.recorded"),
@@ -267,6 +286,7 @@ const Record = () => {
             encryptedData: encryptedString,
             isPublic,
             walletAddress: currentAccount.address,
+            suiRef: suiMetadataObjectId, // Pass Sui metadata object ID
           });
         } catch (metadataError) {
           console.warn("[Record] Metadata save failed (not critical):", metadataError);
