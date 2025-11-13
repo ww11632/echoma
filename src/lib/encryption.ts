@@ -80,17 +80,84 @@ const ivRegistry = new Set<string>();
  * 重要：keyId 僅用於加密流程內部路由與 IV 重用檢測；禁止用於跨紀錄/跨使用者關聯分析。
  * 若需持久化，應以 HKDF 再派生之指紋入庫。
  * 
- * @param encryptionKey - 已派生的加密金鑰（KEK）
+ * @param password - 用於派生 KEK 的密碼
+ * @param salt - 用於派生 KEK 的 salt
+ * @param kdf - KDF 類型（pbkdf2 或 argon2id）
  * @param kdfParams - KDF 參數（用於域分離）
  * @param mode - 作用域模式（wallet/account/guest），預設為 "wallet"
  * @returns keyId（16 字節的十六進位字串）
  */
 async function generateKeyId(
-  encryptionKey: CryptoKey,
-  kdfParams?: { iterations?: number; hash?: string },
+  password: string,
+  salt: ArrayBuffer,
+  kdf: KDFType,
+  kdfParams: KDFParams,
   mode: "wallet" | "account" | "guest" = "wallet"
 ): Promise<string> {
   const encoder = new TextEncoder();
+  
+  // 首先派生一個用於 HKDF 的中間密鑰（KEK）
+  // 使用與加密相同的 KDF 參數，但派生為原始密鑰材料（用於 HKDF）
+  let kekBits: ArrayBuffer;
+  
+  if (kdf === "pbkdf2") {
+    const iterations = kdfParams.iterations || DEFAULT_PBKDF2_ITERATIONS;
+    const hash = kdfParams.hash || "SHA-256";
+    
+    const keyMaterial = await crypto.subtle.importKey(
+      "raw",
+      encoder.encode(password),
+      "PBKDF2",
+      false,
+      ["deriveBits"]
+    );
+    
+    // 派生 256 位原始密鑰材料用於 HKDF
+    kekBits = await crypto.subtle.deriveBits(
+      {
+        name: "PBKDF2",
+        salt: salt,
+        iterations: iterations,
+        hash: hash,
+      },
+      keyMaterial,
+      256 // 256 bits = 32 bytes
+    );
+  } else {
+    // Argon2id fallback to PBKDF2 (same logic as deriveKeyArgon2id)
+    // Use enhanced iterations to compensate for lack of memory-hard properties
+    const baseIterations = await detectDeviceCapability();
+    const iterations = Math.max(baseIterations * 2, 300000); // Use 2x iterations or minimum 300k
+    const hash = "SHA-256";
+    
+    const keyMaterial = await crypto.subtle.importKey(
+      "raw",
+      encoder.encode(password),
+      "PBKDF2",
+      false,
+      ["deriveBits"]
+    );
+    
+    kekBits = await crypto.subtle.deriveBits(
+      {
+        name: "PBKDF2",
+        salt: salt,
+        iterations: iterations,
+        hash: hash,
+      },
+      keyMaterial,
+      256
+    );
+  }
+  
+  // 將原始密鑰材料導入為 HKDF 可用的密鑰
+  const hkdfKey = await crypto.subtle.importKey(
+    "raw",
+    kekBits,
+    "HKDF",
+    false,
+    ["deriveBits"]
+  );
   
   // 應用域分離常數（salt_keyid）
   // 使用固定常數確保相同 KEK 和參數產生相同 keyId
@@ -99,10 +166,10 @@ async function generateKeyId(
   // 構建 info 參數（包含版本、作用域和 KDF 參數，用於域分離）
   // 作用域化：避免跨身分模式關聯
   const infoParts: string[] = [`echoma:keyid:v1:${mode}`];
-  if (kdfParams?.iterations) {
+  if (kdfParams.iterations) {
     infoParts.push(`iterations:${kdfParams.iterations}`);
   }
-  if (kdfParams?.hash) {
+  if (kdfParams.hash) {
     infoParts.push(`hash:${kdfParams.hash}`);
   }
   const info = encoder.encode(infoParts.join("|"));
@@ -115,7 +182,7 @@ async function generateKeyId(
       salt: keyIdSalt,
       info: info,
     },
-    encryptionKey,
+    hkdfKey,
     128 // 128 bits = 16 bytes
   );
   
@@ -508,18 +575,19 @@ export async function encryptData(
     };
   }
   
-  // Derive encryption key first (needed for keyId generation)
-  const encryptionKey = await deriveKey(password, salt.buffer, kdf, finalKdfParams);
-  
-  // Check for IV reuse (session-scoped detection)
+  // Check for IV reuse (session-scoped detection) before deriving encryption key
+  // Generate keyId first (needed for IV reuse detection)
   try {
-    // 生成 keyId（使用已派生的加密金鑰和 KDF 參數）
+    // 生成 keyId（使用密碼、salt 和 KDF 參數）
     // 使用 HKDF 而非直接 SHA-256(password)，避免跨紀錄關聯
     // 預設使用 "wallet" 模式（可根據實際使用場景調整）
-    const keyId = await generateKeyId(encryptionKey, {
-      iterations: finalKdfParams.iterations,
-      hash: finalKdfParams.hash,
-    }, "wallet"); // 預設 wallet 模式
+    const keyId = await generateKeyId(
+      password,
+      salt.buffer,
+      kdf,
+      finalKdfParams,
+      "wallet" // 預設 wallet 模式
+    );
     await assertIvFresh(keyId, iv);
   } catch (error: any) {
     if (error.code === 'IV_REUSE_BLOCKED') {
@@ -531,8 +599,8 @@ export async function encryptData(
     throw error;
   }
   
-  // encryptionKey 已在上面派生（用於 keyId 生成），直接使用
-  const key = encryptionKey;
+  // Derive encryption key for actual encryption
+  const key = await deriveKey(password, salt.buffer, kdf, finalKdfParams);
   
   // Create versioned header（在加密前創建，用於 AAD）
   const header: EncryptionHeader = {
