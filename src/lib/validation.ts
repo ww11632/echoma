@@ -50,6 +50,27 @@ export const emotionSnapshotSchema = z.object({
         message: "Description contains potentially unsafe content",
       }
     ),
+  aiResponse: z
+    .string()
+    .max(5000, "AI response must be less than 5000 characters")
+    .refine(
+      (val) => {
+        // Basic XSS protection for AI response
+        const dangerousPatterns = [
+          /<script/i,
+          /javascript:/i,
+          /on\w+\s*=/i,
+          /<iframe/i,
+          /<object/i,
+          /<embed/i,
+        ];
+        return !dangerousPatterns.some((pattern) => pattern.test(val));
+      },
+      {
+        message: "AI response contains potentially unsafe content",
+      }
+    )
+    .optional(), // AI 回饋為可選字段
   timestamp: z.number().int().positive(),
   walletAddress: z
     .string()

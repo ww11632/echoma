@@ -48,6 +48,7 @@ export interface EmotionSnapshot {
   emotion: string;
   intensity: number;
   description: string;
+  aiResponse?: string; // AI 回饋（可選，加密存儲在 Walrus）
   timestamp: number;
   walletAddress: string;
   version: string;
@@ -1149,7 +1150,8 @@ export function prepareEmotionSnapshot(
   emotion: string,
   intensity: number,
   description: string,
-  walletAddress: string
+  walletAddress: string,
+  aiResponse?: string // AI 回饋（可選）
 ): EmotionSnapshot {
   // Import validation at runtime to avoid circular dependencies
   // Basic validation
@@ -1174,7 +1176,12 @@ export function prepareEmotionSnapshot(
     throw new Error("Invalid wallet address format");
   }
 
-  return {
+  // Validate aiResponse if provided
+  if (aiResponse !== undefined && (typeof aiResponse !== "string" || aiResponse.length > 5000)) {
+    throw new Error("AI response must be a string with max 5000 characters");
+  }
+
+  const snapshot: EmotionSnapshot = {
     emotion,
     intensity: Math.round(intensity), // Ensure integer
     description,
@@ -1182,6 +1189,13 @@ export function prepareEmotionSnapshot(
     walletAddress,
     version: "1.0.0",
   };
+
+  // Only include aiResponse if provided
+  if (aiResponse !== undefined && aiResponse.trim().length > 0) {
+    snapshot.aiResponse = aiResponse.trim();
+  }
+
+  return snapshot;
 }
 
 /**

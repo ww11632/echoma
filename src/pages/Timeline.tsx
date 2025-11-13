@@ -52,6 +52,7 @@ const Timeline = () => {
   const [isQueryingOnChain, setIsQueryingOnChain] = useState(false);
   const [decryptingRecords, setDecryptingRecords] = useState<Set<string>>(new Set());
   const [decryptedDescriptions, setDecryptedDescriptions] = useState<Record<string, string>>({});
+  const [decryptedAiResponses, setDecryptedAiResponses] = useState<Record<string, string>>({});
   const [decryptErrors, setDecryptErrors] = useState<Record<string, string>>({});
   const [decryptErrorDetails, setDecryptErrorDetails] = useState<Record<string, {
     type: string;
@@ -417,6 +418,14 @@ const Timeline = () => {
         ...prev,
         [record.id]: snapshot.description || '',
       }));
+      
+      // 儲存解密後的 AI 回饋（如果有的話）
+      if (snapshot.aiResponse) {
+        setDecryptedAiResponses(prev => ({
+          ...prev,
+          [record.id]: snapshot.aiResponse,
+        }));
+      }
       
       // 清除之前的錯誤資訊
       setDecryptErrors(prev => {
@@ -948,6 +957,19 @@ const Timeline = () => {
                                 <p className="text-sm whitespace-pre-wrap break-words">
                                   {decryptedDescriptions[record.id]}
                                 </p>
+                                {decryptedAiResponses[record.id] && (
+                                  <div className="mt-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
+                                    <div className="flex items-start gap-2">
+                                      <Sparkles className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                                      <div className="flex-1">
+                                        <p className="text-xs font-medium text-primary mb-1">AI 回饋</p>
+                                        <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap break-words">
+                                          {decryptedAiResponses[record.id]}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             ) : decryptErrors[record.id] ? (
                               // 解密失敗，顯示錯誤資訊和重試按鈕

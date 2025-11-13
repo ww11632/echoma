@@ -12,6 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { validateAndSanitizeDescription } from "@/lib/validation";
 import { encryptData, generateUserKeyFromId } from "@/lib/encryption";
+import { prepareEmotionSnapshot } from "@/lib/walrus";
+import { emotionSnapshotSchema } from "@/lib/validation";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import type { User, Session } from "@supabase/supabase-js";
 
@@ -141,13 +143,29 @@ const AuthRecord = () => {
     try {
       const sanitizedDescription = validateAndSanitizeDescription(description);
 
-      // Create snapshot of emotion data
-      const snapshot = {
-        emotion: selectedEmotion,
-        intensity: intensity[0],
-        description: sanitizedDescription,
-        timestamp: new Date().toISOString(),
-      };
+      // 使用錢包地址或生成一個匿名地址（Secure Mode 使用 Supabase user ID 作為標識）
+      // 注意：AuthRecord 使用 Supabase 認證，但 snapshot 需要 walletAddress
+      // 我們使用 user.id 的哈希作為 walletAddress 的替代（格式：0x[64位hex]）
+      // 這確保了加密密鑰的一致性
+      const userIdHash = await crypto.subtle.digest(
+        'SHA-256',
+        new TextEncoder().encode(user.id)
+      );
+      const walletAddress = '0x' + Array.from(new Uint8Array(userIdHash))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+
+      // 創建包含 AI 回饋的 snapshot（如果有的話）
+      const snapshot = prepareEmotionSnapshot(
+        selectedEmotion,
+        intensity[0],
+        sanitizedDescription,
+        walletAddress,
+        aiResponse.trim() || undefined // 只有當 AI 回饋存在時才包含
+      );
+
+      // 驗證 snapshot
+      emotionSnapshotSchema.parse(snapshot);
 
       // Generate encryption key from user ID (secure key derivation using PBKDF2)
       const userKey = await generateUserKeyFromId(user.id);

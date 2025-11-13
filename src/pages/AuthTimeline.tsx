@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Loader2, LogOut, Lock, Unlock, BookOpen } from "lucide-react";
+import { ArrowLeft, Loader2, LogOut, Lock, Unlock, BookOpen, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { decryptDataWithMigration, DecryptionError, DecryptionErrorType } from "@/lib/encryption";
@@ -52,6 +52,8 @@ const AuthTimeline = () => {
   const [isLoading, setIsLoading] = useState(true);
   // Store decrypted descriptions by record ID
   const [decryptedDescriptions, setDecryptedDescriptions] = useState<Record<string, string>>({});
+  // Store decrypted AI responses by record ID
+  const [decryptedAiResponses, setDecryptedAiResponses] = useState<Record<string, string>>({});
   // Track which records are being decrypted
   const [decryptingRecords, setDecryptingRecords] = useState<Set<string>>(new Set());
 
@@ -128,6 +130,19 @@ const AuthTimeline = () => {
           [recordId]: snapshot.description || '',
         };
       });
+      
+      // Store the decrypted AI response if available
+      if (snapshot.aiResponse) {
+        setDecryptedAiResponses(prev => {
+          if (prev[recordId]) {
+            return prev; // Already decrypted
+          }
+          return {
+            ...prev,
+            [recordId]: snapshot.aiResponse,
+          };
+        });
+      }
     } catch (error: any) {
       console.error(`Failed to decrypt record ${recordId}:`, error);
       
@@ -440,20 +455,49 @@ const AuthTimeline = () => {
                 {(() => {
                   // Check if we have a decrypted description
                   const decryptedDesc = decryptedDescriptions[record.id];
+                  const decryptedAiResponse = decryptedAiResponses[record.id];
                   const isDecrypting = decryptingRecords.has(record.id);
                   
                   if (record.description) {
                     // Plaintext description (legacy records)
-                    return <p className="text-foreground/90 leading-relaxed">{record.description}</p>;
+                    return (
+                      <div className="space-y-3">
+                        <p className="text-foreground/90 leading-relaxed">{record.description}</p>
+                        {decryptedAiResponse && (
+                          <div className="mt-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
+                            <div className="flex items-start gap-2">
+                              <Sparkles className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                              <div className="flex-1">
+                                <p className="text-xs font-medium text-primary mb-1">AI 回饋</p>
+                                <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{decryptedAiResponse}</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
                   } else if (decryptedDesc) {
                     // Successfully decrypted
                     return (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Unlock className="w-3 h-3 text-green-500" />
-                          <span>Decrypted from secure storage</span>
+                      <div className="space-y-3">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Unlock className="w-3 h-3 text-green-500" />
+                            <span>Decrypted from secure storage</span>
+                          </div>
+                          <p className="text-foreground/90 leading-relaxed">{decryptedDesc}</p>
                         </div>
-                        <p className="text-foreground/90 leading-relaxed">{decryptedDesc}</p>
+                        {decryptedAiResponse && (
+                          <div className="mt-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
+                            <div className="flex items-start gap-2">
+                              <Sparkles className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                              <div className="flex-1">
+                                <p className="text-xs font-medium text-primary mb-1">AI 回饋</p>
+                                <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{decryptedAiResponse}</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   } else if (isDecrypting) {
