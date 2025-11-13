@@ -1121,26 +1121,21 @@ function bufferToBase64(buffer: ArrayBuffer): string {
  * 若偵測到 padding（=），直接拒絕（PARAM_MISMATCH）
  */
 /**
- * Base64URL 嚴格驗證正則
- * 規範：只允許 A-Za-z0-9_- 字符，不允許 padding（=）
+ * Base64/Base64URL 驗證正則
+ * 允許標準 Base64（A-Za-z0-9+/=）和 Base64URL（A-Za-z0-9_-）
+ * 用於向後兼容舊數據
  */
-const B64URL_REGEX = /^[A-Za-z0-9_-]*$/;
+const B64_REGEX = /^[A-Za-z0-9+/=_-]*$/;
 
 /**
- * 驗證 Base64URL 字符串
+ * 驗證 Base64/Base64URL 字符串
+ * 支持標準 Base64 和 Base64URL 兩種格式（向後兼容）
  */
-function validateBase64URL(s: string): void {
-  if (!B64URL_REGEX.test(s)) {
+function validateBase64(s: string): void {
+  // 基本字符驗證：只允許 Base64 和 Base64URL 的有效字符
+  if (!B64_REGEX.test(s)) {
     const error = new DecryptionError(
-      "Invalid Base64URL: Contains invalid characters",
-      DecryptionErrorType.INVALID_FORMAT
-    );
-    (error as any).code = 'PARAM_MISMATCH';
-    throw error;
-  }
-  if (s.includes('=')) {
-    const error = new DecryptionError(
-      "Base64 padding detected: Must use Base64URL (no padding)",
+      "Invalid Base64/Base64URL: Contains invalid characters",
       DecryptionErrorType.INVALID_FORMAT
     );
     (error as any).code = 'PARAM_MISMATCH';
@@ -1153,24 +1148,45 @@ function base64ToBuffer(base64: string): ArrayBuffer {
   // 這可以處理從外部源（如 Walrus、數據庫）讀取時可能包含的空白字符
   const cleanedBase64 = base64.replace(/\s/g, '');
   
-  // Base64URL 嚴格驗證（正則+拒絕 padding）
-  validateBase64URL(cleanedBase64);
+  // 驗證 Base64/Base64URL 格式（支持兩種格式以向後兼容）
+  validateBase64(cleanedBase64);
   
-  // 轉換 Base64URL 回標準 Base64
-  const standardBase64 = cleanedBase64
-    .replace(/-/g, '+')
-    .replace(/_/g, '/');
+  // 檢測格式並轉換為標準 Base64
+  // 如果包含 Base64URL 字符（- 或 _），則為 Base64URL，需要轉換
+  // 如果包含標準 Base64 字符（+ 或 /），則為標準 Base64，直接使用
+  let standardBase64: string;
+  if (cleanedBase64.includes('-') || cleanedBase64.includes('_')) {
+    // Base64URL 格式：轉換為標準 Base64
+    standardBase64 = cleanedBase64
+      .replace(/-/g, '+')
+      .replace(/_/g, '/');
+  } else {
+    // 標準 Base64 格式：直接使用
+    standardBase64 = cleanedBase64;
+  }
+  
+  // 移除現有的 padding（如果有的話），然後根據實際長度重新計算
+  const base64WithoutPadding = standardBase64.replace(/=+$/, '');
   
   // 補齊 padding（僅用於解碼，不存儲）
-  const padding = (4 - (standardBase64.length % 4)) % 4;
-  const paddedBase64 = standardBase64 + '='.repeat(padding);
+  const padding = (4 - (base64WithoutPadding.length % 4)) % 4;
+  const paddedBase64 = base64WithoutPadding + '='.repeat(padding);
   
-  const binary = atob(paddedBase64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
+  try {
+    const binary = atob(paddedBase64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+  } catch (error) {
+    // 如果解碼失敗，可能是格式問題
+    throw new DecryptionError(
+      "Invalid Base64/Base64URL: Decoding failed",
+      DecryptionErrorType.INVALID_FORMAT,
+      error instanceof Error ? error : undefined
+    );
   }
-  return bytes.buffer;
 }
 
 /**
