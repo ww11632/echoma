@@ -404,7 +404,8 @@ app.post("/api/emotion", requireAuth, rateLimitMiddleware, async (req, res) => {
       user_id: req.user.id, // Add user_id for access control
       emotion,
       intensity,
-      description,
+      // Do not store plaintext description - it's encrypted in Walrus or database fallback
+      description: null,
       blob_id: uploaded.blobId,
       walrus_url: uploaded.walrusUrl,
       payload_hash: payloadHash,
