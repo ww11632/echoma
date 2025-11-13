@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# iOS / Xcode
+ios/App/Pods/
+ios/App/**/xcuserdata/
+ios/App/**/*.xcuserstate
+ios/App/**/*.xcworkspace/xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcuserstate
