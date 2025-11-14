@@ -751,33 +751,31 @@ const Record = () => {
                   </div>
                 </div>
 
-            {/* Database Backup Option - Only show in Anonymous Mode (no wallet connected) */}
-            {!currentAccount && (
-              <Card className="p-4 border-border/50 bg-card/50">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <span className="text-xl">💾</span>
-                    </div>
-                    <div className="flex-1">
-                      <Label htmlFor="backup" className="text-sm font-semibold cursor-pointer">
-                        {backupToDatabase ? "備份到資料庫" : "不備份到資料庫"}
-                      </Label>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {backupToDatabase 
-                          ? "將加密資料備份到 Supabase，即使 Walrus 過期也能恢復"
-                          : "不備份，資料只存在於 Walrus（testnet 數據可能過期）"}
-                      </p>
-                    </div>
+            {/* Database Backup Option - Available for all users */}
+            <Card className="p-4 border-border/50 bg-card/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <span className="text-xl">💾</span>
                   </div>
-                  <Switch
-                    id="backup"
-                    checked={backupToDatabase}
-                    onCheckedChange={setBackupToDatabase}
-                  />
+                  <div className="flex-1">
+                    <Label htmlFor="backup" className="text-sm font-semibold cursor-pointer">
+                      {backupToDatabase ? "備份到資料庫" : "不備份到資料庫"}
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {backupToDatabase 
+                        ? "將加密資料備份到 Supabase，即使 Walrus 過期也能恢復"
+                        : "不備份，資料只存在於 Walrus（testnet 數據可能過期）"}
+                    </p>
+                  </div>
                 </div>
-              </Card>
-            )}
+                <Switch
+                  id="backup"
+                  checked={backupToDatabase}
+                  onCheckedChange={setBackupToDatabase}
+                />
+              </div>
+            </Card>
 
             {/* Wallet Connect Section */}
             {!saveLocally && (
