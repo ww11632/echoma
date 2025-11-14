@@ -488,33 +488,69 @@ const Timeline = () => {
       // 解析加密資料
       const encryptedData: EncryptedData = JSON.parse(encryptedDataString);
       
-      // 產生使用者密鑰
-      let userKey: string;
+      // 嘗試所有可能的解密金鑰（因為記錄可能是在不同模式下加密的）
+      const possibleKeys: Array<{key: string, type: string}> = [];
+      
       try {
-        // 優先嘗試使用 Supabase 使用者 ID
+        // 1. 優先嘗試 Supabase 使用者 ID（如果有登錄）
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user?.id) {
-          userKey = await generateUserKeyFromId(session.user.id);
-        } else if (currentAccount?.address) {
-          // 如果沒有 Supabase session，使用錢包位址
-          userKey = await generateUserKey(currentAccount.address);
-        } else if (record.wallet_address) {
-          userKey = await generateUserKey(record.wallet_address);
-        } else {
-          const anonymousKey = await getAnonymousUserKey();
-          if (anonymousKey) {
-            userKey = anonymousKey;
-          } else {
-            throw new Error("無法產生使用者密鑰：需要登入、連接錢包或保留匿名金鑰");
-          }
+          const supabaseKey = await generateUserKeyFromId(session.user.id);
+          possibleKeys.push({ key: supabaseKey, type: 'Supabase User' });
+        }
+        
+        // 2. 嘗試匿名金鑰（如果存在）
+        const anonymousKey = await getAnonymousUserKey();
+        if (anonymousKey) {
+          possibleKeys.push({ key: anonymousKey, type: 'Anonymous' });
+        }
+        
+        // 3. 嘗試錢包地址（如果有連接錢包）
+        if (currentAccount?.address) {
+          const walletKey = await generateUserKey(currentAccount.address);
+          possibleKeys.push({ key: walletKey, type: 'Wallet Address' });
+        }
+        
+        // 4. 嘗試記錄中的錢包地址
+        if (record.wallet_address && record.wallet_address !== currentAccount?.address) {
+          const recordWalletKey = await generateUserKey(record.wallet_address);
+          possibleKeys.push({ key: recordWalletKey, type: 'Record Wallet' });
+        }
+        
+        if (possibleKeys.length === 0) {
+          throw new Error("無法產生使用者密鑰：需要登入、連接錢包或保留匿名金鑰");
         }
       } catch (keyError) {
-        console.error("[Timeline] Failed to generate user key:", keyError);
+        console.error("[Timeline] Failed to generate decryption keys:", keyError);
         throw new Error("無法產生解密密鑰");
       }
       
-      // 解密資料（支援舊格式自動遷移）
-      const decryptedString = await decryptDataWithMigration(encryptedData, userKey);
+      // 依次嘗試所有可能的金鑰
+      console.log(`[Timeline] Attempting decryption for record ${record.id} with ${possibleKeys.length} possible keys`);
+      let decryptedString: string | null = null;
+      let successKeyType: string = '';
+      let lastError: Error | null = null;
+      
+      for (const {key, type} of possibleKeys) {
+        try {
+          console.log(`[Timeline] Trying decryption with ${type} key...`);
+          decryptedString = await decryptDataWithMigration(encryptedData, key);
+          successKeyType = type;
+          console.log(`[Timeline] ✅ Successfully decrypted with ${type} key`);
+          break;
+        } catch (keyAttemptError) {
+          console.warn(`[Timeline] ❌ Failed to decrypt with ${type} key:`, keyAttemptError);
+          lastError = keyAttemptError as Error;
+          continue;
+        }
+      }
+      
+      if (!decryptedString) {
+        console.error(`[Timeline] All ${possibleKeys.length} decryption attempts failed for record ${record.id}`);
+        throw lastError || new Error(`Failed to decrypt with any available key (tried ${possibleKeys.length} keys)`);
+      }
+      
+      console.log(`[Timeline] 🎉 Record ${record.id} decrypted successfully using ${successKeyType} key`);
       
       // 解析解密後的 JSON 獲取快照
       const snapshot = JSON.parse(decryptedString);
