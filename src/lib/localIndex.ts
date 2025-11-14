@@ -1,6 +1,6 @@
 import type { EmotionRecord } from "./dataSchema";
 import { StorageService, LocalJsonAdapter, EncryptedLocalAdapter } from "./storageService";
-import { generateUserKey, generateUserKeyFromId } from "./encryption";
+import { generateUserKey, generateUserKeyFromId, PUBLIC_SEAL_KEY } from "./encryption";
 import { getAnonymousUserKey } from "./anonymousIdentity";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -74,7 +74,9 @@ export async function addEmotionRecord(
       // CRITICAL: Don't save if we can't decrypt existing data
       // This prevents data loss when user switches accounts
       const ENCRYPTED_LOCAL_KEY = "echoma_encrypted_mvp_records";
-      const hasEncryptedStorage = localStorage.getItem(ENCRYPTED_LOCAL_KEY) !== null;
+      const ENCRYPTED_PUBLIC_KEY = "echoma_encrypted_public_records";
+      const hasEncryptedStorage = localStorage.getItem(ENCRYPTED_LOCAL_KEY) !== null || 
+                                   localStorage.getItem(ENCRYPTED_PUBLIC_KEY) !== null;
       if (hasEncryptedStorage) {
         // Create an error with a code that can be translated in the UI layer
         const error = new Error("SAVE_BLOCKED_DECRYPTION_ERROR");
@@ -97,52 +99,87 @@ export async function addEmotionRecord(
       cleanRecords.push(record);
     }
     
-    // Ensure we're using the correct encryption key for the current context
-    // Use cached keys when possible to improve performance
-    let saveKey = currentEncryptionKey;
+    // CRITICAL: Determine the correct encryption key based on the record being saved
+    // Public records should use PUBLIC_SEAL_KEY, private records should use user-specific key
+    // This ensures that records are encrypted with the correct key for their privacy setting
+    let saveKey: string;
     const { data: { session } } = await supabase.auth.getSession();
     
-    // Verify the key matches the current context (use cached keys when possible)
-    if (currentWalletAddress) {
+    // Determine the correct key for the new record being saved
+    if (record.isPublic) {
+      // Public record: use public seal key
+      saveKey = PUBLIC_SEAL_KEY;
+    } else if (currentWalletAddress) {
+      // Private record with wallet: use wallet key
       const cacheKey = `wallet_${currentWalletAddress}`;
-      let expectedKey: string;
       if (KEY_CACHE.has(cacheKey)) {
-        expectedKey = KEY_CACHE.get(cacheKey)!.key;
+        saveKey = KEY_CACHE.get(cacheKey)!.key;
       } else {
-        expectedKey = await generateUserKey(currentWalletAddress);
-      }
-      if (expectedKey !== currentEncryptionKey) {
-        // Key mismatch - use the expected key and re-initialize
-        saveKey = expectedKey;
-        initializeEncryptedStorage(saveKey);
+        saveKey = await generateUserKey(currentWalletAddress);
+        KEY_CACHE.set(cacheKey, { key: saveKey, type: 'Wallet Address' });
       }
     } else if (session?.user?.id) {
+      // Private record with Supabase session: use Supabase key
       const cacheKey = `supabase_${session.user.id}`;
-      let expectedKey: string;
       if (KEY_CACHE.has(cacheKey)) {
-        expectedKey = KEY_CACHE.get(cacheKey)!.key;
+        saveKey = KEY_CACHE.get(cacheKey)!.key;
       } else {
-        expectedKey = await generateUserKeyFromId(session.user.id);
+        saveKey = await generateUserKeyFromId(session.user.id);
+        KEY_CACHE.set(cacheKey, { key: saveKey, type: 'Supabase User' });
       }
-      if (expectedKey !== currentEncryptionKey) {
-        // Key mismatch - use the expected key and re-initialize
-        saveKey = expectedKey;
-        initializeEncryptedStorage(saveKey);
+    } else {
+      // Private record anonymous: use anonymous key
+      const anonymousKey = await getAnonymousUserKey();
+      if (!anonymousKey) {
+        throw new Error("Cannot determine encryption key for anonymous private record");
+      }
+      const cacheKey = 'anonymous';
+      if (KEY_CACHE.has(cacheKey)) {
+        saveKey = KEY_CACHE.get(cacheKey)!.key;
+      } else {
+        saveKey = anonymousKey;
+        KEY_CACHE.set(cacheKey, { key: saveKey, type: 'Anonymous' });
       }
     }
     
-    // Save all records (merged) with the correct encryption key
-    // Note: This will re-encrypt all records with the current key
-    // Records encrypted with other keys will be lost if we can't decrypt them
-    // But we've already loaded them above, so they're preserved
-    const listJson = JSON.stringify(cleanRecords);
-    const { encryptData } = await import("./encryption");
-    const encrypted = await encryptData(listJson, saveKey);
+    // IMPORTANT: Separate public and private records for storage
+    // Public records should be encrypted with PUBLIC_SEAL_KEY
+    // Private records should be encrypted with user-specific key
+    // This prevents data loss when mixing public and private records
+    const publicRecords = cleanRecords.filter(r => r.isPublic);
+    const privateRecords = cleanRecords.filter(r => !r.isPublic);
+    
     const ENCRYPTED_LOCAL_KEY = "echoma_encrypted_mvp_records";
+    const ENCRYPTED_PUBLIC_KEY = "echoma_encrypted_public_records";
+    const { encryptData } = await import("./encryption");
     
     try {
-      localStorage.setItem(ENCRYPTED_LOCAL_KEY, JSON.stringify(encrypted));
-      // Clear cache after successful save to ensure next load gets fresh data
+      // Save private records with user-specific key
+      if (privateRecords.length > 0) {
+        const privateListJson = JSON.stringify(privateRecords);
+        const privateEncrypted = await encryptData(privateListJson, saveKey);
+        localStorage.setItem(ENCRYPTED_LOCAL_KEY, JSON.stringify(privateEncrypted));
+        // Update encryptedService to use the correct key for private records
+        if (saveKey !== PUBLIC_SEAL_KEY) {
+          currentEncryptionKey = saveKey;
+          encryptedService = new StorageService(new EncryptedLocalAdapter(saveKey));
+        }
+      } else {
+        // No private records, remove the key
+        localStorage.removeItem(ENCRYPTED_LOCAL_KEY);
+      }
+      
+      // Save public records with PUBLIC_SEAL_KEY (separate storage)
+      if (publicRecords.length > 0) {
+        const publicListJson = JSON.stringify(publicRecords);
+        const publicEncrypted = await encryptData(publicListJson, PUBLIC_SEAL_KEY);
+        localStorage.setItem(ENCRYPTED_PUBLIC_KEY, JSON.stringify(publicEncrypted));
+      } else {
+        // No public records, remove the key
+        localStorage.removeItem(ENCRYPTED_PUBLIC_KEY);
+      }
+      
+      // Clear cache after successful save
       recordsCache = null;
     } catch (storageError: any) {
       // Handle localStorage quota exceeded
@@ -180,6 +217,10 @@ async function getAllPossibleKeys(currentWalletAddress?: string | null): Promise
   const possibleKeys: Array<{ key: string; type: string }> = [];
 
   try {
+    // 0. Always try public seal key first (for public records)
+    const publicKeyEntry = { key: PUBLIC_SEAL_KEY, type: 'Public Seal' };
+    possibleKeys.push(publicKeyEntry);
+
     // 1. Try Supabase session (if logged in)
     if (session?.user?.id) {
       const cacheKey = `supabase_${session.user.id}`;
@@ -268,7 +309,30 @@ export async function listEmotionRecordsWithAllKeys(
     }
   }
   
-  // Try each key and merge records
+  // IMPORTANT: Load public records separately (they use PUBLIC_SEAL_KEY)
+  // Public records are stored in a separate localStorage key to avoid mixing with private records
+  const ENCRYPTED_PUBLIC_KEY = "echoma_encrypted_public_records";
+  const publicEncryptedStr = localStorage.getItem(ENCRYPTED_PUBLIC_KEY);
+  if (publicEncryptedStr) {
+    try {
+      const publicEncryptedData = JSON.parse(publicEncryptedStr);
+      const { decryptDataWithMigration } = await import("./encryption");
+      const publicDecryptedJson = await decryptDataWithMigration(publicEncryptedData, PUBLIC_SEAL_KEY);
+      const publicRecords = JSON.parse(publicDecryptedJson) as EmotionRecord[];
+      if (Array.isArray(publicRecords)) {
+        for (const record of publicRecords) {
+          if (record.id) {
+            allRecordsMap.set(record.id, record);
+          }
+        }
+        console.log(`[localIndex] Loaded ${publicRecords.length} public records from separate storage`);
+      }
+    } catch (error) {
+      console.warn("[localIndex] Failed to load public records:", error);
+    }
+  }
+  
+  // Try each key and merge records (for private records)
   let workingKey: string | null = null;
   let workingKeyType: string | null = null;
   let hasEncryptedData = false;
@@ -300,8 +364,10 @@ export async function listEmotionRecordsWithAllKeys(
   }
   
   // Check if there's encrypted data but we couldn't decrypt it
+  // Check both private and public storage
   const ENCRYPTED_LOCAL_KEY = "echoma_encrypted_mvp_records";
-  const hasEncryptedStorage = localStorage.getItem(ENCRYPTED_LOCAL_KEY) !== null;
+  const hasEncryptedStorage = localStorage.getItem(ENCRYPTED_LOCAL_KEY) !== null || 
+                               localStorage.getItem(ENCRYPTED_PUBLIC_KEY) !== null;
   // If encrypted data exists but we couldn't decrypt it with any available key, set warning
   // This includes cases where:
   // 1. We have keys to try but none worked (possibleKeys.length > 0 && !workingKey)
@@ -359,8 +425,10 @@ export async function clearEmotionRecords(): Promise<void> {
  */
 export function forceClearEncryptedStorage(): void {
   const ENCRYPTED_LOCAL_KEY = "echoma_encrypted_mvp_records";
+  const ENCRYPTED_PUBLIC_KEY = "echoma_encrypted_public_records";
   const LOCAL_KEY = "echoma_mvp_records";
   localStorage.removeItem(ENCRYPTED_LOCAL_KEY);
+  localStorage.removeItem(ENCRYPTED_PUBLIC_KEY);
   localStorage.removeItem(LOCAL_KEY);
   // Clear cache and reset service
   clearKeyCache();

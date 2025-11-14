@@ -75,11 +75,11 @@
     "descriptionHint": "🔒 Your description will be encrypted on the client side before storage",
     "characters": "{{count}}/5000 characters",
     "privacy": {
-      "title": "Privacy Control",
+      "title": "Privacy Control (Seal Permissions)",
       "public": "Public Share",
       "private": "Private Record",
-      "publicDesc": "Anyone can see the blob_id and verification status",
-      "privateDesc": "🔒 Encrypted and saved (requires authorization to access)"
+      "publicDesc": "🌐 Encrypted with public Seal key - anyone can verify proof and decrypt content",
+      "privateDesc": "🔒 Encrypted with your exclusive key - only you (with authorized key) can decrypt and access"
     },
     "storage": {
       "title": "Choose Storage Method",
@@ -191,7 +191,7 @@
     "decryptErrorInvalidKey": "Invalid key or incorrect password",
     "decryptErrorDataCorrupted": "Data corrupted or tampered",
     "decryptErrorUnsupportedVersion": "Unsupported encryption format version, please update the app",
-    "walrusAggregatorNotice": "⚠️ Walrus Testnet Aggregator is Unstable\n\nAlthough your data is on-chain (visible on SuiScan), the Walrus aggregator is temporarily unable to provide download services. This is a known issue on testnet",
+    "walrusAggregatorNotice": "⚠️ Walrus Testnet Aggregator Service Unstable\n\nYour data has been successfully uploaded to the chain (viewable on SuiScan), but the Walrus Aggregator is currently unable to provide download services. This is a known issue on testnet. Please try again later.",
     "showDetails": "Show Details",
     "hideDetails": "Hide Details",
     "errorDetail": {

@@ -252,6 +252,9 @@ export class EncryptedLocalAdapter implements StorageAdapter {
 
   async clear(): Promise<void> {
     localStorage.removeItem(ENCRYPTED_LOCAL_KEY);
+    // Also clear public records storage
+    const ENCRYPTED_PUBLIC_KEY = "echoma_encrypted_public_records";
+    localStorage.removeItem(ENCRYPTED_PUBLIC_KEY);
     // Also clear legacy unencrypted data if exists
     localStorage.removeItem(LOCAL_KEY);
   }

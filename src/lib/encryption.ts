@@ -36,6 +36,9 @@ export const MAX_PBKDF2_ITERATIONS_HARD = 2000000; // 2e6
 /** Current encryption schema version */
 export const ENCRYPTION_SCHEMA_VERSION = 2;
 
+/** Public seal key for public records (anyone can decrypt) */
+export const PUBLIC_SEAL_KEY = "echoma_public_seal_key_v1";
+
 /** Default PBKDF2 iterations - will be adjusted based on device capability */
 const DEFAULT_PBKDF2_ITERATIONS = 100000;
 

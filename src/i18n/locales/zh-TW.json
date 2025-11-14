@@ -75,11 +75,11 @@
     "descriptionHint": "🔒 您的描述在儲存前會在客戶端加密",
     "characters": "{{count}}/5000 字元",
     "privacy": {
-      "title": "隱私控制",
+      "title": "隱私控制（Seal 權限）",
       "public": "公開分享",
       "private": "私人記錄",
-      "publicDesc": "任何人都可以看到 blob_id 和驗證狀態",
-      "privateDesc": "🔒 已加密保存（需授權存取）"
+      "publicDesc": "🌐 使用公開 Seal 金鑰加密，任何人都可以查驗 proof 和解密內容",
+      "privateDesc": "🔒 使用您的專屬金鑰加密，只有您（持有授權金鑰）可以解密存取"
     },
     "storage": {
       "title": "選擇儲存方式",
@@ -193,7 +193,7 @@
     "decryptErrorInvalidKey": "金鑰錯誤或密碼不正確",
     "decryptErrorDataCorrupted": "資料損毀或已被篡改",
     "decryptErrorUnsupportedVersion": "不支援的加密格式版本，請更新應用程式",
-    "walrusAggregatorNotice": "⚠️ Walrus Testnet 的 Aggregator 不穩定\n\n雖然你的資料在鏈上（SuiScan 可以看到），但 Walrus aggregator 暫時無法提供下載服務。這是 testnet 的已知問題",
+    "walrusAggregatorNotice": "⚠️ Walrus Testnet Aggregator 服務不穩定\n\n您的資料已成功上傳到鏈上（可在 SuiScan 查看），但 Walrus Aggregator 目前暫時無法提供下載服務。這是 testnet 的已知問題，請稍後再試。",
     "showDetails": "查看詳細資訊",
     "hideDetails": "隱藏詳細資訊",
     "errorDetail": {

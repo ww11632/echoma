@@ -5,8 +5,7 @@ import { Card } from "@/components/ui/card";
 import { ArrowLeft, Loader2, LogOut, Lock, Unlock, BookOpen, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { decryptDataWithMigration, DecryptionError, DecryptionErrorType } from "@/lib/encryption";
-import { generateUserKeyFromId } from "@/lib/encryption";
+import { decryptDataWithMigration, DecryptionError, DecryptionErrorType, generateUserKeyFromId, PUBLIC_SEAL_KEY } from "@/lib/encryption";
 import { readFromWalrus } from "@/lib/walrus";
 import type { User, Session } from "@supabase/supabase-js";
 import type { EncryptedData } from "@/lib/encryption";
@@ -110,11 +109,27 @@ const AuthTimeline = () => {
       // Parse the encrypted data JSON
       const encryptedData: EncryptedData = JSON.parse(encryptedDataString);
       
-      // Generate user key for decryption
-      const userKey = await generateUserKeyFromId(user.id);
+      // Try decryption with multiple keys (public records use public key, private records use user key)
+      let decryptedString: string | null = null;
+      const possibleKeys = [
+        { key: PUBLIC_SEAL_KEY, type: 'Public Seal' },
+        { key: await generateUserKeyFromId(user.id), type: 'User Key' }
+      ];
       
-      // Decrypt the data (supports automatic legacy format migration)
-      const decryptedString = await decryptDataWithMigration(encryptedData, userKey);
+      for (const { key, type } of possibleKeys) {
+        try {
+          decryptedString = await decryptDataWithMigration(encryptedData, key);
+          console.log(`[AuthTimeline] Successfully decrypted with ${type}`);
+          break;
+        } catch (error) {
+          console.log(`[AuthTimeline] Failed to decrypt with ${type}, trying next key...`);
+          continue;
+        }
+      }
+      
+      if (!decryptedString) {
+        throw new Error("Failed to decrypt data with any available key");
+      }
       
       // Parse the decrypted JSON to get the snapshot
       const snapshot = JSON.parse(decryptedString);

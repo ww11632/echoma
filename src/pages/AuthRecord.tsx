@@ -11,7 +11,7 @@ import { Sparkles, ArrowLeft, Loader2, Lock, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { validateAndSanitizeDescription } from "@/lib/validation";
-import { encryptData, generateUserKeyFromId } from "@/lib/encryption";
+import { encryptData, generateUserKeyFromId, PUBLIC_SEAL_KEY } from "@/lib/encryption";
 import { prepareEmotionSnapshot } from "@/lib/walrus";
 import { emotionSnapshotSchema } from "@/lib/validation";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -167,11 +167,15 @@ const AuthRecord = () => {
       // 驗證 snapshot
       emotionSnapshotSchema.parse(snapshot);
 
-      // Generate encryption key from user ID (secure key derivation using PBKDF2)
-      const userKey = await generateUserKeyFromId(user.id);
+      // Generate encryption key based on privacy setting
+      // Public records: use shared public key (anyone can decrypt)
+      // Private records: use user-specific key (only user can decrypt)
+      const encryptionKey = isPublic
+        ? PUBLIC_SEAL_KEY
+        : await generateUserKeyFromId(user.id);
 
       // Properly encrypt the data using AES-GCM
-      const encrypted = await encryptData(JSON.stringify(snapshot), userKey);
+      const encrypted = await encryptData(JSON.stringify(snapshot), encryptionKey);
       const encryptedData = JSON.stringify(encrypted);
 
       // Call Supabase edge function to upload using fetch for better error handling

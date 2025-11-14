@@ -59,6 +59,8 @@ const Timeline = () => {
   const [decryptedDescriptions, setDecryptedDescriptions] = useState<Record<string, string>>({});
   const [decryptedAiResponses, setDecryptedAiResponses] = useState<Record<string, string>>({});
   const [decryptErrors, setDecryptErrors] = useState<Record<string, string>>({});
+  // Track failed auto-decrypt attempts to avoid infinite retries
+  const [failedAutoDecrypts, setFailedAutoDecrypts] = useState<Set<string>>(new Set());
   const [isDecryptingAll, setIsDecryptingAll] = useState(false);
   const [decryptErrorDetails, setDecryptErrorDetails] = useState<Record<string, {
     type: string;
@@ -473,10 +475,8 @@ const Timeline = () => {
       return;
     }
 
-    // 如果是公開記錄，不需要解密
-    if (record.is_public) {
-      return;
-    }
+    // 公開記錄使用公開金鑰，也需要解密（但任何人都可以解密）
+    // 這裡不跳過，繼續解密流程
 
     // 如果是本地記錄且沒有資料庫加密資料，不需要解密
     if (isLocalRecord(record) && !record.encrypted_data) {
@@ -514,6 +514,11 @@ const Timeline = () => {
       const possibleKeys: Array<{key: string, type: string}> = [];
       
       try {
+        // 如果是公開記錄，優先嘗試公開金鑰
+        if (record.is_public) {
+          possibleKeys.push({ key: PUBLIC_SEAL_KEY, type: 'Public Seal' });
+        }
+        
         // 1. 優先嘗試 Supabase 使用者 ID（如果有登錄）
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user?.id) {
@@ -537,6 +542,11 @@ const Timeline = () => {
         if (record.wallet_address && record.wallet_address !== currentAccount?.address) {
           const recordWalletKey = await generateUserKey(record.wallet_address);
           possibleKeys.push({ key: recordWalletKey, type: 'Record Wallet' });
+        }
+        
+        // 5. 如果不是公開記錄，也嘗試公開金鑰（以防記錄被錯誤標記）
+        if (!record.is_public) {
+          possibleKeys.push({ key: PUBLIC_SEAL_KEY, type: 'Public Seal (fallback)' });
         }
         
         if (possibleKeys.length === 0) {
@@ -601,6 +611,13 @@ const Timeline = () => {
         ...prev,
         [record.id]: snapshot.description || '',
       }));
+      
+      // 清除失敗標記（如果之前失敗過）
+      setFailedAutoDecrypts(prev => {
+        const next = new Set(prev);
+        next.delete(record.id);
+        return next;
+      });
       
       // 儲存解密後的 AI 回饋（如果有的話）
       if (snapshot.aiResponse) {
@@ -880,6 +897,37 @@ const Timeline = () => {
       });
     }
   }, [filteredRecords, decryptedDescriptions, isDecryptingAll, decryptDescription, isLocalRecord, toast, t]);
+
+  // 自動解密公開的 Walrus 記錄（因為任何人都可以解密）
+  useEffect(() => {
+    if (!records.length) return;
+    
+    // 找出所有需要自動解密的公開 Walrus 記錄
+    const publicWalrusRecords = records.filter(record => {
+      // 必須是公開記錄
+      if (!record.is_public) return false;
+      // 必須是 Walrus 記錄（不是本地記錄）
+      if (isLocalRecord(record)) return false;
+      // 必須還沒有解密
+      if (decryptedDescriptions[record.id]) return false;
+      // 必須不在解密中（避免重複解密）
+      if (decryptingRecords.has(record.id)) return false;
+      // 必須沒有失敗過（避免無限重試）
+      if (failedAutoDecrypts.has(record.id)) return false;
+      // 必須有加密資料或 blob_id
+      if (!record.encrypted_data && (!record.blob_id || record.blob_id.startsWith("local_"))) return false;
+      return true;
+    });
+    
+    // 自動解密每個公開記錄
+    publicWalrusRecords.forEach(record => {
+      decryptDescription(record).catch(error => {
+        console.warn(`[Timeline] Failed to auto-decrypt public record ${record.id}:`, error);
+        // 記錄失敗的嘗試，避免無限重試
+        setFailedAutoDecrypts(prev => new Set(prev).add(record.id));
+      });
+    });
+  }, [records, decryptedDescriptions, decryptingRecords, decryptDescription, isLocalRecord, failedAutoDecrypts]);
 
   // 統計資料
   const stats = useMemo(() => {
@@ -1259,11 +1307,199 @@ const Timeline = () => {
                             </div>
                           )}
                         </div>
-                        {record.is_public && record.description && (
-                          <div className="mb-3 p-3 rounded-lg bg-muted/30 border border-border/50">
-                            <p className="text-sm whitespace-pre-wrap break-words">
-                              {record.description}
-                            </p>
+                        {record.is_public && (
+                          <div className="mb-3 space-y-2">
+                            {/* 公開記錄：如果已有 description，直接顯示 */}
+                            {record.description ? (
+                              <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
+                                <p className="text-sm whitespace-pre-wrap break-words">
+                                  {record.description}
+                                </p>
+                              </div>
+                            ) : decryptedDescriptions[record.id] ? (
+                              // 已解密，顯示內容
+                              <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                                  <Unlock className="w-3 h-3 text-green-500" />
+                                  <span className="text-green-500">{t("timeline.decrypted")}</span>
+                                </div>
+                                <p className="text-sm whitespace-pre-wrap break-words">
+                                  {decryptedDescriptions[record.id]}
+                                </p>
+                              </div>
+                            ) : decryptErrors[record.id] ? (
+                              // 解密失敗，顯示錯誤資訊和重試按鈕（與私密記錄一致）
+                              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                                <div className="flex items-start justify-between mb-2">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 text-xs text-red-500 mb-1">
+                                      <Lock className="w-3 h-3" />
+                                      <span>{t("timeline.decryptFailed")}</span>
+                                    </div>
+                                    <p className="text-sm text-red-600 dark:text-red-400 mb-2">
+                                      {decryptErrors[record.id]}
+                                    </p>
+                                    
+                                    {/* 詳細錯誤資訊（可展開） */}
+                                    {decryptErrorDetails[record.id] && (
+                                      <div className="mt-2">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => {
+                                            setExpandedErrorDetails(prev => {
+                                              const next = new Set(prev);
+                                              if (next.has(record.id)) {
+                                                next.delete(record.id);
+                                              } else {
+                                                next.add(record.id);
+                                              }
+                                              return next;
+                                            });
+                                          }}
+                                          className="text-xs"
+                                        >
+                                          {expandedErrorDetails.has(record.id) ? (
+                                            <>
+                                              <EyeOff className="w-3 h-3 mr-1" />
+                                              {t("timeline.hideDetails")}
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Eye className="w-3 h-3 mr-1" />
+                                              {t("timeline.showDetails")}
+                                            </>
+                                          )}
+                                        </Button>
+                                        
+                                        {expandedErrorDetails.has(record.id) && (
+                                          <div className="mt-2 p-3 rounded bg-red-500/5 border border-red-500/10 text-xs space-y-2">
+                                            <div>
+                                              <span className="font-semibold text-red-700 dark:text-red-300">
+                                                {t("timeline.errorDetail.type")}:
+                                              </span>
+                                              <span className="ml-2 text-red-600 dark:text-red-400">
+                                                {t(`timeline.errorType.${decryptErrorDetails[record.id].type}`)}
+                                              </span>
+                                            </div>
+                                            
+                                            {decryptErrorDetails[record.id].statusCode && (
+                                              <div>
+                                                <span className="font-semibold text-red-700 dark:text-red-300">
+                                                  {t("timeline.errorDetail.statusCode")}:
+                                                </span>
+                                                <span className="ml-2 text-red-600 dark:text-red-400 font-mono">
+                                                  {decryptErrorDetails[record.id].statusCode}
+                                                </span>
+                                              </div>
+                                            )}
+                                            
+                                            {decryptErrorDetails[record.id].blobId && (
+                                              <div>
+                                                <span className="font-semibold text-red-700 dark:text-red-300">
+                                                  {t("timeline.errorDetail.blobId")}:
+                                                </span>
+                                                <span className="ml-2 text-red-600 dark:text-red-400 font-mono text-xs break-all">
+                                                  {decryptErrorDetails[record.id].blobId}
+                                                </span>
+                                              </div>
+                                            )}
+                                            
+                                            {decryptErrorDetails[record.id].suggestions && decryptErrorDetails[record.id].suggestions.length > 0 && (
+                                              <div>
+                                                <span className="font-semibold text-red-700 dark:text-red-300 block mb-1">
+                                                  {t("timeline.errorDetail.suggestions")}:
+                                                </span>
+                                                <ul className="list-disc list-inside space-y-1 text-red-600 dark:text-red-400">
+                                                  {decryptErrorDetails[record.id].suggestions.map((suggestion, idx) => (
+                                                    <li key={idx} className="text-xs whitespace-pre-wrap">{suggestion}</li>
+                                                  ))}
+                                                </ul>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    // 清除失敗標記和錯誤資訊，允許重試
+                                    setFailedAutoDecrypts(prev => {
+                                      const next = new Set(prev);
+                                      next.delete(record.id);
+                                      return next;
+                                    });
+                                    setDecryptErrors(prev => {
+                                      const next = { ...prev };
+                                      delete next[record.id];
+                                      return next;
+                                    });
+                                    setDecryptErrorDetails(prev => {
+                                      const next = { ...prev };
+                                      delete next[record.id];
+                                      return next;
+                                    });
+                                    decryptDescription(record);
+                                  }}
+                                  disabled={decryptingRecords.has(record.id)}
+                                  className="mt-2"
+                                >
+                                  {decryptingRecords.has(record.id) ? (
+                                    <>
+                                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                      {t("timeline.decrypting")}
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Unlock className="w-4 h-4 mr-2" />
+                                      {t("timeline.retryDecrypt")}
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                            ) : decryptingRecords.has(record.id) ? (
+                              // 正在解密
+                              <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                  <span>{t("timeline.decrypting")}</span>
+                                </div>
+                              </div>
+                            ) : !isLocalRecord(record) && (record.encrypted_data || record.blob_id) ? (
+                              // Walrus 記錄，顯示解密按鈕（雖然應該自動解密，但以防萬一）
+                              <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    // 清除失敗標記，允許重試
+                                    setFailedAutoDecrypts(prev => {
+                                      const next = new Set(prev);
+                                      next.delete(record.id);
+                                      return next;
+                                    });
+                                    decryptDescription(record);
+                                  }}
+                                  disabled={decryptingRecords.has(record.id)}
+                                >
+                                  {decryptingRecords.has(record.id) ? (
+                                    <>
+                                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                      {t("timeline.decrypting")}
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Unlock className="w-4 h-4 mr-2" />
+                                      {t("timeline.decryptAndView")}
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                            ) : null}
                           </div>
                         )}
                         {!record.is_public && (

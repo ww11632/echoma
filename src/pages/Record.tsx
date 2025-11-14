@@ -11,7 +11,7 @@ import { Sparkles, ArrowLeft, Loader2, Lock, Unlock, Database } from "lucide-rea
 import { useToast } from "@/hooks/use-toast";
 import { useCurrentAccount, useCurrentWallet } from "@mysten/dapp-kit";
 import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
-import { encryptData, generateUserKey, generateUserKeyFromId } from "@/lib/encryption";
+import { encryptData, generateUserKey, generateUserKeyFromId, PUBLIC_SEAL_KEY } from "@/lib/encryption";
 import { prepareEmotionSnapshot, uploadToWalrusWithSDK, createSignerFromWallet } from "@/lib/walrus";
 import { validateAndSanitizeDescription, emotionSnapshotSchema } from "@/lib/validation";
 import { supabase } from "@/integrations/supabase/client";
@@ -67,13 +67,18 @@ const Record = () => {
   ) => {
     // Initialize encrypted storage for all users (anonymous or with wallet)
     // Use the same key generation logic as Walrus upload
+    // Public records: use shared public key (anyone can decrypt)
+    // Private records: use user-specific key (only user can decrypt)
     let encryptionKey: string;
     
-    if (currentAccount) {
-      // 有錢包：使用錢包地址生成密鑰
+    if (isPublicValue) {
+      // 公開記錄：使用共享公開金鑰
+      encryptionKey = PUBLIC_SEAL_KEY;
+    } else if (currentAccount) {
+      // 私密記錄 + 有錢包：使用錢包地址生成密鑰
       encryptionKey = await generateUserKey(currentAccount.address);
     } else {
-      // 匿名用戶：優先使用 Supabase session，否則使用本地匿名 ID
+      // 私密記錄 + 匿名用戶：優先使用 Supabase session，否則使用本地匿名 ID
       const { data: { session } } = await supabase.auth.getSession();
       encryptionKey = session?.user?.id
         ? await generateUserKeyFromId(session.user.id)
@@ -181,11 +186,15 @@ const Record = () => {
           walletAddress: null,
           version: "1.0.0",
         };
-        // 使用匿名用戶專屬金鑰（優先使用 Supabase session，否則回退到本地匿名 ID）
+        // 根據隱私設置選擇加密金鑰
+        // 公開記錄：使用共享公開金鑰（任何人都可以解密）
+        // 私密記錄：使用用戶專屬金鑰（只有用戶可以解密）
         const { data: { session } } = await supabase.auth.getSession();
-        const anonymousKey = session?.user?.id
-          ? await generateUserKeyFromId(session.user.id)
-          : await getOrCreateAnonymousUserKey();
+        const anonymousKey = isPublic
+          ? PUBLIC_SEAL_KEY
+          : (session?.user?.id
+              ? await generateUserKeyFromId(session.user.id)
+              : await getOrCreateAnonymousUserKey());
 
         const encrypted = await encryptData(JSON.stringify(anonPayload), anonymousKey);
         const encryptedString = JSON.stringify(encrypted);
@@ -294,11 +303,15 @@ const Record = () => {
       // Validate snapshot with zod schema
       emotionSnapshotSchema.parse(snapshot);
 
-      // Step 3: Generate secure encryption key
-      const userKey = await generateUserKey(currentAccount.address);
+      // Step 3: Generate secure encryption key based on privacy setting
+      // Public records: use shared public key (anyone can decrypt)
+      // Private records: use user-specific key (only user can decrypt)
+      const encryptionKey = isPublic 
+        ? PUBLIC_SEAL_KEY 
+        : await generateUserKey(currentAccount.address);
       
       // Step 4: Encrypt snapshot
-      const encryptedData = await encryptData(JSON.stringify(snapshot), userKey);
+      const encryptedData = await encryptData(JSON.stringify(snapshot), encryptionKey);
       const encryptedString = JSON.stringify(encryptedData);
 
       // Step 5: Check if user wants to save locally only
