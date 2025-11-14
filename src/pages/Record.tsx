@@ -298,7 +298,7 @@ const Record = () => {
         });
         
         const signer = createSignerFromWallet(currentWallet, currentAccount.address, suiClient);
-        const sdkResult = await uploadToWalrusWithSDK(encryptedString, signer, 5);
+        const sdkResult = await uploadToWalrusWithSDK(encryptedString, signer, 200); // 200 epochs = ~200 days on testnet
         
         console.log("[Record] ✅ SDK upload successful:", sdkResult);
         

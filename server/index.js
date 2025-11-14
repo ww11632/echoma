@@ -165,7 +165,7 @@ const DATA_DIR = path.join(process.cwd(), "server", "data");
 const DATA_FILE = path.join(DATA_DIR, "emotions.json");
 const WALRUS_PUBLISHER_URL = process.env.WALRUS_PUBLISHER_URL || "https://upload-relay.testnet.walrus.space";
 const WALRUS_AGGREGATOR_URL = process.env.WALRUS_AGGREGATOR_URL || "https://aggregator.testnet.walrus.space";
-const DEFAULT_EPOCHS = Number(process.env.WALRUS_EPOCHS || 5);
+const DEFAULT_EPOCHS = Number(process.env.WALRUS_EPOCHS || 200); // 200 epochs (~200 days on testnet)
 const WALRUS_ENABLED = process.env.WALRUS_ENABLED !== "false"; // Default to true, can be disabled via env var
 const BLOB_ID_PATTERN = /^[A-Za-z0-9_-]{32,128}$/;
 
