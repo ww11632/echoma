@@ -9,11 +9,22 @@ import { createClient } from "@supabase/supabase-js";
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Initialize Supabase client for JWT verification
-const supabase = createClient(
-  process.env.VITE_SUPABASE_URL || '',
-  process.env.VITE_SUPABASE_PUBLISHABLE_KEY || ''
-);
+// Lazy initialization of Supabase client for JWT verification
+let supabaseClient = null;
+function getSupabaseClient() {
+  if (!supabaseClient) {
+    const supabaseUrl = process.env.VITE_SUPABASE_URL;
+    const supabaseKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase configuration is missing. Please set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY environment variables.');
+    }
+    
+    supabaseClient = createClient(supabaseUrl, supabaseKey);
+  }
+  return supabaseClient;
+}
+
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
 
@@ -27,7 +38,7 @@ const ERROR_CODES = {
   NETWORK_ERROR: 'NETWORK_ERROR',
   VALIDATION_ERROR: 'VALIDATION_ERROR',
   AUTH_ERROR: 'AUTH_ERROR',
-} as const;
+};
 
 /**
  * User-friendly error messages mapped to error codes
@@ -38,7 +49,7 @@ const ERROR_MESSAGES = {
   [ERROR_CODES.NETWORK_ERROR]: 'Network error. Please check your connection and try again.',
   [ERROR_CODES.VALIDATION_ERROR]: 'Invalid request data. Please check your input.',
   [ERROR_CODES.AUTH_ERROR]: 'Authentication failed. Please sign in again.',
-} as const;
+};
 
 /**
  * Determine error code from error object
@@ -128,6 +139,7 @@ async function requireAuth(req, res, next) {
     const token = authHeader.replace('Bearer ', '');
     
     // Verify the JWT token with Supabase
+    const supabase = getSupabaseClient();
     const { data: { user }, error } = await supabase.auth.getUser(token);
     
     if (error || !user) {
@@ -155,6 +167,7 @@ const WALRUS_PUBLISHER_URL = process.env.WALRUS_PUBLISHER_URL || "https://upload
 const WALRUS_AGGREGATOR_URL = process.env.WALRUS_AGGREGATOR_URL || "https://aggregator.testnet.walrus.space";
 const DEFAULT_EPOCHS = Number(process.env.WALRUS_EPOCHS || 5);
 const WALRUS_ENABLED = process.env.WALRUS_ENABLED !== "false"; // Default to true, can be disabled via env var
+const BLOB_ID_PATTERN = /^[A-Za-z0-9_-]{32,128}$/;
 
 // Rate limiting configuration
 const RATE_LIMIT_MAX_REQUESTS = 10; // Maximum requests per window
@@ -224,6 +237,10 @@ function rateLimitMiddleware(req, res, next) {
   }
 
   next();
+}
+
+function isValidWalrusBlobId(blobId) {
+  return typeof blobId === "string" && BLOB_ID_PATTERN.test(blobId);
 }
 
 // Simple health and root routes for quick checks
@@ -416,6 +433,7 @@ app.post("/api/emotion", requireAuth, rateLimitMiddleware, async (req, res) => {
       created_at: new Date().toISOString(),
       version: "1.0.0",
       walrus_upload_failed: walrusUploadFailed, // Track if Walrus upload failed
+      encrypted_data: encryptedData,
     };
 
     console.log(`[API] Saving record to local storage...`);
@@ -449,6 +467,58 @@ app.post("/api/emotion", requireAuth, rateLimitMiddleware, async (req, res) => {
   }
 });
 
+// Proxy endpoint to fetch Walrus blobs server-side (avoids browser CORS limits)
+app.get("/api/walrus/:blobId", async (req, res) => {
+  try {
+    const blobId = req.params.blobId;
+    
+    if (!isValidWalrusBlobId(blobId)) {
+      return res.status(400).json({
+        success: false,
+        error: ERROR_MESSAGES[ERROR_CODES.VALIDATION_ERROR],
+        errorCode: ERROR_CODES.VALIDATION_ERROR,
+      });
+    }
+    
+    const sanitizedBlobId = encodeURIComponent(blobId);
+    const walrusResponse = await fetch(`${WALRUS_AGGREGATOR_URL}/v1/${sanitizedBlobId}`);
+    
+    if (!walrusResponse.ok) {
+      const errorText = await walrusResponse.text();
+      console.error("[Walrus Proxy] Aggregator error:", {
+        status: walrusResponse.status,
+        blobId: `${blobId.slice(0, 8)}...`,
+        error: errorText,
+      });
+      
+      let message;
+      if (walrusResponse.status === 404) {
+        message = "Data not found. It may have expired or been removed.";
+      } else if (walrusResponse.status >= 500) {
+        message = `Storage service temporarily unavailable (${walrusResponse.status}). Please try again later.`;
+      } else {
+        message = `Failed to retrieve data (${walrusResponse.status}). Please try again.`;
+      }
+      
+      return res.status(walrusResponse.status).json({
+        success: false,
+        error: message,
+        status: walrusResponse.status,
+      });
+    }
+    
+    const payload = await walrusResponse.text();
+    res.setHeader("Content-Type", walrusResponse.headers.get("Content-Type") || "application/json");
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("X-Walrus-Proxy", "true");
+    return res.status(200).send(payload);
+  } catch (error) {
+    console.error("[Walrus Proxy] Unexpected error:", error);
+    const errorResponse = createErrorResponse(error, 500);
+    return res.status(500).json(errorResponse);
+  }
+});
+
 app.get("/api/emotions", requireAuth, rateLimitMiddleware, async (req, res) => {
   try {
     console.log(`[API] GET /api/emotions - Authenticated request from user: ${req.user.id}`);
@@ -466,6 +536,63 @@ app.get("/api/emotions", requireAuth, rateLimitMiddleware, async (req, res) => {
     res.json({ success: true, records: userRecords.sort((a, b) => (a.created_at < b.created_at ? 1 : -1)) });
   } catch (e) {
     const errorResponse = createErrorResponse(e, 500);
+    res.status(500).json(errorResponse);
+  }
+});
+
+// Fetch encrypted payload for a blob ID (used as Walrus fallback)
+app.get("/api/emotions/blob/:blobId", async (req, res) => {
+  try {
+    const blobId = req.params.blobId;
+    if (!blobId || !isValidWalrusBlobId(blobId)) {
+      return res.status(400).json({
+        success: false,
+        error: ERROR_MESSAGES[ERROR_CODES.VALIDATION_ERROR],
+        errorCode: ERROR_CODES.VALIDATION_ERROR,
+      });
+    }
+
+    const list = await readAll();
+    const record = list.find(r => r.blob_id === blobId);
+
+    if (!record) {
+      return res.status(404).json({
+        success: false,
+        error: "Encrypted data not found for this blob ID.",
+      });
+    }
+
+    if (!record.encrypted_data) {
+      try {
+        const walrusResponse = await fetch(`${WALRUS_AGGREGATOR_URL}/v1/${encodeURIComponent(blobId)}`);
+        if (!walrusResponse.ok) {
+          const errorText = await walrusResponse.text();
+          return res.status(walrusResponse.status).json({
+            success: false,
+            error: errorText || `Failed to fetch encrypted data from Walrus (${walrusResponse.status}).`,
+          });
+        }
+        const payload = await walrusResponse.text();
+        record.encrypted_data = payload;
+        await writeAll(list);
+        return res.json({
+          success: true,
+          encryptedData: payload,
+        });
+      } catch (walrusError) {
+        console.error("[API] Failed to fetch Walrus backup:", walrusError);
+        const errorResponse = createErrorResponse(walrusError, 500);
+        return res.status(500).json(errorResponse);
+      }
+    }
+
+    return res.json({
+      success: true,
+      encryptedData: record.encrypted_data,
+    });
+  } catch (error) {
+    console.error("[API] Failed to fetch encrypted data:", error);
+    const errorResponse = createErrorResponse(error, 500);
     res.status(500).json(errorResponse);
   }
 });
@@ -507,4 +634,3 @@ app.get("/api/emotions/by-wallet/:walletAddress", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`API server running at http://localhost:${PORT}`);
 });
-

@@ -150,6 +150,7 @@
     "publicRecord": "Public Record",
     "privateRecord": "🔒 Encrypted and saved",
     "encryptedContent": "🔒 This record is encrypted, description content is protected",
+    "encryptedEmotion": "Encrypted emotion",
     "verified": "✓ Verified",
     "pending": "⏳ Pending",
     "failed": "❌ Failed",
@@ -322,4 +323,3 @@
     }
   }
 }
-

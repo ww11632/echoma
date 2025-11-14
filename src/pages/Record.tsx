@@ -11,7 +11,7 @@ import { Sparkles, ArrowLeft, Loader2, Lock, Unlock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrentAccount, useCurrentWallet } from "@mysten/dapp-kit";
 import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
-import { encryptData, generateUserKey } from "@/lib/encryption";
+import { encryptData, generateUserKey, generateUserKeyFromId } from "@/lib/encryption";
 import { prepareEmotionSnapshot, uploadToWalrusWithSDK, createSignerFromWallet } from "@/lib/walrus";
 import { validateAndSanitizeDescription, emotionSnapshotSchema } from "@/lib/validation";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,6 +20,7 @@ import type { EmotionRecord } from "@/lib/dataSchema";
 import { postEmotion } from "@/lib/api";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import WalletConnect from "@/components/WalletConnect";
+import { getOrCreateAnonymousUserKey } from "@/lib/anonymousIdentity";
 
 const isBackendUnavailable = (error: unknown) => {
   if (!(error instanceof Error)) return false;
@@ -139,9 +140,13 @@ const Record = () => {
           walletAddress: null,
           version: "1.0.0",
         };
-        // 使用隨機 key 加密
-        const randomKey = crypto.randomUUID();
-        const encrypted = await encryptData(JSON.stringify(anonPayload), randomKey);
+        // 使用匿名用戶專屬金鑰（優先使用 Supabase session，否則回退到本地匿名 ID）
+        const { data: { session } } = await supabase.auth.getSession();
+        const anonymousKey = session?.user?.id
+          ? await generateUserKeyFromId(session.user.id)
+          : await getOrCreateAnonymousUserKey();
+
+        const encrypted = await encryptData(JSON.stringify(anonPayload), anonymousKey);
         const encryptedString = JSON.stringify(encrypted);
         setUploadStatus("uploading");
         

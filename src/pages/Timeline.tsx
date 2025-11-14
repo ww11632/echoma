@@ -7,10 +7,11 @@ import { ArrowLeft, Home, Sparkles, Shield, Clock, Lock, Unlock, Loader2, BookOp
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import { supabase } from "@/integrations/supabase/client";
 import { listEmotionRecords } from "@/lib/localIndex";
-import { getEmotions, getEmotionsByWallet } from "@/lib/api";
+import { getEmotions, getEmotionsByWallet, getEncryptedEmotionByBlob } from "@/lib/api";
 import { queryWalrusBlobsByOwner, getWalrusUrl, readFromWalrus } from "@/lib/walrus";
 import { decryptData, decryptDataWithMigration, generateUserKey, generateUserKeyFromId, DecryptionError, DecryptionErrorType } from "@/lib/encryption";
 import type { EncryptedData } from "@/lib/encryption";
+import { getAnonymousUserKey } from "@/lib/anonymousIdentity";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Legend } from "recharts";
@@ -28,6 +29,7 @@ interface EmotionRecord {
   proof_status: "pending" | "confirmed" | "failed";
   sui_ref: string | null;
   created_at: string;
+  wallet_address?: string | null;
 }
 
 type FilterType = "all" | "local" | "walrus";
@@ -46,6 +48,7 @@ const Timeline = () => {
     anxiety: { label: t("emotions.anxiety"), emoji: "😰", gradient: "from-purple-400 to-pink-400", color: "#a78bfa" },
     confusion: { label: t("emotions.confusion"), emoji: "🤔", gradient: "from-gray-400 to-slate-400", color: "#94a3b8" },
     peace: { label: t("emotions.peace"), emoji: "✨", gradient: "from-green-400 to-teal-400", color: "#34d399" },
+    encrypted: { label: t("timeline.encryptedEmotion"), emoji: "🔒", gradient: "from-slate-400 to-gray-500", color: "#94a3b8" },
   };
   const [records, setRecords] = useState<EmotionRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -63,6 +66,11 @@ const Timeline = () => {
     suggestions: string[];
   }>>({});
   const [expandedErrorDetails, setExpandedErrorDetails] = useState<Set<string>>(new Set());
+  const sortRecordsByDate = useCallback((items: EmotionRecord[]) => {
+    return [...items].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+  }, []);
 
   useEffect(() => {
     const loadRecords = async () => {
@@ -85,6 +93,7 @@ const Timeline = () => {
             proof_status: "pending" as const,
             sui_ref: null,
             created_at: r.timestamp,
+            wallet_address: null,
           }));
           allRecords.push(...convertedLocalRecords);
         } catch (localError) {
@@ -124,7 +133,7 @@ const Timeline = () => {
                   
                   return {
                     id: r.id,
-                    emotion: r.emotion,
+                    emotion: r.emotion || "encrypted",
                     intensity: r.intensity || 50,
                     description: r.description,
                     blob_id: blobId,
@@ -134,6 +143,7 @@ const Timeline = () => {
                     proof_status: r.proof_status || "pending",
                     sui_ref: r.sui_ref || null,
                     created_at: r.created_at || r.timestamp,
+                    wallet_address: r.wallet_address || null,
                   };
                 });
                 allRecords.push(...convertedRecords);
@@ -161,7 +171,7 @@ const Timeline = () => {
                   
                   return {
                     id: r.id,
-                    emotion: r.emotion,
+                    emotion: r.emotion || "encrypted",
                     intensity: r.intensity || 50,
                     description: r.description,
                     blob_id: blobId,
@@ -171,6 +181,7 @@ const Timeline = () => {
                     proof_status: r.proof_status || "pending",
                     sui_ref: r.sui_ref || null,
                     created_at: r.created_at || r.timestamp,
+                    wallet_address: r.wallet_address || null,
                   };
                 });
                 allRecords.push(...convertedApiRecords);
@@ -223,7 +234,7 @@ const Timeline = () => {
                     // 我們可以嘗試從 blob 讀取，或使用預設值
                     const onChainRecord: EmotionRecord = {
                       id: `onchain_${blob.objectId}`,
-                      emotion: "peace", // 預設值，實際應該從 blob 讀取
+                      emotion: "encrypted", // 加密資料尚未解密前提示為已加密
                       intensity: 50, // 預設值
                       description: "", // 加密內容，需要解密才能顯示
                       blob_id: blob.blobId,
@@ -233,6 +244,7 @@ const Timeline = () => {
                       proof_status: "confirmed", // 鏈上記錄肯定是已確認的
                       sui_ref: blob.objectId,
                       created_at: blob.createdAt || new Date().toISOString(),
+                      wallet_address: currentAccount?.address || null,
                     };
                     allRecords.push(onChainRecord);
                     console.log(`[Timeline] ✅ Added on-chain record:`, {
@@ -241,11 +253,30 @@ const Timeline = () => {
                       walrusUrl: getWalrusUrl(blob.blobId)
                     });
                   } else {
-                    // 如果已存在，更新 sui_ref
+                    let updated = false;
                     if (!existing.sui_ref && blob.objectId) {
                       existing.sui_ref = blob.objectId;
+                      updated = true;
+                    }
+                    if (blob.createdAt) {
+                      const existingTime = new Date(existing.created_at).getTime();
+                      const chainTime = new Date(blob.createdAt).getTime();
+                      if (!Number.isNaN(chainTime) && existingTime !== chainTime) {
+                        existing.created_at = blob.createdAt;
+                        updated = true;
+                      }
+                    }
+                    if (currentAccount?.address && !existing.wallet_address) {
+                      existing.wallet_address = currentAccount.address;
+                      updated = true;
+                    }
+                    if (updated) {
                       existing.proof_status = "confirmed";
-                      console.log(`[Timeline] Updated existing record with on-chain ref: ${blob.objectId}`);
+                      console.log(`[Timeline] Synced on-chain metadata for record ${existing.id}:`, {
+                        blobId: blob.blobId,
+                        objectId: blob.objectId,
+                        created_at: existing.created_at,
+                      });
                     }
                   }
                 }
@@ -267,10 +298,26 @@ const Timeline = () => {
         }
 
         // 3. 去重并排序（按时间倒序）
-        const uniqueRecords = Array.from(
-          new Map(allRecords.map(r => [r.id, r])).values()
-        ).sort((a, b) => 
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        const uniqueRecords = sortRecordsByDate(
+          Array.from(
+            allRecords
+              .reduce((map, record) => {
+                const key = record.blob_id || record.id;
+                const existing = map.get(key);
+                if (!existing) {
+                  map.set(key, record);
+                  return map;
+                }
+
+                const existingTime = new Date(existing.created_at).getTime();
+                const recordTime = new Date(record.created_at).getTime();
+                if (!Number.isNaN(recordTime) && recordTime > existingTime) {
+                  map.set(key, record);
+                }
+                return map;
+              }, new Map<string, EmotionRecord>())
+              .values()
+          )
         );
 
         // 統計資訊
@@ -383,8 +430,14 @@ const Timeline = () => {
     setDecryptingRecords(prev => new Set(prev).add(record.id));
 
     try {
-      // 從 Walrus 讀取加密資料
-      const encryptedDataString = await readFromWalrus(record.blob_id);
+      // 從 Walrus 讀取加密資料（失敗時回退到本地伺服器備份）
+      let encryptedDataString: string;
+      try {
+        encryptedDataString = await readFromWalrus(record.blob_id);
+      } catch (walrusError) {
+        console.warn(`[Timeline] Walrus fetch failed for ${record.blob_id}, falling back to server backup`, walrusError);
+        encryptedDataString = await getEncryptedEmotionByBlob(record.blob_id);
+      }
       
       // 解析加密資料
       const encryptedData: EncryptedData = JSON.parse(encryptedDataString);
@@ -399,8 +452,15 @@ const Timeline = () => {
         } else if (currentAccount?.address) {
           // 如果沒有 Supabase session，使用錢包位址
           userKey = await generateUserKey(currentAccount.address);
+        } else if (record.wallet_address) {
+          userKey = await generateUserKey(record.wallet_address);
         } else {
-          throw new Error("無法產生使用者密鑰：需要登入或連接錢包");
+          const anonymousKey = await getAnonymousUserKey();
+          if (anonymousKey) {
+            userKey = anonymousKey;
+          } else {
+            throw new Error("無法產生使用者密鑰：需要登入、連接錢包或保留匿名金鑰");
+          }
         }
       } catch (keyError) {
         console.error("[Timeline] Failed to generate user key:", keyError);
@@ -412,6 +472,25 @@ const Timeline = () => {
       
       // 解析解密後的 JSON 獲取快照
       const snapshot = JSON.parse(decryptedString);
+      const snapshotTimestamp = snapshot.timestamp
+        ? new Date(snapshot.timestamp).toISOString()
+        : null;
+      
+      // 更新記錄的 metadata（例如真實時間戳與情緒/強度）
+      if (snapshotTimestamp || snapshot.emotion || snapshot.intensity) {
+        setRecords(prev =>
+          sortRecordsByDate(prev.map(r => {
+            if (r.id !== record.id) return r;
+            return {
+              ...r,
+              created_at: snapshotTimestamp || r.created_at,
+              emotion: snapshot.emotion || r.emotion,
+              intensity: typeof snapshot.intensity === "number" ? snapshot.intensity : r.intensity,
+              wallet_address: snapshot.walletAddress || r.wallet_address,
+            };
+          }))
+        );
+      }
       
       // 儲存解密後的描述
       setDecryptedDescriptions(prev => ({

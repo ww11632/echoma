@@ -15,6 +15,7 @@ import type { WalrusClient } from "@mysten/walrus";
 // Walrus testnet configuration (new upload relay + aggregator hosts)
 const WALRUS_PUBLISHER_URL = "https://upload-relay.testnet.walrus.space";
 const WALRUS_AGGREGATOR_URL = "https://aggregator.testnet.walrus.space";
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:3001";
 const DEFAULT_EPOCHS = 5; // Store for 5 epochs (~1 year on testnet)
 
 export interface WalrusUploadResult {
@@ -176,34 +177,45 @@ export function isValidBlobId(blobId: string): boolean {
  * Read data from Walrus storage
  */
 export async function readFromWalrus(blobId: string): Promise<string> {
-  // Validate blob ID format
   if (!isValidBlobId(blobId)) {
     const error: any = new Error("Invalid blob ID format");
     error.status = 400;
     throw error;
   }
 
-  // Sanitize blob ID to prevent URL manipulation
-  const sanitizedBlobId = encodeURIComponent(blobId);
+  try {
+    return await fetchWalrusDirect(blobId);
+  } catch (error) {
+    if (!shouldFallbackToProxy(error)) {
+      throw error;
+    }
+    
+    console.warn("[Walrus] Direct fetch failed, falling back to proxy:", {
+      message: (error as Error).message,
+    });
+    
+    return await fetchWalrusViaProxy(blobId);
+  }
+}
 
+async function fetchWalrusDirect(blobId: string): Promise<string> {
+  const sanitizedBlobId = encodeURIComponent(blobId);
+  
   try {
     const response = await fetch(`${WALRUS_AGGREGATOR_URL}/v1/${sanitizedBlobId}`);
 
     if (!response.ok) {
-      // Log detailed error server-side only
       const errorText = await response.text();
       console.error("[INTERNAL] Walrus read error:", {
         status: response.status,
-        blobId: blobId.slice(0, 8) + "...", // Only log partial blob ID
+        blobId: blobId.slice(0, 8) + "...",
         error: errorText,
       });
 
-      // Create error with status code for detailed diagnostics
       const error: any = new Error();
       error.status = response.status;
       error.response = { status: response.status };
 
-      // Show generic error to user
       if (response.status === 404) {
         error.message = "Data not found. It may have expired or been removed.";
       } else if (response.status >= 500) {
@@ -217,34 +229,81 @@ export async function readFromWalrus(blobId: string): Promise<string> {
 
     return await response.text();
   } catch (error) {
-    // Don't expose internal errors
-    if (error instanceof Error) {
-      // If it's already a user-friendly error with status, re-throw it
-      if ((error as any).status) {
-        throw error;
-      }
-      
-      // If it's already a user-friendly error, re-throw it
-      if (error.message.includes("Invalid blob ID") || 
-          error.message.includes("not found") ||
-          error.message.includes("unavailable") ||
-          error.message.includes("Failed to retrieve")) {
-        throw error;
-      }
-      
-      // Network errors - create error with network type
-      if (error.message.includes("fetch") || error.message.includes("network") || error.name === "TypeError") {
-        const networkError: any = new Error("Network error. Check your connection and try again.");
-        networkError.status = 0; // 0 indicates network error
-        throw networkError;
-      }
-    }
-    
-    // Generic fallback
-    const genericError: any = new Error("Failed to retrieve data. Please try again later.");
-    genericError.status = 0;
-    throw genericError;
+    throw normalizeWalrusError(error);
   }
+}
+
+async function fetchWalrusViaProxy(blobId: string): Promise<string> {
+  const sanitizedBlobId = encodeURIComponent(blobId);
+  
+  try {
+    const response = await fetch(`${API_BASE}/api/walrus/${sanitizedBlobId}`, {
+      headers: {
+        "Accept": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      let errorMessage = `Failed to retrieve data via proxy (${response.status}).`;
+      try {
+        const errorBody = await response.json();
+        if (errorBody?.error) {
+          errorMessage = errorBody.error;
+        }
+      } catch {
+        // Ignore JSON parse errors
+      }
+      
+      const error: any = new Error(errorMessage);
+      error.status = response.status;
+      throw error;
+    }
+
+    return await response.text();
+  } catch (error) {
+    throw normalizeWalrusError(error);
+  }
+}
+
+function shouldFallbackToProxy(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const status = (error as any).status;
+  if (status === 0) {
+    return true;
+  }
+  return (
+    error.message.includes("Network error") ||
+    error.message.includes("Failed to retrieve data. Please try again later.") ||
+    error.message.includes("Failed to fetch") ||
+    error.name === "TypeError"
+  );
+}
+
+function normalizeWalrusError(error: unknown): Error {
+  if (error instanceof Error) {
+    if ((error as any).status) {
+      return error;
+    }
+    if (
+      error.message.includes("Invalid blob ID") ||
+      error.message.includes("not found") ||
+      error.message.includes("unavailable") ||
+      error.message.includes("Failed to retrieve")
+    ) {
+      return error;
+    }
+    if (error.message.includes("fetch") || error.message.includes("network") || error.name === "TypeError") {
+      const networkError: any = new Error("Network error. Check your connection and try again.");
+      networkError.status = 0;
+      return networkError;
+    }
+  }
+  
+  const genericError: any = new Error("Failed to retrieve data. Please try again later.");
+  genericError.status = 0;
+  return genericError;
 }
 
 /**
@@ -269,6 +328,66 @@ export async function queryWalrusBlobsByOwner(
 
     console.log(`[Walrus Query] Querying Walrus blobs for owner: ${ownerAddress}`);
 
+    // Cache transaction timestamps and object details to avoid duplicate RPC calls
+    const txTimestampCache = new Map<string, string | undefined>();
+    const objectDetailsCache = new Map<string, Awaited<ReturnType<typeof client.getObject>> | null>();
+
+    const getObjectDetails = async (objectId: string) => {
+      if (objectDetailsCache.has(objectId)) {
+        return objectDetailsCache.get(objectId);
+      }
+      try {
+        const details = await client.getObject({
+          id: objectId,
+          options: {
+            showContent: true,
+            showType: true,
+            showOwner: true,
+            showPreviousTransaction: true,
+          },
+        });
+        objectDetailsCache.set(objectId, details);
+        return details;
+      } catch (err) {
+        console.warn(`[Walrus Query] Failed to fetch details for object ${objectId}:`, err);
+        objectDetailsCache.set(objectId, null);
+        return null;
+      }
+    };
+
+    const getTimestampFromTransaction = async (
+      transactionDigest?: string | null
+    ): Promise<string | undefined> => {
+      if (!transactionDigest) {
+        return undefined;
+      }
+      if (txTimestampCache.has(transactionDigest)) {
+        return txTimestampCache.get(transactionDigest);
+      }
+      try {
+        const tx = await client.getTransactionBlock({
+          digest: transactionDigest,
+          options: {
+            showEvents: false,
+            showEffects: false,
+            showInput: false,
+          },
+        });
+        const timestamp = tx.timestampMs
+          ? new Date(Number(tx.timestampMs)).toISOString()
+          : undefined;
+        txTimestampCache.set(transactionDigest, timestamp);
+        return timestamp;
+      } catch (err) {
+        console.warn(
+          `[Walrus Query] Failed to fetch timestamp for transaction ${transactionDigest}:`,
+          err
+        );
+        txTimestampCache.set(transactionDigest, undefined);
+        return undefined;
+      }
+    };
+
     // Query for Walrus blob objects
     // Walrus blob objects have a specific type structure
     // We need to query objects owned by the address and filter for Walrus blob types
@@ -283,6 +402,7 @@ export async function queryWalrusBlobsByOwner(
           showType: true,
           showContent: true,
           showOwner: true,
+          showPreviousTransaction: true,
         },
         limit: 50, // Limit to prevent too many requests
       });
@@ -304,8 +424,17 @@ export async function queryWalrusBlobsByOwner(
 
         // Check if this is a Walrus blob object
         // Walrus blob objects typically have blobId in their content
+        let fields: any = null;
         if (obj.data.content && 'fields' in obj.data.content) {
-          const fields = obj.data.content.fields as any;
+          fields = obj.data.content.fields as any;
+        } else {
+          const details = await getObjectDetails(objectId);
+          if (details?.data?.content && 'fields' in details.data.content) {
+            fields = (details.data.content as any).fields;
+          }
+        }
+
+        if (fields) {
           console.log(`[Walrus Query] Object ${objectId} fields:`, Object.keys(fields));
           
           // Look for blobId or similar fields that indicate this is a Walrus blob
@@ -313,10 +442,17 @@ export async function queryWalrusBlobsByOwner(
             const blobId = fields.blobId || fields.blob_id || fields.id || fields.blob_hash;
             
             if (blobId && typeof blobId === 'string') {
+              const previousTx =
+                obj.data.previousTransaction ||
+                (await getObjectDetails(objectId))?.data?.previousTransaction ||
+                null;
+              const createdAt =
+                (await getTimestampFromTransaction(previousTx)) ||
+                undefined;
               walrusBlobs.push({
                 blobId,
                 objectId,
-                createdAt: obj.data.previousTransaction ? undefined : new Date().toISOString(),
+                createdAt,
               });
               console.log(`[Walrus Query] ✅ Found Walrus blob: ${blobId}, objectId: ${objectId}`);
             }
@@ -332,31 +468,38 @@ export async function queryWalrusBlobsByOwner(
           console.log(`[Walrus Query] Object ${objectId} has walrus/blob type, fetching details...`);
           // Try to get blobId from object details
           try {
-            const objectDetails = await client.getObject({
-              id: objectId,
-              options: {
-                showContent: true,
-                showType: true,
-                showOwner: true,
-              },
-            });
+            const objectDetails =
+              (await getObjectDetails(objectId)) ||
+              (await client.getObject({
+                id: objectId,
+                options: {
+                  showContent: true,
+                  showType: true,
+                  showOwner: true,
+                  showPreviousTransaction: true,
+                },
+              }));
 
             console.log(`[Walrus Query] Object ${objectId} details:`, {
-              type: objectDetails.data?.type,
-              hasContent: !!objectDetails.data?.content,
-              owner: objectDetails.data?.owner
+              type: objectDetails?.data?.type,
+              hasContent: !!objectDetails?.data?.content,
+              owner: objectDetails?.data?.owner
             });
 
-            if (objectDetails.data?.content && 'fields' in objectDetails.data.content) {
+            if (objectDetails?.data?.content && 'fields' in objectDetails.data.content) {
               const fields = (objectDetails.data.content as any).fields;
               console.log(`[Walrus Query] Object ${objectId} content fields:`, Object.keys(fields));
               const blobId = fields?.blobId || fields?.blob_id || fields?.id || fields?.blob_hash;
               
               if (blobId && typeof blobId === 'string') {
+                const previousTx =
+                  objectDetails.data?.previousTransaction || obj.data.previousTransaction;
+                const createdAt =
+                  (await getTimestampFromTransaction(previousTx)) || undefined;
                 walrusBlobs.push({
                   blobId,
                   objectId,
-                  createdAt: objectDetails.data.previousTransaction ? undefined : new Date().toISOString(),
+                  createdAt,
                 });
                 console.log(`[Walrus Query] ✅ Found Walrus blob from type: ${blobId}, objectId: ${objectId}`);
               }

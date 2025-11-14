@@ -90,4 +90,13 @@ export async function getEmotionsByWallet(walletAddress: string) {
   return data.records as any[];
 }
 
+// Fetch encrypted snapshot from server as Walrus fallback
+export async function getEncryptedEmotionByBlob(blobId: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/api/emotions/blob/${encodeURIComponent(blobId)}`);
+  const data = await res.json();
+  if (!res.ok || !data.success || !data.encryptedData) {
+    throw new Error(data.error || "Failed to fetch encrypted data from server.");
+  }
+  return data.encryptedData as string;
+}
 
