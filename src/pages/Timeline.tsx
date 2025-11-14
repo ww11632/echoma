@@ -214,6 +214,11 @@ const Timeline = () => {
                 
                 const onChainBlobs = await queryWalrusBlobsByOwner(currentAccount.address);
                 console.log(`[Timeline] Found ${onChainBlobs.length} on-chain Walrus blobs`);
+                console.log(`[Timeline] On-chain blob IDs:`, onChainBlobs.map(b => b.blobId));
+                
+                // Log existing records before merging
+                console.log(`[Timeline] Existing records before on-chain merge:`, allRecords.length);
+                console.log(`[Timeline] Existing blob_ids:`, allRecords.map(r => r.blob_id).filter(Boolean));
                 
                 // 顯示查詢完成的 toast
                 if (onChainBlobs.length > 0) {
@@ -224,6 +229,8 @@ const Timeline = () => {
                 }
 
                 // 將鏈上的 blob 轉換為記錄
+                let addedCount = 0;
+                let updatedCount = 0;
                 for (const blob of onChainBlobs) {
                   // 檢查是否已經存在（透過 blob_id 或 sui_ref）
                   const existing = allRecords.find(
@@ -249,6 +256,7 @@ const Timeline = () => {
                       wallet_address: currentAccount?.address || null,
                     };
                     allRecords.push(onChainRecord);
+                    addedCount++;
                     console.log(`[Timeline] ✅ Added on-chain record:`, {
                       blobId: blob.blobId,
                       objectId: blob.objectId,
@@ -274,6 +282,7 @@ const Timeline = () => {
                     }
                     if (updated) {
                       existing.proof_status = "confirmed";
+                      updatedCount++;
                       console.log(`[Timeline] Synced on-chain metadata for record ${existing.id}:`, {
                         blobId: blob.blobId,
                         objectId: blob.objectId,
@@ -282,6 +291,8 @@ const Timeline = () => {
                     }
                   }
                 }
+                
+                console.log(`[Timeline] On-chain merge complete: added ${addedCount}, updated ${updatedCount}, total records ${allRecords.length}`);
               } catch (onChainError) {
                 console.error("[Timeline] Error querying on-chain Walrus blobs:", onChainError);
                 // 顯示查詢失敗的 toast
@@ -300,27 +311,29 @@ const Timeline = () => {
         }
 
         // 3. 去重并排序（按时间倒序）
-        const uniqueRecords = sortRecordsByDate(
-          Array.from(
-            allRecords
-              .reduce((map, record) => {
-                const key = record.blob_id || record.id;
-                const existing = map.get(key);
-                if (!existing) {
-                  map.set(key, record);
-                  return map;
-                }
+        console.log(`[Timeline] Starting deduplication with ${allRecords.length} total records`);
+        const deduplicationMap = allRecords.reduce((map, record) => {
+          const key = record.blob_id || record.id;
+          const existing = map.get(key);
+          if (!existing) {
+            map.set(key, record);
+            return map;
+          }
 
-                const existingTime = new Date(existing.created_at).getTime();
-                const recordTime = new Date(record.created_at).getTime();
-                if (!Number.isNaN(recordTime) && recordTime > existingTime) {
-                  map.set(key, record);
-                }
-                return map;
-              }, new Map<string, EmotionRecord>())
-              .values()
-          )
-        );
+          const existingTime = new Date(existing.created_at).getTime();
+          const recordTime = new Date(record.created_at).getTime();
+          if (!Number.isNaN(recordTime) && recordTime > existingTime) {
+            console.log(`[Timeline] Dedup: replacing ${existing.id} with ${record.id} for key ${key}`);
+            map.set(key, record);
+          } else {
+            console.log(`[Timeline] Dedup: keeping ${existing.id} for key ${key}, skipping ${record.id}`);
+          }
+          return map;
+        }, new Map<string, EmotionRecord>());
+        
+        console.log(`[Timeline] After deduplication: ${deduplicationMap.size} unique records (removed ${allRecords.length - deduplicationMap.size} duplicates)`);
+        
+        const uniqueRecords = sortRecordsByDate(Array.from(deduplicationMap.values()));
 
         // 統計資訊
         const localCount = uniqueRecords.filter(r => 
