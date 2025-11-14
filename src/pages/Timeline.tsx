@@ -681,11 +681,12 @@ const Timeline = () => {
           ];
         } else if (error.message.includes("not found") || error.message.includes("404")) {
           errorType = "not_found";
-          errorMessage = t("timeline.decryptNotFound");
+          errorMessage = "找不到資料，可能已過期或已被刪除";
           statusCode = 404;
           suggestions = [
-            t("timeline.errorSuggestion.dataExpired"),
-            t("timeline.errorSuggestion.contactSupport"),
+            "⚠️ Walrus Testnet 資料會在 epochs 到期後被刪除",
+            "💡 建議：記錄新情緒時啟用「備份到資料庫」選項",
+            "📱 已備份的資料可在任何設備查看",
           ];
         } else if (error.message.includes("unavailable") || error.message.includes("500") || error.message.includes("503")) {
           errorType = "service_unavailable";
@@ -903,6 +904,23 @@ const Timeline = () => {
             </Button>
           </div>
         </div>
+
+        {/* Testnet Warning Banner */}
+        {records.some(r => !isLocalRecord(r)) && (
+          <Card className="p-4 mb-4 bg-yellow-500/10 border-yellow-500/30">
+            <div className="flex items-start gap-3">
+              <div className="text-yellow-500 mt-0.5">⚠️</div>
+              <div className="flex-1 text-sm">
+                <div className="font-semibold text-yellow-600 dark:text-yellow-400 mb-1">
+                  {t("timeline.testnetWarning")}
+                </div>
+                <div className="text-muted-foreground">
+                  {t("timeline.testnetWarningDesc")}
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
 
         {/* User Info Debug (if logged in) */}
         {session?.user && (

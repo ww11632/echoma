@@ -147,6 +147,8 @@
   "timeline": {
     "title": "情緒時間軸",
     "subtitle": "您個人的情緒歷程記錄",
+    "testnetWarning": "⚠️ Testnet 資料會在 epochs 到期後被刪除",
+    "testnetWarningDesc": "建議啟用「備份到資料庫」以永久保存",
     "noRecords": "尚未記錄任何情緒",
     "noRecordsDesc": "開始記錄您的情緒旅程",
     "recordFirst": "記錄第一個情緒",
