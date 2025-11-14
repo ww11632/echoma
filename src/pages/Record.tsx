@@ -159,6 +159,36 @@ const Record = () => {
             isPublic,
             walletAddress: null,
           });
+          
+          // Backup encrypted_data to Supabase (if user has session)
+          if (session?.user?.id && apiRes.record.blobId) {
+            try {
+              console.log("[Record] Backing up encrypted_data to Supabase...");
+              const { error: backupError } = await supabase
+                .from('emotion_records')
+                .insert([{
+                  user_id: session.user.id,
+                  emotion: selectedEmotion as any,
+                  intensity: intensityValue,
+                  blob_id: apiRes.record.blobId,
+                  walrus_url: apiRes.record.walrusUrl,
+                  payload_hash: apiRes.record.payloadHash,
+                  encrypted_data: encryptedString,
+                  is_public: isPublic,
+                  proof_status: apiRes.record.proof.status as any,
+                  sui_ref: apiRes.record.proof.suiRef,
+                }]);
+              
+              if (backupError) {
+                console.error("[Record] Failed to backup to Supabase:", backupError);
+              } else {
+                console.log("[Record] Successfully backed up to Supabase");
+              }
+            } catch (backupErr) {
+              console.error("[Record] Backup error:", backupErr);
+            }
+          }
+          
           setUploadStatus("success");
           
           // Show warning if Walrus upload failed
@@ -263,7 +293,7 @@ const Record = () => {
           description: t("record.success.recordedSDK", { blobId: sdkResult.blobId.slice(0, 8) }),
         });
         
-        // Try to save metadata to backend (optional)
+        // Try to save metadata to backend and Supabase (optional)
         try {
           await postEmotion({
             emotion: selectedEmotion,
@@ -273,6 +303,33 @@ const Record = () => {
             isPublic,
             walletAddress: currentAccount.address,
           });
+          
+          // Backup encrypted_data to Supabase
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user?.id) {
+            console.log("[Record] Backing up encrypted_data to Supabase after SDK upload...");
+            const { error: backupError } = await supabase
+              .from('emotion_records')
+              .insert([{
+                user_id: session.user.id,
+                emotion: selectedEmotion as any,
+                intensity: intensityValue,
+                blob_id: sdkResult.blobId,
+                walrus_url: `https://aggregator.testnet.walrus.space/v1/${sdkResult.blobId}`,
+                payload_hash: '',
+                encrypted_data: encryptedString,
+                is_public: isPublic,
+                proof_status: 'confirmed' as any,
+                sui_ref: sdkResult.suiRef,
+                wallet_address: currentAccount.address,
+              }]);
+            
+            if (backupError) {
+              console.error("[Record] Failed to backup to Supabase:", backupError);
+            } else {
+              console.log("[Record] Successfully backed up to Supabase");
+            }
+          }
         } catch (metadataError) {
           console.warn("[Record] Metadata save failed (not critical):", metadataError);
         }
@@ -327,6 +384,38 @@ const Record = () => {
             isPublic,
             walletAddress: currentAccount.address,
           });
+          
+          // Backup encrypted_data to Supabase
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user?.id && apiRes.record.blobId) {
+            try {
+              console.log("[Record] Backing up encrypted_data to Supabase...");
+              const { error: backupError } = await supabase
+                .from('emotion_records')
+                .insert([{
+                  user_id: session.user.id,
+                  emotion: selectedEmotion as any,
+                  intensity: intensityValue,
+                  blob_id: apiRes.record.blobId,
+                  walrus_url: apiRes.record.walrusUrl,
+                  payload_hash: apiRes.record.payloadHash,
+                  encrypted_data: encryptedString,
+                  is_public: isPublic,
+                  proof_status: apiRes.record.proof.status as any,
+                  sui_ref: apiRes.record.proof.suiRef,
+                  wallet_address: currentAccount.address,
+                }]);
+              
+              if (backupError) {
+                console.error("[Record] Failed to backup to Supabase:", backupError);
+              } else {
+                console.log("[Record] Successfully backed up to Supabase");
+              }
+            } catch (backupErr) {
+              console.error("[Record] Backup error:", backupErr);
+            }
+          }
+          
           setUploadStatus("success");
           
           // Show warning if Walrus upload failed
