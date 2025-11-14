@@ -30,6 +30,7 @@ interface EmotionRecord {
   sui_ref: string | null;
   created_at: string;
   wallet_address?: string | null;
+  encrypted_data?: string | null;
 }
 
 type FilterType = "all" | "local" | "walrus";
@@ -144,6 +145,7 @@ const Timeline = () => {
                     sui_ref: r.sui_ref || null,
                     created_at: r.created_at || r.timestamp,
                     wallet_address: r.wallet_address || null,
+                    encrypted_data: r.encrypted_data || null,
                   };
                 });
                 allRecords.push(...convertedRecords);
@@ -416,13 +418,18 @@ const Timeline = () => {
       return;
     }
 
-    // 如果是公開記錄或本地記錄，不需要解密
-    if (record.is_public || isLocalRecord(record)) {
+    // 如果是公開記錄，不需要解密
+    if (record.is_public) {
       return;
     }
 
-    // 如果沒有 blob_id，無法解密
-    if (!record.blob_id || record.blob_id.startsWith("local_")) {
+    // 如果是本地記錄且沒有資料庫加密資料，不需要解密
+    if (isLocalRecord(record) && !record.encrypted_data) {
+      return;
+    }
+
+    // 如果沒有加密資料且沒有 blob_id，無法解密
+    if (!record.encrypted_data && (!record.blob_id || record.blob_id.startsWith("local_"))) {
       return;
     }
 
@@ -430,13 +437,19 @@ const Timeline = () => {
     setDecryptingRecords(prev => new Set(prev).add(record.id));
 
     try {
-      // 從 Walrus 讀取加密資料（失敗時回退到本地伺服器備份）
+      // 優先使用資料庫中的 encrypted_data，否則從 Walrus 讀取
       let encryptedDataString: string;
-      try {
-        encryptedDataString = await readFromWalrus(record.blob_id);
-      } catch (walrusError) {
-        console.warn(`[Timeline] Walrus fetch failed for ${record.blob_id}, falling back to server backup`, walrusError);
-        encryptedDataString = await getEncryptedEmotionByBlob(record.blob_id);
+      if (record.encrypted_data) {
+        console.log(`[Timeline] Using encrypted_data from database for record ${record.id}`);
+        encryptedDataString = record.encrypted_data;
+      } else {
+        // 從 Walrus 讀取加密資料（失敗時回退到本地伺服器備份）
+        try {
+          encryptedDataString = await readFromWalrus(record.blob_id);
+        } catch (walrusError) {
+          console.warn(`[Timeline] Walrus fetch failed for ${record.blob_id}, falling back to server backup`, walrusError);
+          encryptedDataString = await getEncryptedEmotionByBlob(record.blob_id);
+        }
       }
       
       // 解析加密資料
