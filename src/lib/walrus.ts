@@ -16,7 +16,7 @@ import type { WalrusClient } from "@mysten/walrus";
 const WALRUS_PUBLISHER_URL = "https://upload-relay.testnet.walrus.space";
 const WALRUS_AGGREGATOR_URL = "https://aggregator.testnet.walrus.space";
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:3001";
-const DEFAULT_EPOCHS = 5; // Store for 5 epochs (~1 year on testnet)
+const DEFAULT_EPOCHS = 200; // Store for 200 epochs (testnet epochs are ~1 day each, so ~200 days)
 
 export interface WalrusUploadResult {
   blobId: string;
