@@ -65,7 +65,6 @@ const AuthTimeline = () => {
       }
       setSession(session);
       setUser(session.user);
-      loadRecords();
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -207,12 +206,18 @@ const AuthTimeline = () => {
     });
   }, [user, records]);
 
-  const loadRecords = async () => {
+  const loadRecords = useCallback(async () => {
     setIsLoading(true);
     try {
+      if (!user) {
+        setRecords([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('emotion_records')
         .select('id, created_at, emotion, intensity, description, is_public, walrus_url, blob_id, encrypted_data')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -228,7 +233,14 @@ const AuthTimeline = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, toast]);
+
+  // Load records when user is available
+  useEffect(() => {
+    if (user) {
+      loadRecords();
+    }
+  }, [user, loadRecords]);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
