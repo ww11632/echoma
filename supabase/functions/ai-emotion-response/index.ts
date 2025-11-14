@@ -325,6 +325,13 @@ Please respond in English.`
 
     const systemPrompt = systemPrompts[language as keyof typeof systemPrompts] || systemPrompts['zh-TW'];
     
+    // Log prompt version for verification
+    console.log('[AI Response] Using system prompt:', {
+      language,
+      promptVersion: `v${new Date().toISOString().split('T')[0]}`,
+      promptPreview: systemPrompt.substring(0, 150) + '...'
+    });
+    
     // 用户消息只包含清理后的描述（最小化上下文，防止 prompt injection）
     const userMessage = cleanDescription(description);
 
