@@ -41,6 +41,7 @@ const Timeline = () => {
   const { t, i18n } = useTranslation();
   const { toast } = useToast();
   const [filter, setFilter] = useState<FilterType>("all");
+  const [session, setSession] = useState<any>(null);
 
   const emotionLabels = {
     joy: { label: t("emotions.joy"), emoji: "😊", gradient: "from-yellow-400 to-orange-400", color: "#fbbf24" },
@@ -71,6 +72,13 @@ const Timeline = () => {
     return [...items].sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
+  }, []);
+
+  // Get current session
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
   }, []);
 
   useEffect(() => {
@@ -895,6 +903,21 @@ const Timeline = () => {
             </Button>
           </div>
         </div>
+
+        {/* User Info Debug (if logged in) */}
+        {session?.user && (
+          <Card className="p-4 mb-4 bg-muted/30 border-primary/20">
+            <div className="flex items-center gap-3 text-sm">
+              <Shield className="w-4 h-4 text-primary" />
+              <div>
+                <div className="font-medium">當前登入帳號</div>
+                <div className="text-muted-foreground">
+                  {session.user.email} <span className="text-xs opacity-70">(ID: {session.user.id.slice(0, 8)}...)</span>
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
 
         {/* Header */}
         <div className="glass-card rounded-2xl p-8 mb-6">
