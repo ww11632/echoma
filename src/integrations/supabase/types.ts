@@ -14,6 +14,105 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_audit_logs: {
+        Row: {
+          api_endpoint: string
+          completion_tokens: number | null
+          created_at: string
+          detected_keywords: string[] | null
+          error_message: string | null
+          id: string
+          input_length: number
+          input_summary: string
+          language: string
+          model_name: string
+          prompt_tokens: number | null
+          response_category: string
+          response_length: number
+          risk_level: string
+          security_check_passed: boolean
+          total_tokens: number | null
+          truncation_reason: string | null
+          user_id: string
+          was_truncated: boolean
+        }
+        Insert: {
+          api_endpoint: string
+          completion_tokens?: number | null
+          created_at?: string
+          detected_keywords?: string[] | null
+          error_message?: string | null
+          id?: string
+          input_length: number
+          input_summary: string
+          language?: string
+          model_name: string
+          prompt_tokens?: number | null
+          response_category: string
+          response_length: number
+          risk_level: string
+          security_check_passed: boolean
+          total_tokens?: number | null
+          truncation_reason?: string | null
+          user_id: string
+          was_truncated?: boolean
+        }
+        Update: {
+          api_endpoint?: string
+          completion_tokens?: number | null
+          created_at?: string
+          detected_keywords?: string[] | null
+          error_message?: string | null
+          id?: string
+          input_length?: number
+          input_summary?: string
+          language?: string
+          model_name?: string
+          prompt_tokens?: number | null
+          response_category?: string
+          response_length?: number
+          risk_level?: string
+          security_check_passed?: boolean
+          total_tokens?: number | null
+          truncation_reason?: string | null
+          user_id?: string
+          was_truncated?: boolean
+        }
+        Relationships: []
+      }
+      api_keys: {
+        Row: {
+          created_at: string
+          encrypted_key: string
+          id: string
+          is_active: boolean
+          key_name: string
+          last_rotated_at: string | null
+          next_rotation_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          encrypted_key: string
+          id?: string
+          is_active?: boolean
+          key_name: string
+          last_rotated_at?: string | null
+          next_rotation_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          encrypted_key?: string
+          id?: string
+          is_active?: boolean
+          key_name?: string
+          last_rotated_at?: string | null
+          next_rotation_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       emotion_records: {
         Row: {
           blob_id: string | null
