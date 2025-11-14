@@ -295,6 +295,14 @@ Echoma 實現了完整的安全測試套件，確保加密機制的正確性和�
 
 可在 `src/App.tsx` 中修改網路配置。
 
+### ⚠️ Walrus Aggregator 已知問題
+
+**重要提示**：雖然你的資料在鏈上（SuiScan 可以看到），但 Walrus aggregator 暫時無法提供下載服務。這是 testnet 的已知問題。
+
+- 資料已成功上傳到鏈上，可以在 SuiScan 查看
+- 由於 Walrus aggregator 的限制，暫時無法從 aggregator 下載資料
+- 在 Anonymous Mode 的時間線中，如果解密失敗，系統會自動顯示此提示
+
 ## 💧 獲取測試代幣
 
 使用 Walrus 上傳需要 **SUI** 和 **WAL** 測試代幣：
@@ -325,6 +333,7 @@ Echoma 提供三種不同的使用模式，滿足不同需求：
   2. 選擇情感類型和強度
   3. 輸入描述文字
   4. 點擊「記錄並鑄造 NFT」
+- **注意**: 如果解密失敗，系統會提示：雖然你的資料在鏈上（SuiScan 可以看到），但 Walrus aggregator 暫時無法提供下載服務。這是 testnet 的已知問題
 
 #### 2. 認證模式（Secure Mode）
 - **路由**: `/auth-record` 和 `/auth-timeline`

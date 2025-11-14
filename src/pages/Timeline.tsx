@@ -718,6 +718,18 @@ const Timeline = () => {
         statusCode = error.response.status;
       }
       
+      // 如果是 Anonymous Mode（沒有連接錢包）且是 Walrus 記錄，添加 Walrus aggregator 提示
+      const isAnonymousMode = !currentAccount;
+      const isWalrusRecord = record.blob_id && !record.blob_id.startsWith("local_");
+      
+      if (isAnonymousMode && isWalrusRecord) {
+        // 在錯誤訊息中添加 Walrus aggregator 提示
+        const aggregatorNotice = t("timeline.walrusAggregatorNotice");
+        errorMessage = `${errorMessage}\n\n${aggregatorNotice}`;
+        // 也在建議中添加
+        suggestions = [aggregatorNotice, ...suggestions];
+      }
+      
       // 儲存詳細錯誤資訊
       const errorDetail = {
         type: errorType,

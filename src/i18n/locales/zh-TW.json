@@ -180,6 +180,7 @@
     "decryptErrorInvalidKey": "金鑰錯誤或密碼不正確",
     "decryptErrorDataCorrupted": "資料損毀或已被篡改",
     "decryptErrorUnsupportedVersion": "不支援的加密格式版本，請更新應用程式",
+    "walrusAggregatorNotice": "雖然你的資料在鏈上（SuiScan 可以看到），但 Walrus aggregator 暫時無法提供下載服務。這是 testnet 的已知問題",
     "showDetails": "查看詳細資訊",
     "hideDetails": "隱藏詳細資訊",
     "errorDetail": {

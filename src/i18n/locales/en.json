@@ -180,6 +180,7 @@
     "decryptErrorInvalidKey": "Invalid key or incorrect password",
     "decryptErrorDataCorrupted": "Data corrupted or tampered",
     "decryptErrorUnsupportedVersion": "Unsupported encryption format version, please update the app",
+    "walrusAggregatorNotice": "Although your data is on-chain (visible on SuiScan), the Walrus aggregator is temporarily unable to provide download services. This is a known issue on testnet",
     "showDetails": "Show Details",
     "hideDetails": "Hide Details",
     "errorDetail": {
