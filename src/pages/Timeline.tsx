@@ -1013,14 +1013,30 @@ const Timeline = () => {
         {/* User Info Debug (if logged in) */}
         {session?.user && (
           <Card className="p-4 mb-4 bg-muted/30 border-primary/20">
-            <div className="flex items-center gap-3 text-sm">
-              <Shield className="w-4 h-4 text-primary" />
-              <div>
-                <div className="font-medium">當前登入帳號</div>
-                <div className="text-muted-foreground">
-                  {session.user.email} <span className="text-xs opacity-70">(ID: {session.user.id.slice(0, 8)}...)</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3 text-sm">
+                <Shield className="w-4 h-4 text-primary" />
+                <div>
+                  <div className="font-medium">{t("timeline.currentAccount")}</div>
+                  <div className="text-muted-foreground">
+                    {session.user.email} <span className="text-xs opacity-70">(ID: {session.user.id.slice(0, 8)}...)</span>
+                  </div>
                 </div>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  toast({
+                    title: t("timeline.loggedOut"),
+                    description: t("timeline.loggedOutDesc"),
+                  });
+                  navigate("/auth");
+                }}
+              >
+                {t("timeline.logout")}
+              </Button>
             </div>
           </Card>
         )}

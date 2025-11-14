@@ -149,6 +149,10 @@
   "timeline": {
     "title": "Emotion Timeline",
     "subtitle": "Your personal emotion journey record",
+    "currentAccount": "Current Account",
+    "logout": "Logout",
+    "loggedOut": "Logged Out",
+    "loggedOutDesc": "You have successfully logged out",
     "noRecords": "No emotions recorded yet",
     "noRecordsDesc": "Start recording your emotion journey",
     "recordFirst": "Record First Emotion",
