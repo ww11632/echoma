@@ -122,6 +122,14 @@ export const uploadEmotionRequestSchema = z.object({
     })
     .optional()
     .default(false),
+  epochs: z
+    .number({
+      invalid_type_error: "Epochs must be a number",
+    })
+    .int("Epochs must be an integer")
+    .min(1, "Epochs must be between 1 and 1000")
+    .max(1000, "Epochs must be between 1 and 1000")
+    .optional(),
 });
 
 /**

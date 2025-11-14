@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
       throw new Error(`Validation failed: ${errors}`);
     }
 
-    const { emotion, intensity, description, encryptedData, isPublic } = validationResult.data;
+    const { emotion, intensity, description, encryptedData, isPublic, epochs } = validationResult.data;
 
     console.log('Request data validated:', { 
       emotion, 
@@ -121,9 +121,13 @@ Deno.serve(async (req) => {
     let suiRef: string | null = null;
     let useDbFallback = false;
     
+    // Validate and set epochs (default to 200 if not provided)
+    const validEpochs = epochs && epochs >= 1 && epochs <= 1000 ? epochs : 200;
+    console.log(`Using ${validEpochs} epochs for Walrus upload`);
+    
     try {
       const walrusResponse = await fetch(
-        'https://publisher.testnet.walrus.space/v1/store?epochs=5',
+        `https://publisher.testnet.walrus.space/v1/store?epochs=${validEpochs}`,
         {
           method: 'PUT',
           body: binaryData,

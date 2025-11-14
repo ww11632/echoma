@@ -15,7 +15,9 @@
     "connect": "Connect",
     "disconnect": "Disconnect",
     "connected": "Connected",
-    "disconnected": "Disconnected"
+    "disconnected": "Disconnected",
+    "testnet": "Testnet",
+    "testnetNotice": "⚠️ This app is currently running on Sui Testnet for testing purposes only"
   },
   "disclaimer": {
     "title": "Important Notice",
@@ -86,7 +88,10 @@
       "localOnly": "Save to local browser only, do not upload to Walrus",
       "walrusOnly": "Only attempt to upload to Walrus, will not save on failure",
       "walletRequired": "⚠️ Wallet connection required to upload emotions to Walrus",
-      "walrusHint": "Using Walrus storage means your emotion records will be stored on decentralized storage, and no third party can decrypt them."
+      "walrusHint": "Using Walrus storage means your emotion records will be stored on decentralized storage, and no third party can decrypt them.",
+      "epoch": "Storage Duration (Epoch)",
+      "epochDesc": "Select the number of epochs to store data on Walrus Testnet (1 epoch ≈ 1 day)",
+      "epochValue": "{{value}} epochs (approx. {{days}} days)"
     },
     "status": {
       "encrypting": "Encrypting...",

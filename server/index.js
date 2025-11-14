@@ -344,7 +344,7 @@ async function uploadToWalrus(encryptedData, epochs = DEFAULT_EPOCHS) {
 app.post("/api/emotion", requireAuth, rateLimitMiddleware, async (req, res) => {
   try {
     console.log(`[API] POST /api/emotion - Authenticated request from user: ${req.user.id}`);
-    const { emotion, intensity, description, encryptedData, isPublic = false, walletAddress = null } = req.body || {};
+    const { emotion, intensity, description, encryptedData, isPublic = false, walletAddress = null, epochs } = req.body || {};
     
     // Validate inputs
     if (!emotion || typeof emotion !== "string") {
@@ -380,7 +380,22 @@ app.post("/api/emotion", requireAuth, rateLimitMiddleware, async (req, res) => {
       });
     }
 
-    console.log(`[API] Validated inputs - emotion: ${emotion}, intensity: ${intensity}, description length: ${description.length}, encryptedData length: ${encryptedData.length}`);
+    // Validate epochs if provided
+    let validEpochs = DEFAULT_EPOCHS;
+    if (epochs !== undefined) {
+      const epochsNum = Number(epochs);
+      if (isNaN(epochsNum) || epochsNum < 1 || epochsNum > 1000) {
+        console.error(`[API] Validation error: epochs must be between 1 and 1000, got: ${epochs}`);
+        return res.status(400).json({
+          success: false,
+          error: "Invalid epochs value. Must be between 1 and 1000.",
+          errorCode: ERROR_CODES.VALIDATION_ERROR,
+        });
+      }
+      validEpochs = epochsNum;
+    }
+
+    console.log(`[API] Validated inputs - emotion: ${emotion}, intensity: ${intensity}, description length: ${description.length}, encryptedData length: ${encryptedData.length}, epochs: ${validEpochs}`);
 
     const payloadHash = createHash("sha256").update(encryptedData).digest("hex");
     console.log(`[API] Payload hash calculated: ${payloadHash.slice(0, 16)}...`);
@@ -391,8 +406,8 @@ app.post("/api/emotion", requireAuth, rateLimitMiddleware, async (req, res) => {
     
     if (WALRUS_ENABLED) {
       try {
-        console.log(`[API] Starting Walrus upload...`);
-        uploaded = await uploadToWalrus(encryptedData, DEFAULT_EPOCHS);
+        console.log(`[API] Starting Walrus upload with ${validEpochs} epochs...`);
+        uploaded = await uploadToWalrus(encryptedData, validEpochs);
         console.log(`[API] Walrus upload completed - blobId: ${uploaded.blobId}`);
       } catch (walrusError) {
         console.warn(`[API] Walrus upload failed, falling back to local storage:`, walrusError.message);

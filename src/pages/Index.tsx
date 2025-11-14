@@ -61,6 +61,12 @@ const Index = () => {
                 <span className="text-secondary">{t("index.subtitleHighlight1")}</span> {t("index.subtitleConnector")}{" "}
                 <span className="text-primary">{t("index.subtitleHighlight2")}</span>
               </p>
+              {/* Testnet Notice */}
+              <Card className="inline-block mx-auto px-4 py-2 bg-yellow-500/10 border-yellow-500/20">
+                <p className="text-sm text-yellow-600 dark:text-yellow-400 font-medium">
+                  {t("common.testnetNotice")}
+                </p>
+              </Card>
             </div>
 
             {/* Mode Selection Cards */}

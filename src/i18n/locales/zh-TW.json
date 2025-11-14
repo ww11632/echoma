@@ -15,7 +15,9 @@
     "connect": "連接",
     "disconnect": "斷開連接",
     "connected": "已連接",
-    "disconnected": "已斷開"
+    "disconnected": "已斷開",
+    "testnet": "測試網",
+    "testnetNotice": "⚠️ 此應用目前運行於 Sui Testnet，僅供測試使用"
   },
   "disclaimer": {
     "title": "重要聲明",
@@ -86,7 +88,10 @@
       "localOnly": "僅保存到本地瀏覽器，不上傳到 Walrus",
       "walrusOnly": "僅嘗試上傳到 Walrus，失敗時不會保存",
       "walletRequired": "⚠️ 需要連接錢包才能上傳情緒到 Walrus",
-      "walrusHint": "使用 Walrus 儲存代表您的情緒記錄會上鏈至去中心化儲存，任何第三方無法解密。"
+      "walrusHint": "使用 Walrus 儲存代表您的情緒記錄會上鏈至去中心化儲存，任何第三方無法解密。",
+      "epoch": "儲存期限（Epoch）",
+      "epochDesc": "選擇資料在 Walrus Testnet 上儲存的 epoch 數量（1 epoch ≈ 1 天）",
+      "epochValue": "{{value}} epochs（約 {{days}} 天）"
     },
     "status": {
       "encrypting": "正在加密...",

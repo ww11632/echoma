@@ -7,6 +7,7 @@ export async function postEmotion(payload: {
   encryptedData: string;
   isPublic: boolean;
   walletAddress?: string | null;
+  epochs?: number;
 }) {
   try {
     const res = await fetch(`${API_BASE}/api/emotion`, {

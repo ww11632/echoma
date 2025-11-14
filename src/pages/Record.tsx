@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Sparkles, ArrowLeft, Loader2, Lock, Unlock } from "lucide-react";
+import { Sparkles, ArrowLeft, Loader2, Lock, Unlock, Database } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrentAccount, useCurrentWallet } from "@mysten/dapp-kit";
 import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
@@ -55,6 +55,7 @@ const Record = () => {
   const [isPublic, setIsPublic] = useState(false);
   const [saveLocally, setSaveLocally] = useState(true); // 默认保存到本地
   const [backupToDatabase, setBackupToDatabase] = useState(true); // 是否備份到 Supabase
+  const [epochs, setEpochs] = useState([200]); // Walrus 儲存期限（epochs），預設 200 epochs
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<"idle" | "encrypting" | "uploading" | "saving" | "success" | "error">("idle");
 
@@ -152,6 +153,7 @@ const Record = () => {
         setUploadStatus("uploading");
         
         try {
+          const selectedEpochs = epochs[0];
           const apiRes = await postEmotion({
             emotion: selectedEmotion,
             intensity: intensityValue,
@@ -159,6 +161,7 @@ const Record = () => {
             encryptedData: encryptedString,
             isPublic,
             walletAddress: null,
+            epochs: selectedEpochs,
           });
           
           // Backup encrypted_data to Supabase (if user chose to backup)
@@ -298,7 +301,8 @@ const Record = () => {
         });
         
         const signer = createSignerFromWallet(currentWallet, currentAccount.address, suiClient);
-        const sdkResult = await uploadToWalrusWithSDK(encryptedString, signer, 200); // 200 epochs = ~200 days on testnet
+        const selectedEpochs = epochs[0];
+        const sdkResult = await uploadToWalrusWithSDK(encryptedString, signer, selectedEpochs);
         
         console.log("[Record] ✅ SDK upload successful:", sdkResult);
         
@@ -310,6 +314,7 @@ const Record = () => {
         
         // Try to save metadata to backend and Supabase (optional)
         try {
+          const selectedEpochs = epochs[0];
           await postEmotion({
             emotion: selectedEmotion,
             intensity: intensityValue,
@@ -317,6 +322,7 @@ const Record = () => {
             encryptedData: encryptedString,
             isPublic,
             walletAddress: currentAccount.address,
+            epochs: selectedEpochs,
           });
           
           // Backup encrypted_data to Supabase (if user chose to backup)
@@ -395,6 +401,7 @@ const Record = () => {
       if (!session) {
         // 沒有 Supabase session：走自建 API（後端存 Walrus + 本地檔案）作為主線
         try {
+          const selectedEpochs = epochs[0];
           const apiRes = await postEmotion({
             emotion: selectedEmotion,
             intensity: intensityValue,
@@ -402,6 +409,7 @@ const Record = () => {
             encryptedData: encryptedString,
             isPublic,
             walletAddress: currentAccount.address,
+            epochs: selectedEpochs,
           });
           
           // Backup encrypted_data to Supabase (if user chose to backup)
@@ -695,16 +703,18 @@ const Record = () => {
             <Card className="p-4 border-border/50">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  {isPublic ? (
-                    <Unlock className="h-5 w-5 text-primary" />
-                  ) : (
-                    <Lock className="h-5 w-5 text-primary" />
-                  )}
-                  <div>
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    {isPublic ? (
+                      <Unlock className="h-5 w-5 text-primary" />
+                    ) : (
+                      <Lock className="h-5 w-5 text-primary" />
+                    )}
+                  </div>
+                  <div className="flex-1">
                     <Label htmlFor="privacy" className="text-sm font-semibold cursor-pointer">
                       {isPublic ? t("record.privacy.public") : t("record.privacy.private")}
                     </Label>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       {isPublic 
                         ? t("record.privacy.publicDesc")
                         : t("record.privacy.privateDesc")}
@@ -715,6 +725,37 @@ const Record = () => {
                   id="privacy"
                   checked={isPublic}
                   onCheckedChange={setIsPublic}
+                />
+              </div>
+            </Card>
+
+            {/* Database Backup Option - Available for all users */}
+            <Card className="p-4 border-border/50 bg-card/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Database className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <Label htmlFor="backup" className="text-sm font-semibold cursor-pointer">
+                      {backupToDatabase ? "備份到資料庫" : "不備份到資料庫"}
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {backupToDatabase 
+                        ? "將加密資料備份到 Supabase，即使 Walrus 過期也能恢復"
+                        : "不備份，資料只存在於 Walrus（testnet 數據可能過期）"}
+                    </p>
+                    {backupToDatabase && !currentAccount && (
+                      <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                        ⚠️ 匿名模式需登入 Supabase 才能備份
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <Switch
+                  id="backup"
+                  checked={backupToDatabase}
+                  onCheckedChange={setBackupToDatabase}
                 />
               </div>
             </Card>
@@ -764,45 +805,70 @@ const Record = () => {
                     </p>
                 </Button>
                 {!saveLocally && (
-                  <Card className="p-3 bg-blue-500/10 border-blue-500/20">
-                    <p className="text-xs text-center text-blue-600 dark:text-blue-400">
-                      {t("record.storage.walrusHint")}
-                    </p>
-                  </Card>
+                  <>
+                    <Card className="p-3 bg-blue-500/10 border-blue-500/20">
+                      <p className="text-xs text-center text-blue-600 dark:text-blue-400">
+                        {t("record.storage.walrusHint")}
+                      </p>
+                    </Card>
+                    {/* Epoch Selection */}
+                    <div className="space-y-3">
+                      <Label className="text-sm font-semibold">
+                        {t("record.storage.epoch")}
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        {t("record.storage.epochDesc")}
+                      </p>
+                      <Slider
+                        value={epochs}
+                        onValueChange={setEpochs}
+                        min={1}
+                        max={1000}
+                        step={1}
+                        className="py-4"
+                      />
+                      <div className="flex justify-between items-center">
+                        <p className="text-sm text-muted-foreground">
+                          {t("record.storage.epochValue", { 
+                            value: epochs[0], 
+                            days: Math.round(epochs[0]) 
+                          })}
+                        </p>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setEpochs([5])}
+                            className="h-7 text-xs"
+                          >
+                            5
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setEpochs([200])}
+                            className="h-7 text-xs"
+                          >
+                            200
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setEpochs([365])}
+                            className="h-7 text-xs"
+                          >
+                            365
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </>
                 )}
                   </div>
                 </div>
-
-            {/* Database Backup Option - Available for all users */}
-            <Card className="p-4 border-border/50 bg-card/50">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="text-xl">💾</span>
-                  </div>
-                  <div className="flex-1">
-                    <Label htmlFor="backup" className="text-sm font-semibold cursor-pointer">
-                      {backupToDatabase ? "備份到資料庫" : "不備份到資料庫"}
-                    </Label>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {backupToDatabase 
-                        ? "將加密資料備份到 Supabase，即使 Walrus 過期也能恢復"
-                        : "不備份，資料只存在於 Walrus（testnet 數據可能過期）"}
-                    </p>
-                    {backupToDatabase && !currentAccount && (
-                      <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
-                        ⚠️ 匿名模式需登入 Supabase 才能備份
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <Switch
-                  id="backup"
-                  checked={backupToDatabase}
-                  onCheckedChange={setBackupToDatabase}
-                />
-              </div>
-            </Card>
 
             {/* Wallet Connect Section */}
             {!saveLocally && (
