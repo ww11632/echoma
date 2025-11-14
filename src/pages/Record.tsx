@@ -54,6 +54,7 @@ const Record = () => {
   const [description, setDescription] = useState("");
   const [isPublic, setIsPublic] = useState(false);
   const [saveLocally, setSaveLocally] = useState(true); // 默认保存到本地
+  const [backupToDatabase, setBackupToDatabase] = useState(true); // 是否備份到 Supabase
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<"idle" | "encrypting" | "uploading" | "saving" | "success" | "error">("idle");
 
@@ -160,8 +161,8 @@ const Record = () => {
             walletAddress: null,
           });
           
-          // Backup encrypted_data to Supabase (if user has session)
-          if (session?.user?.id && apiRes.record.blobId) {
+          // Backup encrypted_data to Supabase (if user has session and chose to backup)
+          if (backupToDatabase && session?.user?.id && apiRes.record.blobId) {
             try {
               console.log("[Record] Backing up encrypted_data to Supabase...");
               const { error: backupError } = await supabase
@@ -304,9 +305,9 @@ const Record = () => {
             walletAddress: currentAccount.address,
           });
           
-          // Backup encrypted_data to Supabase
+          // Backup encrypted_data to Supabase (if user chose to backup)
           const { data: { session } } = await supabase.auth.getSession();
-          if (session?.user?.id) {
+          if (backupToDatabase && session?.user?.id) {
             console.log("[Record] Backing up encrypted_data to Supabase after SDK upload...");
             const { error: backupError } = await supabase
               .from('emotion_records')
@@ -385,9 +386,9 @@ const Record = () => {
             walletAddress: currentAccount.address,
           });
           
-          // Backup encrypted_data to Supabase
+          // Backup encrypted_data to Supabase (if user chose to backup)
           const { data: { session } } = await supabase.auth.getSession();
-          if (session?.user?.id && apiRes.record.blobId) {
+          if (backupToDatabase && session?.user?.id && apiRes.record.blobId) {
             try {
               console.log("[Record] Backing up encrypted_data to Supabase...");
               const { error: backupError } = await supabase
@@ -749,6 +750,34 @@ const Record = () => {
                 )}
                   </div>
                 </div>
+
+            {/* Database Backup Option - Only show in Anonymous Mode (no wallet connected) */}
+            {!currentAccount && (
+              <Card className="p-4 border-border/50 bg-card/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <span className="text-xl">💾</span>
+                    </div>
+                    <div className="flex-1">
+                      <Label htmlFor="backup" className="text-sm font-semibold cursor-pointer">
+                        {backupToDatabase ? "備份到資料庫" : "不備份到資料庫"}
+                      </Label>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {backupToDatabase 
+                          ? "將加密資料備份到 Supabase，即使 Walrus 過期也能恢復"
+                          : "不備份，資料只存在於 Walrus（testnet 數據可能過期）"}
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    id="backup"
+                    checked={backupToDatabase}
+                    onCheckedChange={setBackupToDatabase}
+                  />
+                </div>
+              </Card>
+            )}
 
             {/* Wallet Connect Section */}
             {!saveLocally && (
