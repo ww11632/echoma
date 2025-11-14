@@ -105,10 +105,13 @@ export function cleanDescription(description: string): string {
   cleaned = cleaned.replace(/<\|.*?\|>/g, '');
   cleaned = cleaned.replace(/\[INST\].*?\[\/INST\]/gs, '');
   
-  // 限制长度，防止过长的注入尝试
-  const MAX_LENGTH = 2000;
-  if (cleaned.length > MAX_LENGTH) {
-    cleaned = cleaned.substring(0, MAX_LENGTH) + '...';
+  // 限制长度，防止过长的注入尝试和过大的 token 消耗
+  // Note: This is a safety limit for AI processing, not a user-facing limit
+  // The user-facing limit is 5000 characters (validated before this function)
+  // We truncate to 2000 characters for AI processing to prevent excessive token usage
+  const MAX_LENGTH_FOR_AI = 2000;
+  if (cleaned.length > MAX_LENGTH_FOR_AI) {
+    cleaned = cleaned.substring(0, MAX_LENGTH_FOR_AI) + '...';
   }
   
   return cleaned.trim();

@@ -3,6 +3,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { sanitizeUserInput, performSecurityCheck, cleanDescription, checkUserInputSecurity } from '../_shared/security.ts';
 import { getActiveApiKey, checkAndRotateApiKey } from '../_shared/apiKeyRotation.ts';
 import { logAuditEvent, extractTokenUsage, checkTruncation } from '../_shared/auditLogger.ts';
+import { checkRateLimit, checkAnonymousRateLimit, createRateLimitResponse } from '../_shared/rateLimit.ts';
 
 console.log('AI emotion response function started');
 
@@ -14,73 +15,79 @@ Deno.serve(async (req) => {
   try {
     console.log('[AI Response] Processing request');
     
-    // Get auth header first
+    // Get auth header and anonymous ID
     const authHeader = req.headers.get('Authorization');
     console.log('[AI Response] Auth header present:', !!authHeader);
     
-    if (!authHeader) {
-      console.error('[AI Response] No authorization header provided');
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'No authorization header',
-          errorCode: 'UNAUTHORIZED'
-        }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
     // Check environment variables
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     console.log('[AI Response] Env vars present:', { url: !!supabaseUrl, key: !!supabaseKey });
 
-    // Create Supabase client with user's auth context
-    const supabase = createClient(
-      supabaseUrl ?? '',
-      supabaseKey ?? '',
-      {
-        global: {
-          headers: { Authorization: authHeader },
-        },
-        auth: {
-          persistSession: false,
-        },
-      }
-    );
+    // Create Supabase client
+    let supabase: ReturnType<typeof createClient>;
+    let user: { id: string } | null = null;
+    let isAnonymous = false;
+    let anonymousId: string | null = null;
+    let serviceClient: ReturnType<typeof createClient> | null = null;
 
-    console.log('[AI Response] Supabase client created, verifying user...');
-
-    // Verify user authentication
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-    console.log('[AI Response] Auth result:', { 
-      hasData: !!authData, 
-      hasUser: !!authData?.user, 
-      hasError: !!authError,
-      errorMessage: authError?.message 
-    });
-    
-    const user = authData?.user;
-    
-    if (authError || !user) {
-      console.error('[AI Response] Authentication failed:', authError?.message);
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Unauthorized',
-          errorCode: 'UNAUTHORIZED'
-        }),
+    if (authHeader) {
+      // Authenticated user path
+      supabase = createClient(
+        supabaseUrl ?? '',
+        supabaseKey ?? '',
         {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          global: {
+            headers: { Authorization: authHeader },
+          },
+          auth: {
+            persistSession: false,
+          },
         }
       );
-    }
 
-    console.log('User authenticated:', user.id);
+      console.log('[AI Response] Supabase client created, verifying user...');
+
+      // Verify user authentication
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      console.log('[AI Response] Auth result:', { 
+        hasData: !!authData, 
+        hasUser: !!authData?.user, 
+        hasError: !!authError,
+        errorMessage: authError?.message 
+      });
+      
+      if (authError || !authData?.user) {
+        console.error('[AI Response] Authentication failed:', authError?.message);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'Unauthorized',
+            errorCode: 'UNAUTHORIZED'
+          }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      user = authData.user;
+      console.log('User authenticated:', user.id);
+    } else {
+      // Anonymous user path - require anonymousId in request body
+      isAnonymous = true;
+      console.log('[AI Response] Anonymous user mode');
+      
+      // Create service client for anonymous rate limiting
+      if (supabaseUrl && supabaseServiceKey) {
+        serviceClient = createClient(supabaseUrl, supabaseServiceKey);
+      }
+      
+      // Create regular client for anonymous users (no auth)
+      supabase = createClient(supabaseUrl ?? '', supabaseKey ?? '');
+    }
 
     // Parse and validate request body
     let body: unknown;
@@ -116,19 +123,113 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { emotion, intensity, description, language = 'zh-TW' } = body as {
+    const { emotion, intensity, description, language = 'zh-TW', anonymousId } = body as {
       emotion?: string;
       intensity?: number;
       description?: string;
       language?: string;
+      anonymousId?: string;
     };
 
-    // Validate required fields
+    // Normalize language code (support zh-CN, zh-HK, etc.)
+    const normalizedLanguage = language.startsWith('zh') ? 'zh-TW' : 'en';
+
+    // Security: If user is authenticated, they should not pass anonymousId
+    // This prevents confusion and potential abuse
+    if (user && anonymousId) {
+      console.warn('[AI Response] Authenticated user provided anonymousId, ignoring it');
+      // We'll ignore anonymousId for authenticated users, but log it for security monitoring
+    }
+
+    // For anonymous users, require and validate anonymousId
+    if (isAnonymous) {
+      if (!anonymousId) {
+        // Note: normalizedLanguage is available here since we parse body first
+        const errorMessage = normalizedLanguage.startsWith('zh')
+          ? '匿名请求需要提供匿名 ID'
+          : 'Anonymous ID is required for anonymous requests';
+        
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: errorMessage,
+            errorCode: 'INVALID_REQUEST'
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      // Validate anonymousId format (should be UUID)
+      const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!UUID_REGEX.test(anonymousId)) {
+        const errorMessage = normalizedLanguage.startsWith('zh')
+          ? '无效的匿名 ID 格式'
+          : 'Invalid anonymous ID format';
+        
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: errorMessage,
+            errorCode: 'INVALID_REQUEST'
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      console.log('[AI Response] Anonymous user ID:', anonymousId);
+      
+      // Check rate limit for anonymous users (must have serviceClient)
+      if (!serviceClient) {
+        console.error('[AI Response] Service client not available for anonymous rate limiting');
+        const errorMessage = normalizedLanguage.startsWith('zh')
+          ? '服务暂时不可用，请稍后再试。'
+          : 'Service temporarily unavailable. Please try again later.';
+        
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: errorMessage,
+            errorCode: 'SERVICE_UNAVAILABLE'
+          }),
+          {
+            status: 503,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      const rateLimitCheck = await checkAnonymousRateLimit(serviceClient, anonymousId);
+      if (!rateLimitCheck.allowed) {
+        console.warn('[AI Response] Anonymous rate limit exceeded');
+        // Note: normalizedLanguage is available here since we parse body first
+        return createRateLimitResponse(rateLimitCheck.resetAt, true, normalizedLanguage);
+      }
+    } else if (user) {
+      // Check rate limit for authenticated users (before processing request)
+      const rateLimitCheck = await checkRateLimit(supabase, user.id);
+      if (!rateLimitCheck.allowed) {
+        console.warn('[AI Response] Rate limit exceeded for user:', user.id);
+        // Note: normalizedLanguage is available here since we parse body first
+        return createRateLimitResponse(rateLimitCheck.resetAt, false, normalizedLanguage);
+      }
+    }
+
+    // Validate required fields (after rate limit check)
     if (!emotion || !description || typeof intensity !== 'number') {
+      const errorMessage = normalizedLanguage.startsWith('zh')
+        ? '缺少必填字段：请提供情绪、强度和描述'
+        : 'Missing required fields: emotion, intensity, and description are required';
+      
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Missing required fields: emotion, intensity, and description are required',
+          error: errorMessage,
           errorCode: 'INVALID_REQUEST'
         }),
         {
@@ -138,16 +239,65 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log('[AI Response] Request:', { emotion, intensity, language, descriptionLength: description.length });
+    // Validate description length (consistent with frontend: 5000 characters)
+    const MAX_DESCRIPTION_LENGTH = 5000;
+    if (description.length > MAX_DESCRIPTION_LENGTH) {
+      const errorMessage = normalizedLanguage.startsWith('zh')
+        ? `描述过长，最多 ${MAX_DESCRIPTION_LENGTH} 个字符`
+        : `Description too long, maximum ${MAX_DESCRIPTION_LENGTH} characters`;
+      
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: errorMessage,
+          errorCode: 'INVALID_REQUEST'
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Validate intensity range
+    if (intensity < 0 || intensity > 100) {
+      const errorMessage = normalizedLanguage.startsWith('zh')
+        ? '强度值必须在 0 到 100 之间'
+        : 'Intensity must be between 0 and 100';
+      
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: errorMessage,
+          errorCode: 'INVALID_REQUEST'
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    console.log('[AI Response] Request:', { 
+      emotion, 
+      intensity, 
+      language: normalizedLanguage, 
+      descriptionLength: description.length,
+      isAnonymous,
+      userId: user?.id || `anon:${anonymousId}`
+    });
 
     // 安全检测：在发送到模型前检查用户输入
-    const inputSecurityCheck = checkUserInputSecurity(description, language);
+    const inputSecurityCheck = checkUserInputSecurity(description, normalizedLanguage);
     if (!inputSecurityCheck.isSafe && inputSecurityCheck.riskLevel === 'high') {
       console.warn('[AI Response] High risk detected in user input, blocking request');
       
       // 记录审计日志（即使被阻止）
-      await logAuditEvent(supabase, {
-        userId: user.id,
+      const userIdForLog = isAnonymous ? `anon:${anonymousId}` : user!.id;
+      const clientForLog = isAnonymous && serviceClient ? serviceClient : supabase;
+      
+      await logAuditEvent(clientForLog, {
+        userId: userIdForLog,
         apiEndpoint: 'https://ai.gateway.lovable.dev/v1/chat/completions',
         modelName: 'google/gemini-2.5-flash',
         responseLength: 0,
@@ -158,14 +308,19 @@ Deno.serve(async (req) => {
         detectedKeywords: inputSecurityCheck.detectedKeywords,
         inputSummary: `情绪: ${emotion}, 强度: ${intensity}/100`,
         inputLength: description.length,
-        language,
+        language: normalizedLanguage,
         errorMessage: 'Request blocked due to high risk content'
       });
+      
+      // Return error message in user's language
+      const errorMessage = normalizedLanguage.startsWith('zh')
+        ? '检测到敏感内容，为了您的安全，我们无法处理此请求。如需帮助，请联系专业心理健康服务。'
+        : 'Sensitive content detected. For your safety, we cannot process this request. If you need help, please contact professional mental health services.';
       
       return new Response(
         JSON.stringify({
           success: false,
-          error: '检测到敏感内容，为了您的安全，我们无法处理此请求。如需帮助，请联系专业心理健康服务。',
+          error: errorMessage,
           errorCode: 'SECURITY_BLOCKED',
           category: 'crisis'
         }),
@@ -177,13 +332,18 @@ Deno.serve(async (req) => {
     }
 
     // 获取 API key（支持 rotation）
-    // 创建服务端 Supabase 客户端用于 API key 管理
-    const supabaseServiceUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    // 创建服务端 Supabase 客户端用于 API key 管理（如果还没有）
+    if (!serviceClient) {
+      const supabaseServiceUrl = Deno.env.get('SUPABASE_URL');
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      if (supabaseServiceUrl && supabaseServiceKey) {
+        serviceClient = createClient(supabaseServiceUrl, supabaseServiceKey);
+      }
+    }
+    
     let apiKey: string | null = null;
     
-    if (supabaseServiceUrl && supabaseServiceKey) {
-      const serviceClient = createClient(supabaseServiceUrl, supabaseServiceKey);
+    if (serviceClient) {
       // 检查并轮换 API key
       await checkAndRotateApiKey(serviceClient);
       // 获取当前活跃的 API key
@@ -197,10 +357,14 @@ Deno.serve(async (req) => {
     
     if (!apiKey) {
       console.error('LOVABLE_API_KEY not configured');
+      const errorMessage = normalizedLanguage.startsWith('zh')
+        ? 'AI 服务未配置，请联系支持。'
+        : 'AI service is not configured. Please contact support.';
+      
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'AI service is not configured. Please contact support.',
+          error: errorMessage,
           errorCode: 'SERVICE_UNAVAILABLE'
         }),
         {
@@ -395,11 +559,11 @@ Response Logic (adjusted based on emotion and intensity):
   - Keep the word count concise and powerful, generally 3–8 sentences is appropriate. Prefer short and sincere over long and empty words.`
     };
 
-    const systemPrompt = systemPrompts[language as keyof typeof systemPrompts] || systemPrompts['zh-TW'];
+    const systemPrompt = systemPrompts[normalizedLanguage as keyof typeof systemPrompts] || systemPrompts['zh-TW'];
     
     // Log prompt version for verification
     console.log('[AI Response] Using system prompt:', {
-      language,
+      language: normalizedLanguage,
       promptVersion: `v${new Date().toISOString().split('T')[0]}`,
       promptPreview: systemPrompt.substring(0, 150) + '...'
     });
@@ -430,10 +594,14 @@ Response Logic (adjusted based on emotion and intensity):
       });
     } catch (fetchError) {
       console.error('[AI Response] Network error calling AI service:', fetchError);
+      const errorMessage = normalizedLanguage.startsWith('zh')
+        ? '无法连接到 AI 服务，请稍后再试。'
+        : 'Failed to connect to AI service. Please try again later.';
+      
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Failed to connect to AI service. Please try again later.',
+          error: errorMessage,
           errorCode: 'NETWORK_ERROR'
         }),
         {
@@ -458,10 +626,14 @@ Response Logic (adjusted based on emotion and intensity):
       });
 
       if (response.status === 429) {
+        const errorMessage = normalizedLanguage.startsWith('zh')
+          ? 'AI 服务繁忙，请稍后再试。'
+          : 'AI service is busy. Please try again in a moment.';
+        
         return new Response(
           JSON.stringify({
             success: false,
-            error: 'AI service is busy. Please try again in a moment.',
+            error: errorMessage,
             errorCode: 'RATE_LIMIT'
           }),
           {
@@ -471,10 +643,14 @@ Response Logic (adjusted based on emotion and intensity):
         );
       }
       if (response.status === 402) {
+        const errorMessage = normalizedLanguage.startsWith('zh')
+          ? 'AI 服务需要积分，请联系支持。'
+          : 'AI service requires credits. Please contact support.';
+        
         return new Response(
           JSON.stringify({
             success: false,
-            error: 'AI service requires credits. Please contact support.',
+            error: errorMessage,
             errorCode: 'PAYMENT_REQUIRED'
           }),
           {
@@ -484,10 +660,14 @@ Response Logic (adjusted based on emotion and intensity):
         );
       }
       
+      const errorMessage = normalizedLanguage.startsWith('zh')
+        ? 'AI 服务错误，请稍后再试。'
+        : 'AI service error. Please try again later.';
+      
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'AI service error. Please try again later.',
+          error: errorMessage,
           errorCode: 'AI_SERVICE_ERROR'
         }),
         {
@@ -503,10 +683,14 @@ Response Logic (adjusted based on emotion and intensity):
       data = await response.json();
     } catch (parseError) {
       console.error('[AI Response] Failed to parse AI response:', parseError);
+      const errorMessage = normalizedLanguage.startsWith('zh')
+        ? 'AI 服务返回无效响应，请稍后再试。'
+        : 'Invalid response from AI service. Please try again.';
+      
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Invalid response from AI service.',
+          error: errorMessage,
           errorCode: 'INVALID_RESPONSE'
         }),
         {
@@ -523,8 +707,11 @@ Response Logic (adjusted based on emotion and intensity):
       console.error('[AI Response] No response content in AI response:', JSON.stringify(data).substring(0, 500));
       
       // 记录错误审计日志
-      await logAuditEvent(supabase, {
-        userId: user.id,
+      const userIdForLog = isAnonymous ? `anon:${anonymousId}` : user!.id;
+      const clientForLog = isAnonymous && serviceClient ? serviceClient : supabase;
+      
+      await logAuditEvent(clientForLog, {
+        userId: userIdForLog,
         apiEndpoint: 'https://ai.gateway.lovable.dev/v1/chat/completions',
         modelName: 'google/gemini-2.5-flash',
         responseLength: 0,
@@ -534,14 +721,18 @@ Response Logic (adjusted based on emotion and intensity):
         securityCheckPassed: true,
         inputSummary: `情绪: ${emotion}, 强度: ${intensity}/100`,
         inputLength: description.length,
-        language,
+        language: normalizedLanguage,
         errorMessage: 'No response from AI'
       });
+      
+      const errorMessage = normalizedLanguage.startsWith('zh')
+        ? 'AI 没有返回响应，请稍后再试。'
+        : 'No response from AI. Please try again.';
       
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'No response from AI. Please try again.',
+          error: errorMessage,
           errorCode: 'NO_RESPONSE'
         }),
         {
@@ -552,7 +743,7 @@ Response Logic (adjusted based on emotion and intensity):
     }
 
     // 安全检测：检查 AI 响应
-    const securityCheck = performSecurityCheck(description, aiResponse, language);
+    const securityCheck = performSecurityCheck(description, aiResponse, normalizedLanguage);
     
     // 提取 token 使用信息
     const tokenUsage = extractTokenUsage(data);
@@ -561,8 +752,11 @@ Response Logic (adjusted based on emotion and intensity):
     const truncation = checkTruncation(data, maxTokens);
     
     // 记录审计日志
-    await logAuditEvent(supabase, {
-      userId: user.id,
+    const userIdForLog = isAnonymous ? `anon:${anonymousId}` : user!.id;
+    const clientForLog = isAnonymous && serviceClient ? serviceClient : supabase;
+    
+    await logAuditEvent(clientForLog, {
+      userId: userIdForLog,
       apiEndpoint: 'https://ai.gateway.lovable.dev/v1/chat/completions',
       modelName: 'google/gemini-2.5-flash',
       promptTokens: tokenUsage.promptTokens,
@@ -575,17 +769,17 @@ Response Logic (adjusted based on emotion and intensity):
       riskLevel: securityCheck.riskLevel,
       securityCheckPassed: securityCheck.isSafe,
       detectedKeywords: securityCheck.detectedKeywords,
-      inputSummary: `情绪: ${emotion}, 强度: ${intensity}/100`,
-      inputLength: description.length,
-      language
-    });
+        inputSummary: `情绪: ${emotion}, 强度: ${intensity}/100`,
+        inputLength: description.length,
+        language: normalizedLanguage
+      });
 
     // 如果检测到高风险内容，返回安全响应
     if (!securityCheck.isSafe && securityCheck.riskLevel === 'high') {
       console.warn('[AI Response] High risk detected in AI response');
       
       // 返回通用的支持性响应，不返回 AI 的原始响应
-      const safeResponse = language.startsWith('zh')
+      const safeResponse = normalizedLanguage.startsWith('zh')
         ? '我理解你正在经历困难。请记住，你并不孤单。如果你正在考虑伤害自己或他人，请立即联系专业心理健康服务或紧急服务。'
         : 'I understand you are going through a difficult time. Please remember you are not alone. If you are considering harming yourself or others, please contact professional mental health services or emergency services immediately.';
       

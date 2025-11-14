@@ -96,7 +96,7 @@ const AuthRecord = () => {
           emotion: selectedEmotion,
           intensity: intensity[0],
           description,
-          language: i18n.language === 'zh-TW' ? 'zh-TW' : 'en',
+          language: i18n.language.startsWith('zh') ? 'zh-TW' : 'en',
         },
       });
 
@@ -109,9 +109,42 @@ const AuthRecord = () => {
       }
     } catch (error: any) {
       console.error('AI response error:', error);
+      
+      // 区分不同类型的错误
+      let errorTitle = t("authRecord.errors.aiError");
+      let errorDescription = t("authRecord.errors.aiErrorDesc");
+      
+      // 检查错误消息（可能是英文或中文）
+      const errorMsg = (error?.message || error?.error || '').toLowerCase();
+      
+      // 检查速率限制错误（支持中英文）
+      if (errorMsg.includes('rate limit') || 
+          errorMsg.includes('too many requests') ||
+          errorMsg.includes('请求过于频繁') ||
+          errorMsg.includes('rate_limit_exceeded') ||
+          error?.errorCode === 'RATE_LIMIT') {
+        errorTitle = t("record.errors.rateLimitExceeded");
+        errorDescription = t("record.errors.rateLimitExceededDesc");
+      } 
+      // 检查服务不可用错误（支持中英文）
+      else if (errorMsg.includes('service unavailable') || 
+               errorMsg.includes('服务暂时不可用') ||
+               errorMsg.includes('503') ||
+               error?.errorCode === 'SERVICE_UNAVAILABLE') {
+        errorTitle = t("record.errors.serviceUnavailable");
+        errorDescription = t("record.errors.serviceUnavailableDesc");
+      }
+      // 检查安全阻止错误
+      else if (errorMsg.includes('sensitive content') ||
+               errorMsg.includes('检测到敏感内容') ||
+               error?.errorCode === 'SECURITY_BLOCKED') {
+        errorTitle = t("authRecord.errors.aiError");
+        errorDescription = error?.error || error?.message || t("authRecord.errors.aiErrorDesc");
+      }
+      
       toast({
-        title: t("authRecord.errors.aiError"),
-        description: t("authRecord.errors.aiErrorDesc"),
+        title: errorTitle,
+        description: errorDescription,
         variant: "destructive",
       });
     } finally {

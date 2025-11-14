@@ -20,7 +20,7 @@ import type { EmotionRecord } from "@/lib/dataSchema";
 import { postEmotion } from "@/lib/api";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import WalletConnect from "@/components/WalletConnect";
-import { getOrCreateAnonymousUserKey } from "@/lib/anonymousIdentity";
+import { getOrCreateAnonymousUserKey, getOrCreateAnonymousUserId } from "@/lib/anonymousIdentity";
 
 const isBackendUnavailable = (error: unknown) => {
   if (!(error instanceof Error)) return false;
@@ -37,7 +37,7 @@ const isBackendUnavailable = (error: unknown) => {
 const Record = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const currentAccount = useCurrentAccount();
   const { currentWallet } = useCurrentWallet();
 
@@ -58,6 +58,106 @@ const Record = () => {
   const [epochs, setEpochs] = useState([200]); // Walrus 儲存期限（epochs），預設 200 epochs
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<"idle" | "encrypting" | "uploading" | "saving" | "success" | "error">("idle");
+  const [aiResponse, setAiResponse] = useState<string>("");
+  const [isAiLoading, setIsAiLoading] = useState(false);
+
+  const getAiResponse = async () => {
+    // 檢查是否有輸入描述
+    if (!description.trim()) {
+      toast({
+        title: t("record.errors.missingDescription"),
+        description: t("record.errors.missingDescriptionDesc"),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // 檢查是否選擇了情緒
+    if (!selectedEmotion) {
+      toast({
+        title: t("record.errors.missingEmotion"),
+        description: t("record.errors.missingEmotionDesc"),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsAiLoading(true);
+    setAiResponse("");
+
+    try {
+      // 獲取匿名 ID（如果沒有登入）
+      const { data: { session } } = await supabase.auth.getSession();
+      const anonymousId = session?.user?.id ? undefined : getOrCreateAnonymousUserId();
+
+      // 調用 AI 回應 function（匿名用戶不需要 auth header）
+      const { data, error } = await supabase.functions.invoke('ai-emotion-response', {
+        body: {
+          emotion: selectedEmotion,
+          intensity: intensity[0],
+          description,
+          language: i18n.language.startsWith('zh') ? 'zh-TW' : 'en',
+          anonymousId: anonymousId,
+        },
+        // 如果有 session，使用 auth header；否則匿名調用
+        ...(session?.access_token ? {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        } : {}),
+      });
+
+      if (error) throw error;
+
+      if (data?.success && data?.response) {
+        setAiResponse(data.response);
+      } else {
+        throw new Error(data?.error || 'Failed to get AI response');
+      }
+    } catch (error: any) {
+      console.error('AI response error:', error);
+      
+      // 区分不同类型的错误
+      let errorTitle = t("record.errors.aiError");
+      let errorDescription = t("record.errors.aiErrorDesc");
+      
+      // 检查错误消息（可能是英文或中文）
+      const errorMsg = (error?.message || error?.error || '').toLowerCase();
+      
+      // 检查速率限制错误（支持中英文）
+      if (errorMsg.includes('rate limit') || 
+          errorMsg.includes('too many requests') ||
+          errorMsg.includes('请求过于频繁') ||
+          errorMsg.includes('rate_limit_exceeded') ||
+          error?.errorCode === 'RATE_LIMIT') {
+        errorTitle = t("record.errors.rateLimitExceeded");
+        errorDescription = t("record.errors.rateLimitExceededDesc");
+      } 
+      // 检查服务不可用错误（支持中英文）
+      else if (errorMsg.includes('service unavailable') || 
+               errorMsg.includes('服务暂时不可用') ||
+               errorMsg.includes('503') ||
+               error?.errorCode === 'SERVICE_UNAVAILABLE') {
+        errorTitle = t("record.errors.serviceUnavailable");
+        errorDescription = t("record.errors.serviceUnavailableDesc");
+      }
+      // 检查安全阻止错误
+      else if (errorMsg.includes('sensitive content') ||
+               errorMsg.includes('检测到敏感内容') ||
+               error?.errorCode === 'SECURITY_BLOCKED') {
+        errorTitle = t("record.errors.aiError");
+        errorDescription = error?.error || error?.message || t("record.errors.aiErrorDesc");
+      }
+      
+      toast({
+        title: errorTitle,
+        description: errorDescription,
+        variant: "destructive",
+      });
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
 
   const saveToLocalIndex = async (
     sanitizedDescription: string,
@@ -783,6 +883,46 @@ const Record = () => {
                 <p className="text-xs text-muted-foreground">
                   {t("record.characters", { count: description.length })}
                 </p>
+              </div>
+
+              {/* AI Response Button */}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={getAiResponse}
+                disabled={isAiLoading || !selectedEmotion || !description.trim()}
+                className="w-full mt-2"
+              >
+                {isAiLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {t("record.aiThinking")}
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    {t("record.getAiResponse")}
+                  </>
+                )}
+              </Button>
+
+              {/* AI Response Display */}
+              <div className="mt-4 p-4 rounded-lg bg-primary/5 border border-primary/20 animate-in fade-in-50 slide-in-from-bottom-2">
+                <div className="flex items-start gap-3">
+                  <Sparkles className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-primary mb-2">{t("record.aiResponse")}</p>
+                    {aiResponse ? (
+                      <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
+                        {aiResponse}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">
+                        {t("record.getAiResponse")}
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 

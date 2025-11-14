@@ -112,6 +112,14 @@
     "errors": {
       "missingInfo": "Missing Information",
       "missingInfoDesc": "Please select an emotion and add a description.",
+      "missingDescription": "Missing Description",
+      "missingDescriptionDesc": "Please describe your feelings first.",
+      "missingEmotion": "Missing Emotion",
+      "missingEmotionDesc": "Please select your emotion first.",
+      "aiError": "AI Response Error",
+      "aiErrorDesc": "Unable to get AI response, please try again later.",
+      "rateLimitExceeded": "Rate Limit Exceeded",
+      "rateLimitExceededDesc": "You have reached the usage limit, please try again later.",
       "recordFailed": "Record Failed",
       "tryAgain": "Please try again later.",
       "serviceUnavailable": "Storage Service Unavailable",
@@ -127,6 +135,9 @@
       "storageQuotaExceeded": "Local Storage Quota Exceeded",
       "storageQuotaExceededDesc": "Browser local storage is full. Please clear browser data or delete some old records and try again."
     },
+    "getAiResponse": "Get AI Emotion Response",
+    "aiThinking": "AI is thinking...",
+    "aiResponse": "AI Response",
     "success": {
       "recorded": "Emotion Recorded! ✨",
       "recordedLocal": "Emotion Recorded (Local Storage)",

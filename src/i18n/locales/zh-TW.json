@@ -112,6 +112,14 @@
     "errors": {
       "missingInfo": "缺少資訊",
       "missingInfoDesc": "請選擇情緒並添加描述。",
+      "missingDescription": "缺少描述",
+      "missingDescriptionDesc": "請先描述您的感受。",
+      "missingEmotion": "缺少情緒",
+      "missingEmotionDesc": "請先選擇您的情緒。",
+      "aiError": "AI 回應錯誤",
+      "aiErrorDesc": "無法取得 AI 回應，請稍後再試。",
+      "rateLimitExceeded": "請求過於頻繁",
+      "rateLimitExceededDesc": "您已達到使用限制，請稍後再試。",
       "recordFailed": "記錄失敗",
       "tryAgain": "請稍後再試。",
       "serviceUnavailable": "儲存服務暫時無法使用",
@@ -127,6 +135,9 @@
       "storageQuotaExceeded": "本地儲存空間不足",
       "storageQuotaExceededDesc": "瀏覽器本地儲存空間已滿。請清理瀏覽器數據或刪除一些舊記錄後再試。"
     },
+    "getAiResponse": "獲得 AI 情緒回應",
+    "aiThinking": "AI 正在思考中...",
+    "aiResponse": "AI 回應",
     "success": {
       "recorded": "情緒已記錄！✨",
       "recordedLocal": "情緒已記錄（本地儲存）",
