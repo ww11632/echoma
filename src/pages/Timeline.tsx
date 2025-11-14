@@ -312,6 +312,25 @@ const Timeline = () => {
 
         // 3. 去重并排序（按时间倒序）
         console.log(`[Timeline] Starting deduplication with ${allRecords.length} total records`);
+        
+        // 分析 blob_id 重複情況
+        const blobIdCounts = new Map<string, number>();
+        allRecords.forEach(record => {
+          const key = record.blob_id || record.id;
+          blobIdCounts.set(key, (blobIdCounts.get(key) || 0) + 1);
+        });
+        
+        const duplicateBlobIds = Array.from(blobIdCounts.entries())
+          .filter(([_, count]) => count > 1)
+          .sort((a, b) => b[1] - a[1]);
+        
+        if (duplicateBlobIds.length > 0) {
+          console.log(`[Timeline] Found ${duplicateBlobIds.length} blob_ids with duplicates:`);
+          duplicateBlobIds.forEach(([blobId, count]) => {
+            console.log(`  - ${blobId.substring(0, 20)}... appears ${count} times`);
+          });
+        }
+        
         const deduplicationMap = allRecords.reduce((map, record) => {
           const key = record.blob_id || record.id;
           const existing = map.get(key);
@@ -332,6 +351,7 @@ const Timeline = () => {
         }, new Map<string, EmotionRecord>());
         
         console.log(`[Timeline] After deduplication: ${deduplicationMap.size} unique records (removed ${allRecords.length - deduplicationMap.size} duplicates)`);
+        console.log(`[Timeline] This is EXPECTED: Multiple Sui objects can reference the same Walrus blob`);
         
         const uniqueRecords = sortRecordsByDate(Array.from(deduplicationMap.values()));
 
