@@ -8,6 +8,7 @@ export interface EmotionRecord {
   proof: string | null; // reserved for future on-chain proof or hash
   version: "1.0.0";
   isPublic?: boolean; // 是否公開分享（可選，向後兼容）
+  intensity?: number; // 情緒強度 0-100（可選，向後兼容）
 }
 
 export const EMOTION_OPTIONS: { label: string; value: EmotionType }[] = [

@@ -123,7 +123,9 @@
       "encryptionError": "加密錯誤",
       "encryptionErrorDesc": "資料加密時發生錯誤。請重新嘗試。",
       "dataTooLarge": "資料過大",
-      "dataTooLargeDesc": "您輸入的內容過長。請縮短描述後再試。"
+      "dataTooLargeDesc": "您輸入的內容過長。請縮短描述後再試。",
+      "storageQuotaExceeded": "本地儲存空間不足",
+      "storageQuotaExceededDesc": "瀏覽器本地儲存空間已滿。請清理瀏覽器數據或刪除一些舊記錄後再試。"
     },
     "success": {
       "recorded": "情緒已記錄！✨",
@@ -187,7 +189,7 @@
     "decryptErrorInvalidKey": "金鑰錯誤或密碼不正確",
     "decryptErrorDataCorrupted": "資料損毀或已被篡改",
     "decryptErrorUnsupportedVersion": "不支援的加密格式版本，請更新應用程式",
-    "walrusAggregatorNotice": "雖然你的資料在鏈上（SuiScan 可以看到），但 Walrus aggregator 暫時無法提供下載服務。這是 testnet 的已知問題",
+    "walrusAggregatorNotice": "⚠️ Walrus Testnet 的 Aggregator 不穩定\n\n雖然你的資料在鏈上（SuiScan 可以看到），但 Walrus aggregator 暫時無法提供下載服務。這是 testnet 的已知問題",
     "showDetails": "查看詳細資訊",
     "hideDetails": "隱藏詳細資訊",
     "errorDetail": {
@@ -240,6 +242,25 @@
       "emotionDistribution": "情緒分布",
       "storageDistribution": "儲存方式分布",
       "timelineChart": "時間趨勢"
+    },
+    "decryptAll": {
+      "button": "🔓 一鍵解密所有",
+      "decrypting": "解密中...",
+      "noRecords": "無需解密的記錄",
+      "noRecordsDesc": "所有記錄已經解密或無需解密",
+      "success": "解密完成",
+      "successDesc": "成功解密 {{count}} 條記錄",
+      "partialSuccess": "部分解密成功",
+      "partialSuccessDesc": "成功解密 {{success}} 條，失敗 {{fail}} 條"
+    },
+    "localStorage": {
+      "keyMismatchTitle": "⚠️ 本地記錄可能無法訪問",
+      "keyMismatchDesc": "檢測到本地儲存中有加密資料，但無法用當前帳戶解密。這可能是因為您切換了帳戶（錢包/匿名/登入狀態）。請嘗試切換回原來的帳戶狀態以訪問這些記錄。",
+      "saveBlockedTitle": "無法保存記錄",
+      "saveBlockedDesc": "檢測到本地儲存中有無法解密的資料。這可能是因為您切換了帳戶（錢包/匿名/登入狀態）。",
+      "saveBlockedSolution1": "解決方案 1：切換回原來的帳戶狀態以訪問這些記錄",
+      "saveBlockedSolution2": "解決方案 2：清除本地儲存後重新開始（將刪除所有本地記錄）",
+      "saveBlockedNote": "注意：清除本地儲存後，無法解密的記錄將永久丟失。"
     }
   },
   "auth": {

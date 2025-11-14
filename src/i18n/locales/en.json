@@ -123,7 +123,9 @@
       "encryptionError": "Encryption Error",
       "encryptionErrorDesc": "An error occurred during data encryption. Please try again.",
       "dataTooLarge": "Data Too Large",
-      "dataTooLargeDesc": "Your input is too long. Please shorten your description and try again."
+      "dataTooLargeDesc": "Your input is too long. Please shorten your description and try again.",
+      "storageQuotaExceeded": "Local Storage Quota Exceeded",
+      "storageQuotaExceededDesc": "Browser local storage is full. Please clear browser data or delete some old records and try again."
     },
     "success": {
       "recorded": "Emotion Recorded! ✨",
@@ -185,7 +187,7 @@
     "decryptErrorInvalidKey": "Invalid key or incorrect password",
     "decryptErrorDataCorrupted": "Data corrupted or tampered",
     "decryptErrorUnsupportedVersion": "Unsupported encryption format version, please update the app",
-    "walrusAggregatorNotice": "Although your data is on-chain (visible on SuiScan), the Walrus aggregator is temporarily unable to provide download services. This is a known issue on testnet",
+    "walrusAggregatorNotice": "⚠️ Walrus Testnet Aggregator is Unstable\n\nAlthough your data is on-chain (visible on SuiScan), the Walrus aggregator is temporarily unable to provide download services. This is a known issue on testnet",
     "showDetails": "Show Details",
     "hideDetails": "Hide Details",
     "errorDetail": {
@@ -238,6 +240,25 @@
       "emotionDistribution": "Emotion Distribution",
       "storageDistribution": "Storage Distribution",
       "timelineChart": "Timeline Trend"
+    },
+    "decryptAll": {
+      "button": "🔓 Decrypt All",
+      "decrypting": "Decrypting...",
+      "noRecords": "No Records to Decrypt",
+      "noRecordsDesc": "All records are already decrypted or do not need decryption",
+      "success": "Decryption Complete",
+      "successDesc": "Successfully decrypted {{count}} records",
+      "partialSuccess": "Partial Success",
+      "partialSuccessDesc": "Successfully decrypted {{success}} records, {{fail}} failed"
+    },
+    "localStorage": {
+      "keyMismatchTitle": "⚠️ Local Records May Be Inaccessible",
+      "keyMismatchDesc": "Encrypted data detected in local storage, but cannot be decrypted with current account. This may be because you switched accounts (wallet/anonymous/login status). Please try switching back to the original account state to access these records.",
+      "saveBlockedTitle": "Cannot Save Record",
+      "saveBlockedDesc": "Encrypted data detected in local storage that cannot be decrypted. This may be because you switched accounts (wallet/anonymous/login status).",
+      "saveBlockedSolution1": "Solution 1: Switch back to the original account state to access these records",
+      "saveBlockedSolution2": "Solution 2: Clear local storage and start fresh (this will delete all local records)",
+      "saveBlockedNote": "Note: After clearing local storage, records that cannot be decrypted will be permanently lost."
     }
   },
   "auth": {

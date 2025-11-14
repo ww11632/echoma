@@ -15,7 +15,7 @@ import { encryptData, generateUserKey, generateUserKeyFromId } from "@/lib/encry
 import { prepareEmotionSnapshot, uploadToWalrusWithSDK, createSignerFromWallet } from "@/lib/walrus";
 import { validateAndSanitizeDescription, emotionSnapshotSchema } from "@/lib/validation";
 import { supabase } from "@/integrations/supabase/client";
-import { addEmotionRecord } from "@/lib/localIndex";
+import { addEmotionRecord, initializeEncryptedStorage } from "@/lib/localIndex";
 import type { EmotionRecord } from "@/lib/dataSchema";
 import { postEmotion } from "@/lib/api";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -62,28 +62,67 @@ const Record = () => {
   const saveToLocalIndex = async (
     sanitizedDescription: string,
     emotionValue: string,
-    isPublicValue: boolean
+    isPublicValue: boolean,
+    intensityValue?: number
   ) => {
-    const mvpEmotion =
-      emotionValue === "joy"
-        ? "joy"
-        : emotionValue === "sadness"
-        ? "sadness"
-        : emotionValue === "anger"
-        ? "anger"
-        : "joy";
+    // Initialize encrypted storage for all users (anonymous or with wallet)
+    // Use the same key generation logic as Walrus upload
+    let encryptionKey: string;
+    
+    if (currentAccount) {
+      // 有錢包：使用錢包地址生成密鑰
+      encryptionKey = await generateUserKey(currentAccount.address);
+    } else {
+      // 匿名用戶：優先使用 Supabase session，否則使用本地匿名 ID
+      const { data: { session } } = await supabase.auth.getSession();
+      encryptionKey = session?.user?.id
+        ? await generateUserKeyFromId(session.user.id)
+        : await getOrCreateAnonymousUserKey();
+    }
+    
+    // Initialize encrypted storage with the encryption key
+    initializeEncryptedStorage(encryptionKey);
+
+    // Validate and map emotion type (support all emotion types)
+    const validEmotions: EmotionRecord["emotion"][] = ["joy", "sadness", "anger", "anxiety", "confusion", "peace"];
+    const emotion = validEmotions.includes(emotionValue as EmotionRecord["emotion"])
+      ? (emotionValue as EmotionRecord["emotion"])
+      : "joy"; // Default to joy if invalid
 
     const localRecord: EmotionRecord = {
       id: crypto.randomUUID(),
       timestamp: new Date().toISOString(),
-      emotion: mvpEmotion as "joy" | "sadness" | "anger",
+      emotion: emotion,
       note: sanitizedDescription,
       proof: null,
       version: "1.0.0",
       isPublic: isPublicValue,
+      intensity: intensityValue, // 保存強度值（如果提供）
     };
 
-    await addEmotionRecord(localRecord);
+    // This will now use encrypted storage since we initialized it
+    try {
+      await addEmotionRecord(localRecord, currentAccount?.address);
+    } catch (error: any) {
+      console.error("[Record] Failed to save to local index:", error);
+      // Re-throw with user-friendly message
+      const errorMessage = error?.message || "保存失敗";
+      // Check for storage quota exceeded error
+      if (errorMessage === "STORAGE_QUOTA_EXCEEDED" || 
+          (error as any)?.errorCode === "STORAGE_QUOTA_EXCEEDED" ||
+          errorMessage.includes("QuotaExceeded")) {
+        // This will be handled in handleSubmit's error handling
+        const quotaError = new Error("STORAGE_QUOTA_EXCEEDED");
+        (quotaError as any).errorCode = "STORAGE_QUOTA_EXCEEDED";
+        throw quotaError;
+      }
+      // Check if this is a decryption error that can be recovered
+      if (error?.isDecryptionError && error?.canForceClear) {
+        // Re-throw with the original message (it already contains helpful instructions)
+        throw error;
+      }
+      throw new Error(`保存到本地儲存失敗：${errorMessage}`);
+    }
   };
 
   const handleSubmit = async () => {
@@ -121,7 +160,7 @@ const Record = () => {
         if (saveLocally) {
           console.log("[Record] Anonymous user chose to save locally only, skipping Walrus upload");
           setUploadStatus("saving");
-          await saveToLocalIndex(sanitizedDescription, selectedEmotion, isPublic);
+          await saveToLocalIndex(sanitizedDescription, selectedEmotion, isPublic, intensityValue);
           setUploadStatus("success");
           
           toast({
@@ -229,7 +268,7 @@ const Record = () => {
           if (isBackendUnavailable(apiError)) {
             console.log("[Client] API failed, saving to local storage as fallback");
             setUploadStatus("saving");
-            await saveToLocalIndex(sanitizedDescription, selectedEmotion, isPublic);
+            await saveToLocalIndex(sanitizedDescription, selectedEmotion, isPublic, intensityValue);
             setUploadStatus("success");
             
             toast({
@@ -371,6 +410,7 @@ const Record = () => {
             description: t("record.wallet.insufficientBalanceDesc"),
             variant: "destructive",
           });
+          setUploadStatus("error");
           setIsSubmitting(false);
           return;
         } else if (sdkError.message.includes("簽名失敗") || sdkError.message.includes("Sign failed") || sdkError.message.toLowerCase().includes("sign")) {
@@ -379,6 +419,7 @@ const Record = () => {
             description: t("record.wallet.signFailedDesc"),
             variant: "destructive",
           });
+          setUploadStatus("error");
           setIsSubmitting(false);
           return;
         } else if (sdkError.message.includes("交易已取消") || sdkError.message.includes("Transaction cancelled") || sdkError.message.toLowerCase().includes("cancelled") || sdkError.message.toLowerCase().includes("user rejected")) {
@@ -387,6 +428,7 @@ const Record = () => {
             description: t("record.wallet.transactionCancelledDesc"),
             variant: "default",
           });
+          setUploadStatus("idle"); // 用戶取消，恢復到初始狀態
           setIsSubmitting(false);
           return;
         }
@@ -471,7 +513,7 @@ const Record = () => {
             // User chose local storage, so fallback is OK
             console.log("[Client] API failed, saving to local storage as fallback");
             setUploadStatus("saving");
-            await saveToLocalIndex(sanitizedDescription, selectedEmotion, isPublic);
+            await saveToLocalIndex(sanitizedDescription, selectedEmotion, isPublic, intensityValue);
             setUploadStatus("success");
             
             toast({
@@ -529,7 +571,15 @@ const Record = () => {
         const msg = error.message;
         
         // Check if it's a validation error
-        if (msg.includes("Invalid") || 
+        if (msg === "INVALID_RECORD_DATA" || 
+            (error as any)?.errorCode === "INVALID_RECORD_DATA") {
+          errorTitle = t("record.errors.missingInfo");
+          errorMessage = t("record.errors.missingInfoDesc");
+        } else if (msg === "EMPTY_RECORD_NOTE" || 
+                   (error as any)?.errorCode === "EMPTY_RECORD_NOTE") {
+          errorTitle = t("record.errors.missingInfo");
+          errorMessage = t("record.errors.missingInfoDesc");
+        } else if (msg.includes("Invalid") || 
             msg.includes("must be") ||
             msg.includes("cannot be") ||
             msg.includes("contains potentially unsafe")) {
@@ -555,17 +605,41 @@ const Record = () => {
           errorTitle = t("record.errors.uploadFailed");
           errorMessage = t("record.errors.uploadFailedDesc");
         } 
-        // Check for encryption errors
+        // Check for encryption/decryption errors
         else if (msg.includes("encrypt") ||
-                 msg.includes("decrypt")) {
-          errorTitle = t("record.errors.encryptionError");
-          errorMessage = t("record.errors.encryptionErrorDesc");
+                 msg.includes("decrypt") ||
+                 msg === "SAVE_BLOCKED_DECRYPTION_ERROR" ||
+                 (error as any).isDecryptionError) {
+          // Special handling for decryption errors that block saving
+          if ((error as any).isDecryptionError && (error as any).canForceClear) {
+            errorTitle = t("timeline.localStorage.saveBlockedTitle");
+            errorMessage = `${t("timeline.localStorage.saveBlockedDesc")}\n\n${t("timeline.localStorage.saveBlockedSolution1")}\n${t("timeline.localStorage.saveBlockedSolution2")}\n\n${t("timeline.localStorage.saveBlockedNote")}`;
+          } else {
+            errorTitle = t("record.errors.encryptionError");
+            errorMessage = t("record.errors.encryptionErrorDesc");
+          }
         }
         // Check for data size errors
         else if (msg.includes("Data too large") ||
                  msg.includes("Maximum size")) {
           errorTitle = t("record.errors.dataTooLarge");
           errorMessage = t("record.errors.dataTooLargeDesc");
+        }
+        // Check for storage quota exceeded errors
+        else if (msg === "STORAGE_QUOTA_EXCEEDED" ||
+                 (error as any)?.errorCode === "STORAGE_QUOTA_EXCEEDED" ||
+                 msg.includes("QuotaExceeded") ||
+                 msg.includes("空間不足")) {
+          errorTitle = t("record.errors.storageQuotaExceeded");
+          errorMessage = t("record.errors.storageQuotaExceededDesc");
+        }
+        // Check for local storage save errors
+        else if (msg.includes("保存到本地儲存失敗") || 
+                 msg.includes("Failed to save to local")) {
+          // Extract the underlying error message
+          const underlyingError = msg.split("：").pop() || msg.split(":").pop() || msg;
+          errorTitle = t("record.errors.uploadFailed");
+          errorMessage = underlyingError;
         }
         // Use the error message directly if it's already user-friendly
         else if (msg.length > 0 && msg.length < 200) {

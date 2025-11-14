@@ -6,12 +6,12 @@ import { Card } from "@/components/ui/card";
 import { ArrowLeft, Home, Sparkles, Shield, Clock, Lock, Unlock, Loader2, BookOpen, BarChart3, Filter, Eye, EyeOff } from "lucide-react";
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import { supabase } from "@/integrations/supabase/client";
-import { listEmotionRecords } from "@/lib/localIndex";
+import { listEmotionRecords, initializeEncryptedStorage, listEmotionRecordsWithAllKeys } from "@/lib/localIndex";
 import { getEmotions, getEmotionsByWallet, getEncryptedEmotionByBlob } from "@/lib/api";
 import { queryWalrusBlobsByOwner, getWalrusUrl, readFromWalrus } from "@/lib/walrus";
 import { decryptData, decryptDataWithMigration, generateUserKey, generateUserKeyFromId, DecryptionError, DecryptionErrorType } from "@/lib/encryption";
 import type { EncryptedData } from "@/lib/encryption";
-import { getAnonymousUserKey } from "@/lib/anonymousIdentity";
+import { getAnonymousUserKey, getOrCreateAnonymousUserKey } from "@/lib/anonymousIdentity";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Legend } from "recharts";
@@ -59,6 +59,7 @@ const Timeline = () => {
   const [decryptedDescriptions, setDecryptedDescriptions] = useState<Record<string, string>>({});
   const [decryptedAiResponses, setDecryptedAiResponses] = useState<Record<string, string>>({});
   const [decryptErrors, setDecryptErrors] = useState<Record<string, string>>({});
+  const [isDecryptingAll, setIsDecryptingAll] = useState(false);
   const [decryptErrorDetails, setDecryptErrorDetails] = useState<Record<string, {
     type: string;
     message: string;
@@ -89,11 +90,24 @@ const Timeline = () => {
       try {
         // 1. 嘗試從本地儲存載入記錄
         try {
-          const localRecords = await listEmotionRecords();
+          // Try to load records with all possible keys (handles account switching)
+          // This function will automatically try Supabase session, anonymous ID, and wallet address
+          const localRecords = await listEmotionRecordsWithAllKeys(currentAccount?.address);
+          
+          // Check if there's a decryption warning
+          if ((localRecords as any).__decryptionWarning) {
+            // Show user-friendly warning about potential data loss
+            toast({
+              title: t("timeline.localStorage.keyMismatchTitle"),
+              description: t("timeline.localStorage.keyMismatchDesc"),
+              variant: "default",
+            });
+          }
+          
           const convertedLocalRecords: EmotionRecord[] = localRecords.map((r) => ({
             id: r.id,
             emotion: r.emotion,
-            intensity: 50,
+            intensity: r.intensity ?? 50, // 使用保存的強度值，如果沒有則使用默認值 50
             description: r.note,
             blob_id: `local_${r.id.slice(0, 8)}`,
             walrus_url: `local://${r.id}`,
@@ -727,15 +741,13 @@ const Timeline = () => {
         statusCode = error.response.status;
       }
       
-      // 如果是 Anonymous Mode（沒有連接錢包）且是 Walrus 記錄，添加 Walrus aggregator 提示
-      const isAnonymousMode = !currentAccount;
+      // 如果是 Walrus 記錄，添加 Walrus aggregator 提示（所有用戶都可能遇到）
       const isWalrusRecord = record.blob_id && !record.blob_id.startsWith("local_");
       
-      if (isAnonymousMode && isWalrusRecord) {
+      if (isWalrusRecord) {
         // 在錯誤訊息中添加 Walrus aggregator 提示
         const aggregatorNotice = t("timeline.walrusAggregatorNotice");
-        errorMessage = `${errorMessage}\n\n${aggregatorNotice}`;
-        // 也在建議中添加
+        // 將提示添加到建議列表的最前面，讓用戶更容易看到
         suggestions = [aggregatorNotice, ...suggestions];
       }
       
@@ -777,7 +789,7 @@ const Timeline = () => {
     }
   }, [decryptedDescriptions, decryptingRecords, currentAccount, toast, t, isLocalRecord]);
 
-  // 篩選後的記錄
+  // 篩選後的記錄（需要在 decryptAllRecords 之前定義）
   const filteredRecords = useMemo(() => {
     if (filter === "all") return records;
     
@@ -792,6 +804,82 @@ const Timeline = () => {
     if (filter === "walrus") return records.filter(r => !isLocal(r));
     return records;
   }, [records, filter]);
+
+  // 批量解密所有記錄
+  const decryptAllRecords = useCallback(async () => {
+    if (isDecryptingAll) return;
+    
+    setIsDecryptingAll(true);
+    
+    // 找出所有需要解密的記錄
+    const recordsToDecrypt = filteredRecords.filter(record => {
+      // 跳過已經解密的
+      if (decryptedDescriptions[record.id]) return false;
+      // 跳過公開記錄
+      if (record.is_public) return false;
+      // 跳過本地記錄（已經自動解密）
+      if (isLocalRecord(record) && !record.encrypted_data) return false;
+      // 跳過沒有加密資料的
+      if (!record.encrypted_data && (!record.blob_id || record.blob_id.startsWith("local_"))) return false;
+      return true;
+    });
+
+    if (recordsToDecrypt.length === 0) {
+      toast({
+        title: t("timeline.decryptAll.noRecords"),
+        description: t("timeline.decryptAll.noRecordsDesc"),
+        variant: "default",
+      });
+      setIsDecryptingAll(false);
+      return;
+    }
+
+    let successCount = 0;
+    let failCount = 0;
+    let hasWalrusFailures = false;
+
+    // 依次解密每個記錄
+    for (const record of recordsToDecrypt) {
+      try {
+        await decryptDescription(record);
+        successCount++;
+        // 添加小延遲避免過於頻繁的請求
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error) {
+        console.error(`[Timeline] Failed to decrypt record ${record.id} in batch:`, error);
+        failCount++;
+        // 檢查是否為 Walrus 記錄
+        const isWalrusRecord = record.blob_id && !record.blob_id.startsWith("local_");
+        if (isWalrusRecord) {
+          hasWalrusFailures = true;
+        }
+      }
+    }
+
+    setIsDecryptingAll(false);
+
+    // 顯示結果
+    if (failCount === 0) {
+      toast({
+        title: t("timeline.decryptAll.success"),
+        description: t("timeline.decryptAll.successDesc", { count: successCount }),
+        variant: "default",
+      });
+    } else {
+      // 如果有 Walrus 記錄失敗，在描述中添加 aggregator 提示
+      let description = t("timeline.decryptAll.partialSuccessDesc", { success: successCount, fail: failCount });
+      if (hasWalrusFailures) {
+        const aggregatorNotice = t("timeline.walrusAggregatorNotice");
+        description = `${description}\n\n${aggregatorNotice}`;
+      }
+      
+      toast({
+        title: t("timeline.decryptAll.partialSuccess"),
+        description,
+        variant: "default",
+      });
+    }
+  }, [filteredRecords, decryptedDescriptions, isDecryptingAll, decryptDescription, isLocalRecord, toast, t]);
 
   // 統計資料
   const stats = useMemo(() => {
@@ -947,8 +1035,8 @@ const Timeline = () => {
             <p className="text-muted-foreground">{t("timeline.subtitle")}</p>
           </div>
 
-          {/* Filter Buttons */}
-          <div className="flex items-center gap-3 justify-center mb-6">
+          {/* Filter Buttons and Decrypt All */}
+          <div className="flex items-center gap-3 justify-center mb-6 flex-wrap">
             <Filter className="w-4 h-4 text-muted-foreground" />
             <div className="flex gap-2">
               {(["all", "local", "walrus"] as FilterType[]).map((filterType) => (
@@ -963,6 +1051,33 @@ const Timeline = () => {
                 </Button>
               ))}
             </div>
+            {/* 一鍵解密按鈕 */}
+            {filteredRecords.some(r => 
+              !r.is_public && 
+              !decryptedDescriptions[r.id] && 
+              !(isLocalRecord(r) && !r.encrypted_data) &&
+              (r.encrypted_data || (r.blob_id && !r.blob_id.startsWith("local_")))
+            ) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={decryptAllRecords}
+                disabled={isDecryptingAll}
+                className="ml-2"
+              >
+                {isDecryptingAll ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {t("timeline.decryptAll.decrypting")}
+                  </>
+                ) : (
+                  <>
+                    <Unlock className="w-4 h-4 mr-2" />
+                    {t("timeline.decryptAll.button")}
+                  </>
+                )}
+              </Button>
+            )}
           </div>
 
           {/* Statistics Cards */}
@@ -1137,7 +1252,19 @@ const Timeline = () => {
                         )}
                         {!record.is_public && (
                           <div className="mb-3 space-y-2">
-                            {decryptedDescriptions[record.id] ? (
+                            {/* 本地記錄：如果已有 description，直接顯示（已在讀取時自動解密） */}
+                            {isLocal && record.description ? (
+                              <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                                  <Unlock className="w-3 h-3 text-green-500" />
+                                  <span className="text-green-500">{t("timeline.decrypted")}</span>
+                                  <span className="text-muted-foreground">（本地儲存）</span>
+                                </div>
+                                <p className="text-sm whitespace-pre-wrap break-words">
+                                  {record.description}
+                                </p>
+                              </div>
+                            ) : decryptedDescriptions[record.id] ? (
                               // 已解密，顯示內容
                               <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
                                 <div className="flex items-center justify-between mb-2">
@@ -1354,6 +1481,7 @@ const Timeline = () => {
                                   <p className="text-sm text-muted-foreground italic">
                                     {t("timeline.encryptedContent")}
                                   </p>
+                                  {/* 本地記錄不需要解密按鈕（已在讀取時自動解密），只顯示 Walrus 記錄的解密按鈕 */}
                                   {!isLocal && record.blob_id && !record.blob_id.startsWith("local_") && (
                                     <Button
                                       variant="outline"
@@ -1413,12 +1541,17 @@ const Timeline = () => {
                             </div>
                           )}
                           <div className="flex items-center gap-2 flex-wrap">
-                            {record.proof_status === "confirmed" ? (
-                              <span className="px-2 py-1 rounded-full bg-green-500/10 text-green-500 text-xs">{t("timeline.verified")}</span>
-                            ) : record.proof_status === "pending" ? (
-                              <span className="px-2 py-1 rounded-full bg-yellow-500/10 text-yellow-500 text-xs">{t("timeline.pending")}</span>
-                            ) : (
-                              <span className="px-2 py-1 rounded-full bg-red-500/10 text-red-500 text-xs">{t("timeline.failed")}</span>
+                            {/* 本地存储的记录不显示状态（用户已明确选择本地存储） */}
+                            {!isLocal && (
+                              <>
+                                {record.proof_status === "confirmed" ? (
+                                  <span className="px-2 py-1 rounded-full bg-green-500/10 text-green-500 text-xs">{t("timeline.verified")}</span>
+                                ) : record.proof_status === "pending" ? (
+                                  <span className="px-2 py-1 rounded-full bg-yellow-500/10 text-yellow-500 text-xs">{t("timeline.pending")}</span>
+                                ) : (
+                                  <span className="px-2 py-1 rounded-full bg-red-500/10 text-red-500 text-xs">{t("timeline.failed")}</span>
+                                )}
+                              </>
                             )}
                             {record.sui_ref && (
                               <>
