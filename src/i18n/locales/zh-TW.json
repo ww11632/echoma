@@ -149,6 +149,10 @@
   "timeline": {
     "title": "情緒時間軸",
     "subtitle": "您個人的情緒歷程記錄",
+    "currentAccount": "當前登入帳號",
+    "logout": "登出",
+    "loggedOut": "已登出",
+    "loggedOutDesc": "您已成功登出帳號",
     "testnetWarning": "⚠️ Testnet 資料會在 epochs 到期後被刪除",
     "testnetWarningDesc": "建議啟用「備份到資料庫」以永久保存",
     "noRecords": "尚未記錄任何情緒",
