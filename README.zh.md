@@ -54,7 +54,7 @@ Echoma 現在支持打包成 iOS 原生應用！使用 **Capacitor** 框架，�
    npm run cap:open:ios
    ```
 
-詳細說明請查看 [iOS 開發指南](./IOS_開發指南.md)
+詳細說明請查看 [iOS 開發指南](./IOS_Development_Guide.md)
 
 ## 🚀 快速開始
 
@@ -347,7 +347,7 @@ Echoma 實現了完整的安全測試套件，確保加密機制的正確性和�
 - **開發環境**：自動啟用 `/security-tests` 路由
 - **生產環境**：需設置 `VITE_ENABLE_SECURITY_TESTS=true` 和 `VITE_FORCE_ENABLE_SECURITY_TESTS=true`（強制保護）
 
-詳細的安全測試說明請參閱 [安全測試說明.md](./安全測試說明.md)
+詳細的安全測試說明請參閱 [Security_Test_Guide.md](./Security_Test_Guide.md)
 
 ### 安全審計
 
@@ -409,7 +409,7 @@ Echoma 實現了完整的安全測試套件，確保加密機制的正確性和�
 - **Walrus CLI**：`walrus get-wal`（使用 SUI 以 1:1 比例兌換）
 - **Stakely 水龍頭**：https://stakely.io/faucet/walrus-testnet-wal
 
-詳細說明請查看 [Faucet_獲取測試代幣.md](./Faucet_獲取測試代幣.md)
+詳細說明請查看 [Faucet_Test_Token_Guide.md](./Faucet_Test_Token_Guide.md)
 
 ## 📝 使用說明
 
@@ -676,8 +676,8 @@ Echoma 提供三種不同的使用模式，滿足不同需求：
 
 項目包含完整的功能測試指南和快速測試腳本：
 
-- **功能測試指南** (`功能测试指南.md`) - 詳細的測試步驟和驗證方法
-- **快速測試腳本** (`快速测试脚本.js`) - 在瀏覽器 Console 中運行的自動化測試腳本
+- **功能測試指南** (`Functional_Test_Guide.md`) - 詳細的測試步驟和驗證方法
+- **快速測試腳本** (`Quick_Test_Script.js`) - 在瀏覽器 Console 中運行的自動化測試腳本
 
 #### 快速開始測試
 
@@ -689,10 +689,10 @@ Echoma 提供三種不同的使用模式，滿足不同需求：
 2. 打開應用並運行測試：
    - 打開瀏覽器開發者工具（F12）
    - 進入 Console 標籤
-   - 複製 `快速测试脚本.js` 的內容並執行
+   - 複製 `Quick_Test_Script.js` 的內容並執行
 
 3. 查看詳細測試步驟：
-   - 參考 `功能测试指南.md` 進行完整的功能測試
+   - 參考 `Functional_Test_Guide.md` 進行完整的功能測試
 
 #### 已修復的問題驗證
 
@@ -723,8 +723,8 @@ Echoma 提供三種不同的使用模式，滿足不同需求：
 - [shadcn/ui 文檔](https://ui.shadcn.com/)
 - [安全功能說明](./SECURITY_FEATURES.md) - AI 安全防護、審計日誌、API key rotation
 - [安全最佳實踐](./SECURITY_BEST_PRACTICES.md) - 加密機制安全審計報告
-- [安全測試說明](./安全測試說明.md) - 完整的安全測試套件文檔（可重現、可量測、可審計）
-- [功能測試指南](./功能测试指南.md) - 功能測試步驟和驗證方法
+- [Security_Test_Guide.md](./Security_Test_Guide.md) - 完整的安全測試套件文檔（可重現、可量測、可審計）
+- [功能測試指南](./Functional_Test_Guide.md) - 功能測試步驟和驗證方法
 
 ## 🔧 環境變數配置
 
@@ -757,7 +757,7 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key  # 用於 API key rotation 和�
   - 生產構建腳本：不應包含安全測試相關的環境變數
 - **GitHub Actions**：`.github/workflows/security-check.yml` 會在 PR 和 push 時自動運行檢查
 
-詳細說明請參閱 [安全測試說明.md](./安全測試說明.md) 中的「風險旗標掃描」章節。
+詳細說明請參閱 [Security_Test_Guide.md](./Security_Test_Guide.md) 中的「風險旗標掃描」章節。
 
 ### 數據庫遷移
 

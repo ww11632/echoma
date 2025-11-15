@@ -52,7 +52,7 @@ Echoma ships as a native iOS app via **Capacitor**. Wrap the web app and deploy 
    npm run cap:open:ios
    ```
 
-See the [iOS Guide](./IOS_開發指南.md) for full details.
+See the [iOS Development Guide](./IOS_Development_Guide.md) for full details.
 
 ## 🚀 Quick Start
 
@@ -338,7 +338,7 @@ A dedicated suite validates the cryptographic pipeline end-to-end.
 - **Development** – `/security-tests` route enabled automatically
 - **Production** – set `VITE_ENABLE_SECURITY_TESTS=true` and `VITE_FORCE_ENABLE_SECURITY_TESTS=true`
 
-Full details live in [安全測試說明.md](./安全測試說明.md).
+Full details live in [Security_Test_Guide.md](./Security_Test_Guide.md).
 
 ### Security Audit
 
@@ -393,7 +393,7 @@ Walrus uploads need **SUI** and **WAL** on testnet.
 - Walrus CLI: `walrus get-wal` (1:1 swap from SUI)
 - Stakely: https://stakely.io/faucet/walrus-testnet-wal
 
-See [Faucet_獲取測試代幣.md](./Faucet_獲取測試代幣.md) for walkthroughs.
+See [Faucet Test Token Guide](./Faucet_Test_Token_Guide.md) for walkthroughs.
 
 ## 📝 Usage Guide
 
@@ -616,8 +616,8 @@ Available in Anonymous *and* Authenticated modes.
 
 ### Functional Testing
 
-- **功能测试指南.md** – detailed manual steps (Traditional Chinese)
-- **快速测试脚本.js** – browser-console automation script
+- **Functional_Test_Guide.md** – detailed manual steps (Traditional Chinese)
+- **Quick_Test_Script.js** – browser-console automation script
 
 #### Quick Start
 
@@ -627,8 +627,8 @@ npm run dev
 
 1. Launch the app.
 2. Open DevTools → Console.
-3. Paste the contents of `快速测试脚本.js` and run it.
-4. Follow `功能测试指南.md` for the full checklist.
+3. Paste the contents of `Quick_Test_Script.js` and run it.
+4. Follow `Functional_Test_Guide.md` for the full checklist.
 
 #### Verified Fixes
 
@@ -655,8 +655,8 @@ Hackathon project for Haulout Hackathon.
 - [shadcn/ui Docs](https://ui.shadcn.com/)
 - [Security Features](./SECURITY_FEATURES.md)
 - [Security Best Practices](./SECURITY_BEST_PRACTICES.md)
-- [Security Test Guide](./安全測試說明.md)
-- [Functional Test Guide](./功能测试指南.md)
+- [Security Test Guide](./Security_Test_Guide.md)
+- [Functional Test Guide](./Functional_Test_Guide.md)
 
 ## 🔧 Environment Variables
 
@@ -687,7 +687,7 @@ It scans:
 - `Dockerfile`/`docker-compose.yml`
 - Production build scripts
 
-GitHub Actions (`.github/workflows/security-check.yml`) runs it on every PR/push. Details live in [安全測試說明.md](./安全測試說明.md).
+GitHub Actions (`.github/workflows/security-check.yml`) runs it on every PR/push. Details live in [Security_Test_Guide.md](./Security_Test_Guide.md).
 
 ### Database Migrations
 
