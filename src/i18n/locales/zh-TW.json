@@ -124,6 +124,17 @@
       "epochDesc": "選擇資料在 Walrus Testnet 上儲存的 epoch 數量（1 epoch ≈ 1 天）",
       "epochValue": "{{value}} epochs（約 {{days}} 天）"
     },
+    "backup": {
+      "title": "備份到資料庫",
+      "titleDisabled": "不備份到資料庫",
+      "description": "將加密資料備份到 Supabase，即使 Walrus 過期也能恢復",
+      "descriptionDisabled": "不備份，資料只存在於 Walrus（testnet 數據可能過期）",
+      "anonymousWarning": "⚠️ 匿名模式需登入 Supabase 才能備份",
+      "cannotBackup": "⚠️ 無法備份到資料庫",
+      "cannotBackupDesc": "匿名模式需要登入 Supabase 才能備份。資料已上傳到 Walrus。",
+      "backupFailed": "⚠️ 備份失敗",
+      "backupFailedDesc": "資料已上傳到 Walrus，但備份到資料庫失敗。"
+    },
     "status": {
       "encrypting": "正在加密...",
       "uploading": "上傳至 Walrus...",

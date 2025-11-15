@@ -124,6 +124,17 @@
       "epochDesc": "Select the number of epochs to store data on Walrus Testnet (1 epoch ≈ 1 day)",
       "epochValue": "{{value}} epochs (approx. {{days}} days)"
     },
+    "backup": {
+      "title": "Backup to Database",
+      "titleDisabled": "Don't Backup to Database",
+      "description": "Backup encrypted data to Supabase, recoverable even if Walrus expires",
+      "descriptionDisabled": "No backup, data only exists on Walrus (testnet data may expire)",
+      "anonymousWarning": "⚠️ Anonymous mode requires Supabase login to backup",
+      "cannotBackup": "⚠️ Cannot Backup to Database",
+      "cannotBackupDesc": "Anonymous mode requires Supabase login to backup. Data has been uploaded to Walrus.",
+      "backupFailed": "⚠️ Backup Failed",
+      "backupFailedDesc": "Data has been uploaded to Walrus, but backup to database failed."
+    },
     "status": {
       "encrypting": "Encrypting...",
       "uploading": "Uploading to Walrus...",
