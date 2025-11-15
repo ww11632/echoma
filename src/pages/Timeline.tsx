@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { listEmotionRecords, initializeEncryptedStorage, listEmotionRecordsWithAllKeys, deleteEmotionRecord } from "@/lib/localIndex";
 import { getEmotions, getEmotionsByWallet, getEncryptedEmotionByBlob } from "@/lib/api";
 import { queryWalrusBlobsByOwner, getWalrusUrl, readFromWalrus } from "@/lib/walrus";
+import { queryEntryNFTsByOwner } from "@/lib/mintContract";
 import { decryptData, decryptDataWithMigration, generateUserKey, generateUserKeyFromId, DecryptionError, DecryptionErrorType, PUBLIC_SEAL_KEY } from "@/lib/encryption";
 import type { EncryptedData } from "@/lib/encryption";
 import { getAnonymousUserKey, getOrCreateAnonymousUserKey } from "@/lib/anonymousIdentity";
@@ -47,6 +48,7 @@ interface EmotionRecord {
   wallet_address?: string | null;
   encrypted_data?: string | null;
   tags?: string[];
+  transaction_digest?: string | null; // NFT 鑄造交易的 digest
 }
 
 type FilterType = "all" | "local" | "walrus";
@@ -286,6 +288,7 @@ const Timeline = () => {
                     created_at: r.created_at || r.timestamp,
                     wallet_address: r.wallet_address || null,
                     encrypted_data: r.encrypted_data || null,
+                    transaction_digest: r.transaction_digest || null,
                   };
                 });
                 allRecords.push(...convertedRecords);
@@ -324,6 +327,7 @@ const Timeline = () => {
                     sui_ref: r.sui_ref || null,
                     created_at: r.created_at || r.timestamp,
                     wallet_address: r.wallet_address || null,
+                    transaction_digest: r.transaction_digest || null,
                   };
                 });
                 allRecords.push(...convertedApiRecords);
@@ -446,6 +450,141 @@ const Timeline = () => {
               } finally {
                 setIsQueryingOnChain(false);
               }
+              
+              // 4. 查詢 EntryNFT（如果錢包已連接）
+              try {
+                console.log("[Timeline] Querying EntryNFTs for address:", currentAccount.address);
+                const entryNFTs = await queryEntryNFTsByOwner(currentAccount.address);
+                console.log(`[Timeline] Found ${entryNFTs.length} EntryNFTs`);
+                
+                let nftAddedCount = 0;
+                let nftUpdatedCount = 0;
+                
+                for (const nft of entryNFTs) {
+                  // 從 Walrus URL 中提取 blob ID（如果 imageUrl 是完整的 Walrus URL）
+                  let blobIdFromNft: string | null = null;
+                  if (nft.imageUrl) {
+                    // 嘗試從 URL 中提取 blob ID
+                    // Walrus URL 格式: https://aggregator.testnet.walrus.space/v1/{blobId}
+                    const match = nft.imageUrl.match(/\/([^\/]+)$/);
+                    if (match) {
+                      blobIdFromNft = match[1];
+                    } else {
+                      // 如果不是完整 URL，可能就是 blob ID
+                      blobIdFromNft = nft.imageUrl;
+                    }
+                  }
+                  
+                  // 檢查是否已經存在（優先通過 sui_ref 或 id 匹配 NFT ID，然後通過 blob_id 匹配）
+                  // 情況1：數據庫記錄的 sui_ref 指向這個 NFT（r.sui_ref === nft.nftId）
+                  // 情況2：數據庫記錄的 id 就是這個 NFT ID（r.id === nft.nftId，雖然不太可能）
+                  // 情況3：通過 blob_id 或 walrus_url 匹配
+                  const existing = allRecords.find(
+                    r => r.id === nft.nftId ||  // 數據庫記錄的 id 就是 NFT ID（雖然不太可能）
+                         r.sui_ref === nft.nftId ||  // 數據庫記錄的 sui_ref 指向這個 NFT
+                         (blobIdFromNft && r.blob_id === blobIdFromNft) ||
+                         (nft.imageUrl && r.walrus_url === nft.imageUrl)
+                  );
+                  
+                  if (!existing) {
+                    // 將 moodScore (1-10) 轉換為 intensity (0-100)
+                    const intensity = Math.min(100, Math.max(0, (nft.moodScore / 10) * 100));
+                    
+                    // 解析標籤
+                    const tags = nft.tagsCsv ? nft.tagsCsv.split(",").map(t => t.trim()).filter(Boolean) : [];
+                    
+                    // 創建 NFT 記錄
+                    // 注意：NFT 中沒有存儲 emotion 類型，只有 mood_text
+                    // 使用 "encrypted" 表示這是加密記錄（雖然 NFT 中 mood_text 是明文，但為了與其他記錄一致）
+                    // 優先使用從鏈上獲取的 transaction_digest，如果沒有則為 null（可能從數據庫獲取）
+                    const nftRecord: EmotionRecord = {
+                      id: nft.nftId, // 使用 NFT ID 作為唯一標識
+                      emotion: "encrypted", // NFT 中沒有存儲 emotion 類型，使用 "encrypted" 表示需要從描述推斷
+                      intensity: intensity,
+                      description: nft.moodText || "", // NFT 中存儲的 mood_text（這是描述，不是 emotion 類型）
+                      blob_id: blobIdFromNft || `nft_${nft.nftId.slice(0, 8)}`, // 使用從 URL 提取的 blob ID，或生成 NFT 前綴的 ID
+                      walrus_url: nft.imageUrl || "", // 使用 imageUrl（通常是 Walrus URL）
+                      payload_hash: "",
+                      is_public: false,
+                      proof_status: "confirmed", // NFT 肯定是已確認的
+                      sui_ref: nft.nftId,
+                      created_at: nft.timestamp,
+                      wallet_address: currentAccount?.address || null,
+                      tags: tags.length > 0 ? tags : undefined,
+                      transaction_digest: nft.transactionDigest || null, // 從鏈上 NFT 對象的 previousTransaction 獲取
+                    };
+                    
+                    allRecords.push(nftRecord);
+                    nftAddedCount++;
+                    console.log(`[Timeline] ✅ Added EntryNFT record:`, {
+                      nftId: nft.nftId,
+                      moodScore: nft.moodScore,
+                      intensity,
+                      timestamp: nft.timestamp,
+                    });
+                  } else {
+                    // 更新現有記錄的 NFT 信息
+                    let updated = false;
+                    
+                    // 更新 sui_ref：如果沒有 sui_ref，或現有的 sui_ref 不是 NFT ID，則更新為 NFT ID
+                    // NFT 是比 Walrus blob 更高級的證明，所以應該優先使用 NFT ID
+                    // 判斷現有 sui_ref 是否是 NFT ID：如果 sui_ref === id，說明是鏈上 NFT 記錄；否則可能是 Walrus blob object ID
+                    const isCurrentSuiRefNFT = existing.sui_ref && existing.sui_ref === existing.id;
+                    if (nft.nftId && (!existing.sui_ref || (!isCurrentSuiRefNFT && existing.sui_ref !== nft.nftId))) {
+                      existing.sui_ref = nft.nftId;
+                      updated = true;
+                    }
+                    
+                    // 更新 transaction_digest：優先保留數據庫中的（如果存在），否則使用鏈上的
+                    if (nft.transactionDigest && !existing.transaction_digest) {
+                      existing.transaction_digest = nft.transactionDigest;
+                      updated = true;
+                    }
+                    
+                    // 如果現有記錄沒有描述，使用 NFT 的描述
+                    if (!existing.description && nft.moodText) {
+                      existing.description = nft.moodText;
+                      updated = true;
+                    }
+                    
+                    // 更新強度（如果 NFT 中有）
+                    if (nft.moodScore > 0) {
+                      const intensity = Math.min(100, Math.max(0, (nft.moodScore / 10) * 100));
+                      if (existing.intensity !== intensity) {
+                        existing.intensity = intensity;
+                        updated = true;
+                      }
+                    }
+                    
+                    // 更新標籤
+                    if (nft.tagsCsv) {
+                      const tags = nft.tagsCsv.split(",").map(t => t.trim()).filter(Boolean);
+                      if (tags.length > 0) {
+                        existing.tags = tags;
+                        updated = true;
+                      }
+                    }
+                    
+                    if (updated) {
+                      existing.proof_status = "confirmed";
+                      nftUpdatedCount++;
+                      console.log(`[Timeline] ✅ Updated record with NFT data:`, existing.id);
+                    }
+                  }
+                }
+                
+                console.log(`[Timeline] NFT merge complete: added ${nftAddedCount}, updated ${nftUpdatedCount}`);
+                
+                if (entryNFTs.length > 0) {
+                  toast({
+                    title: t("timeline.queryCompleted") || "查詢完成",
+                    description: t("timeline.queryCompletedDesc", { count: entryNFTs.length }) || `找到 ${entryNFTs.length} 個 NFT 記錄`,
+                  });
+                }
+              } catch (nftError) {
+                console.error("[Timeline] Error querying EntryNFTs:", nftError);
+                // NFT 查詢失敗不影響其他記錄的載入
+              }
             }
           } catch (supabaseError) {
           console.log("[Timeline] Supabase error:", supabaseError);
@@ -455,14 +594,70 @@ const Timeline = () => {
         console.log(`[Timeline] Starting deduplication with ${allRecords.length} total records`);
         
         // 優先使用 id 作為去重鍵（唯一標識符）
-        // blob_id 作為輔助查找鍵（可能為空或重複）
+        // blob_id 和 sui_ref 作為輔助查找鍵（可能為空或重複）
         const deduplicationMap = new Map<string, EmotionRecord>();
         const blobIdToRecordMap = new Map<string, EmotionRecord>(); // 輔助映射：blob_id -> record
+        const suiRefToRecordMap = new Map<string, EmotionRecord>(); // 輔助映射：sui_ref -> record（用於 NFT 去重）
         
         for (const record of allRecords) {
           // 優先使用 id 作為主鍵
           const primaryKey = record.id;
           const existingById = deduplicationMap.get(primaryKey);
+          
+          // 檢查 sui_ref 衝突（不同 id 但指向同一個 NFT）
+          // 判斷記錄類型：
+          // - 鏈上 NFT 記錄：id === sui_ref（id 和 sui_ref 都是 NFT_ID）
+          // - 數據庫記錄：id !== sui_ref（id 是 UUID，sui_ref 是 NFT_ID）
+          // 優先保留數據庫記錄（因為數據更完整，如 transaction_digest、emotion 等）
+          if (record.sui_ref) {
+            const isCurrentNFTRecord = record.id === record.sui_ref; // 當前記錄是否是鏈上 NFT 記錄
+            
+            // 檢查1：是否有其他記錄的 id 等於當前記錄的 sui_ref
+            // 這會匹配：數據庫記錄（id = UUID, sui_ref = NFT_ID）遇到鏈上 NFT 記錄（id = NFT_ID）
+            const existingBySuiRefAsId = deduplicationMap.get(record.sui_ref);
+            if (existingBySuiRefAsId && existingBySuiRefAsId.id !== record.id) {
+              const existingIsNFTRecord = existingBySuiRefAsId.id === existingBySuiRefAsId.sui_ref;
+              
+              // 優先保留數據庫記錄（id !== sui_ref）
+              if (!existingIsNFTRecord && isCurrentNFTRecord) {
+                // existingBySuiRefAsId 是數據庫記錄，record 是鏈上 NFT 記錄，保留數據庫記錄
+                console.log(`[Timeline] Dedup: sui_ref conflict - keeping database record ${existingBySuiRefAsId.id}, skipping chain NFT record ${record.id}`);
+                continue;
+              } else if (existingIsNFTRecord && !isCurrentNFTRecord) {
+                // existingBySuiRefAsId 是鏈上 NFT 記錄，record 是數據庫記錄，替換
+                console.log(`[Timeline] Dedup: sui_ref conflict - replacing chain NFT record ${existingBySuiRefAsId.id} with database record ${record.id}`);
+                deduplicationMap.set(record.id, record);
+                if (record.sui_ref && record.sui_ref !== record.id) {
+                  suiRefToRecordMap.set(record.sui_ref, record);
+                }
+                deduplicationMap.delete(existingBySuiRefAsId.id);
+                continue;
+              }
+              // 如果兩個都是同一類型，繼續處理（讓後續邏輯處理）
+            }
+            
+            // 檢查2：是否有其他記錄的 sui_ref 等於當前記錄的 id（通過輔助映射）
+            // 這會匹配：鏈上 NFT 記錄（id = NFT_ID）遇到數據庫記錄（id = UUID, sui_ref = NFT_ID）
+            const existingBySuiRef = suiRefToRecordMap.get(record.sui_ref);
+            if (existingBySuiRef && existingBySuiRef.id !== record.id) {
+              const existingIsNFTRecord = existingBySuiRef.id === existingBySuiRef.sui_ref;
+              
+              // 優先保留數據庫記錄
+              if (!existingIsNFTRecord && isCurrentNFTRecord) {
+                // existingBySuiRef 是數據庫記錄，record 是鏈上 NFT 記錄，保留數據庫記錄
+                console.log(`[Timeline] Dedup: sui_ref conflict - keeping database record ${existingBySuiRef.id}, skipping chain NFT record ${record.id}`);
+                continue;
+              } else if (existingIsNFTRecord && !isCurrentNFTRecord) {
+                // existingBySuiRef 是鏈上 NFT 記錄，record 是數據庫記錄，替換
+                console.log(`[Timeline] Dedup: sui_ref conflict - replacing chain NFT record ${existingBySuiRef.id} with database record ${record.id}`);
+                deduplicationMap.set(record.id, record);
+                suiRefToRecordMap.set(record.sui_ref, record);
+                deduplicationMap.delete(existingBySuiRef.id);
+                continue;
+              }
+              // 如果兩個都是同一類型，繼續處理
+            }
+          }
           
           if (!existingById) {
             // 新記錄，添加到主映射
@@ -471,6 +666,11 @@ const Timeline = () => {
             // 如果 blob_id 存在且不同於 id，也建立輔助映射（用於查找）
             if (record.blob_id && record.blob_id !== primaryKey) {
               blobIdToRecordMap.set(record.blob_id, record);
+            }
+            
+            // 如果 sui_ref 存在且不同於 id，建立輔助映射（用於 NFT 去重）
+            if (record.sui_ref && record.sui_ref !== primaryKey) {
+              suiRefToRecordMap.set(record.sui_ref, record);
             }
           } else {
             // id 已存在，比較時間戳，保留最新的
@@ -484,6 +684,9 @@ const Timeline = () => {
               // 更新輔助映射
               if (record.blob_id && record.blob_id !== primaryKey) {
                 blobIdToRecordMap.set(record.blob_id, record);
+              }
+              if (record.sui_ref && record.sui_ref !== primaryKey) {
+                suiRefToRecordMap.set(record.sui_ref, record);
               }
             } else {
               console.log(`[Timeline] Dedup: keeping ${existingById.id} (same id, older or equal timestamp), skipping ${record.id}`);
@@ -598,11 +801,18 @@ const Timeline = () => {
     loadRecords();
   }, [currentAccount]);
 
-  // 生成 Sui Scan 链接
+  // 生成 Sui Scan 链接（对象）
   const getSuiScanUrl = (objectId: string | null): string | null => {
     if (!objectId) return null;
     // Sui Scan testnet URL format: https://suiscan.xyz/testnet/object/{objectId}
     return `https://suiscan.xyz/testnet/object/${objectId}`;
+  };
+
+  // 生成 Sui Scan 交易链接
+  const getSuiScanTransactionUrl = (transactionDigest: string | null | undefined): string | null => {
+    if (!transactionDigest) return null;
+    // Sui Scan testnet transaction URL format: https://suiscan.xyz/testnet/tx/{transactionDigest}
+    return `https://suiscan.xyz/testnet/tx/${transactionDigest}`;
   };
 
   // 指數退避重試函數
@@ -624,7 +834,8 @@ const Timeline = () => {
   }, []);
 
   // 判斷記錄是否為本地儲存
-  const isLocalRecord = (record: EmotionRecord) => {
+  // 使用 useCallback 缓存 isLocalRecord 函数，避免每次渲染时重新创建
+  const isLocalRecord = useCallback((record: EmotionRecord) => {
     // 檢查 blob_id 和 walrus_url 來判斷是否為本地記錄
     // 如果 blob_id 以 "local_" 開頭，或 walrus_url 以 "local://" 開頭，則為本地記錄
     const blobId = record.blob_id || "";
@@ -650,10 +861,21 @@ const Timeline = () => {
     }
     
     return isLocal;
-  };
+  }, []);
 
   // 解密記錄描述
   const decryptDescription = useCallback(async (record: EmotionRecord) => {
+    // NFT 記錄的描述（mood_text）是明文存儲的，不需要解密
+    // 檢查是否為 NFT 記錄：id 和 sui_ref 相同
+    const isNFTRecord = record.sui_ref && record.id === record.sui_ref;
+    if (isNFTRecord && record.description) {
+      // NFT 記錄的描述已經是明文，直接設置
+      setDecryptedDescriptions(prev => ({
+        ...prev,
+        [record.id]: record.description,
+      }));
+      return;
+    }
     // 如果正在解密，則跳過
     if (decryptingRecords.has(record.id)) {
       return;
@@ -1008,6 +1230,15 @@ const Timeline = () => {
   }, [decryptedDescriptions, decryptingRecords, currentAccount, toast, t, isLocalRecord, retryWithBackoff]);
 
   // 獲取所有可用的標籤
+  // 緩存是否有非本地記錄（用於顯示 Testnet 警告）
+  const hasNonLocalRecords = useMemo(() => {
+    return records.some(r => !isLocalRecord(r));
+  }, [records, isLocalRecord]);
+  
+  // 警告横幅显示状态：跟随 hasNonLocalRecords 的变化
+  // 使用 useMemo 直接计算，避免不必要的 state 更新
+  const showWarningBanner = hasNonLocalRecords;
+
   const availableTags = useMemo(() => {
     const tagSet = new Set<string>();
     records.forEach(record => {
@@ -1022,17 +1253,11 @@ const Timeline = () => {
   const filteredRecords = useMemo(() => {
     let filtered = records;
     
-    // 1. 儲存類型過濾
-    const isLocal = (record: EmotionRecord) => {
-      const blobId = record.blob_id || "";
-      const walrusUrl = record.walrus_url || "";
-      return blobId.startsWith("local_") || walrusUrl.startsWith("local://");
-    };
-    
+    // 1. 儲存類型過濾（使用已定義的 isLocalRecord 函數，避免代碼重複）
     if (filter === "local") {
-      filtered = filtered.filter(isLocal);
+      filtered = filtered.filter(isLocalRecord);
     } else if (filter === "walrus") {
-      filtered = filtered.filter(r => !isLocal(r));
+      filtered = filtered.filter(r => !isLocalRecord(r));
     }
     
     // 2. 日期範圍過濾
@@ -1090,7 +1315,7 @@ const Timeline = () => {
     });
     
     return sorted;
-  }, [records, filter, searchQuery, selectedTags, sortBy, sortOrder, decryptedDescriptions, i18n.language, dateRange]);
+  }, [records, filter, searchQuery, selectedTags, sortBy, sortOrder, decryptedDescriptions, i18n.language, dateRange, isLocalRecord]);
 
   // 虛擬滾動器配置
   // 使用動態高度估計以提升滾動準確性
@@ -1547,10 +1772,11 @@ const Timeline = () => {
         privacy: isZh ? "是否公開" : "Privacy",
         status: isZh ? "狀態" : "Status",
         suiRef: isZh ? "Sui 引用" : "Sui Reference",
+        transactionDigest: isZh ? "鑄造交易" : "Mint Transaction",
       };
 
       const headers: string[] = [];
-      const fieldOrder: Array<keyof typeof customExportFields> = ["date", "emotion", "intensity", "description", "storage", "privacy", "status", "suiRef"];
+      const fieldOrder: Array<keyof typeof customExportFields> = ["date", "emotion", "intensity", "description", "storage", "privacy", "status", "suiRef", "transactionDigest"];
       
       fieldOrder.forEach(field => {
         if (customExportFields[field]) {
@@ -1585,6 +1811,9 @@ const Timeline = () => {
         }
         if (customExportFields.suiRef && record.sui_ref) {
           row.push(record.sui_ref);
+        }
+        if (customExportFields.transactionDigest && record.transaction_digest) {
+          row.push(record.transaction_digest);
         }
         
         return row;
@@ -1639,6 +1868,11 @@ const Timeline = () => {
         }
         if (customExportFields.suiRef && record.sui_ref) {
           data.suiRef = record.sui_ref;
+        }
+        if (customExportFields.transactionDigest && record.transaction_digest) {
+          data.transactionDigest = record.transaction_digest;
+          // 同時提供 Sui Scan 鏈接
+          data.transactionUrl = getSuiScanTransactionUrl(record.transaction_digest) || null;
         }
         
         // 始終包含 ID（用於追蹤）
@@ -1735,6 +1969,10 @@ const Timeline = () => {
           doc.text(`${isZh ? "Sui 引用" : "Sui Reference"}: ${record.sui_ref}`, margin, yPos);
           yPos += lineHeight;
         }
+        if (customExportFields.transactionDigest && record.transaction_digest) {
+          doc.text(`${isZh ? "鑄造交易" : "Mint Transaction"}: ${record.transaction_digest}`, margin, yPos);
+          yPos += lineHeight;
+        }
         
         yPos += 5;
         
@@ -1799,6 +2037,14 @@ const Timeline = () => {
         if (customExportFields.suiRef && record.sui_ref) {
           mdContent.push(`**${isZh ? "Sui 引用" : "Sui Reference"}**: ${record.sui_ref}  \n`);
         }
+        if (customExportFields.transactionDigest && record.transaction_digest) {
+          const txUrl = getSuiScanTransactionUrl(record.transaction_digest);
+          if (txUrl) {
+            mdContent.push(`**${isZh ? "鑄造交易" : "Mint Transaction"}**: [${record.transaction_digest}](${txUrl})  \n`);
+          } else {
+            mdContent.push(`**${isZh ? "鑄造交易" : "Mint Transaction"}**: ${record.transaction_digest}  \n`);
+          }
+        }
         
         mdContent.push("\n---\n\n");
       });
@@ -1833,6 +2079,19 @@ const Timeline = () => {
 
   const handleDeleteConfirm = useCallback(async () => {
     if (!recordToDelete) return;
+    
+    // 檢查是否為 NFT 記錄（id 和 sui_ref 相同）
+    const isNFTRecord = recordToDelete.sui_ref && recordToDelete.id === recordToDelete.sui_ref;
+    
+    // 如果是 NFT 記錄，顯示特殊提示
+    if (isNFTRecord) {
+      const confirmMessage = "⚠️ 這是 NFT 記錄\n\n刪除操作只會從本地數據庫移除記錄，鏈上的 NFT 仍然存在且無法刪除。\n\n確定要繼續嗎？";
+      if (!window.confirm(confirmMessage)) {
+        setDeleteDialogOpen(false);
+        setRecordToDelete(null);
+        return;
+      }
+    }
     
     setIsDeleting(true);
     try {
@@ -1871,7 +2130,9 @@ const Timeline = () => {
       
       toast({
         title: t("timeline.deleteSuccess") || "刪除成功",
-        description: t("timeline.deleteSuccessDesc") || "記錄已刪除",
+        description: isNFTRecord 
+          ? "記錄已從數據庫刪除（鏈上 NFT 仍然存在）"
+          : (t("timeline.deleteSuccessDesc") || "記錄已刪除"),
       });
       
       setDeleteDialogOpen(false);
@@ -2149,18 +2410,18 @@ const Timeline = () => {
           </Card>
         )}
 
-        {/* Testnet Warning Banner */}
-        {records.some(r => !isLocalRecord(r)) && (
-          <Card className="p-4 mb-4 bg-yellow-500/10 border-yellow-500/30">
-            <div className="flex items-start gap-3">
-              <div className="text-yellow-500 mt-0.5">⚠️</div>
-              <div className="flex-1 text-sm">
-                <div className="font-semibold text-yellow-600 dark:text-yellow-400 mb-1">
-                  {t("timeline.testnetWarning")}
-                </div>
-                <div className="text-muted-foreground">
-                  {t("timeline.testnetWarningDesc")}
-                </div>
+        {/* Testnet Warning Banner - 只顯示一次 */}
+        {showWarningBanner && (
+          <Card 
+            key="testnet-warning-banner" 
+            className="p-4 mb-4 bg-yellow-500/10 border-yellow-500/30"
+          >
+            <div className="text-sm">
+              <div className="font-semibold text-yellow-600 dark:text-yellow-400 mb-1">
+                {t("timeline.testnetWarning")}
+              </div>
+              <div className="text-muted-foreground">
+                {t("timeline.testnetWarningDesc")}
               </div>
             </div>
           </Card>
@@ -3518,6 +3779,13 @@ const Timeline = () => {
                                 )}
                               </>
                             )}
+                            {/* 檢查是否為 NFT 記錄：id 和 sui_ref 相同，且 blob_id 以 nft_ 開頭或沒有 walrus_url */}
+                            {record.sui_ref && record.id === record.sui_ref && (
+                              <span className="px-2 py-1 rounded-full bg-purple-500/10 text-purple-500 text-xs inline-flex items-center gap-1">
+                                <Sparkles className="w-3 h-3" />
+                                NFT
+                              </span>
+                            )}
                             {record.sui_ref && (
                               <>
                                 <span className="px-2 py-1 rounded-full bg-primary/10 text-primary text-xs">{t("timeline.onChain")}</span>
@@ -3529,6 +3797,20 @@ const Timeline = () => {
                                     className="px-2 py-1 rounded-full bg-blue-500/10 text-blue-500 text-xs hover:bg-blue-500/20 transition-colors inline-flex items-center gap-1"
                                   >
                                     {t("timeline.viewOnSuiScan")}
+                                    <span>↗</span>
+                                  </a>
+                                )}
+                                {/* 如果是 NFT 記錄且有交易 digest，顯示查看鑄造交易的鏈接 */}
+                                {record.sui_ref && record.id === record.sui_ref && record.transaction_digest && getSuiScanTransactionUrl(record.transaction_digest) && (
+                                  <a
+                                    href={getSuiScanTransactionUrl(record.transaction_digest)!}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="px-2 py-1 rounded-full bg-purple-500/10 text-purple-500 text-xs hover:bg-purple-500/20 transition-colors inline-flex items-center gap-1"
+                                    title="查看鑄造交易"
+                                  >
+                                    <Sparkles className="w-3 h-3" />
+                                    查看鑄造交易
                                     <span>↗</span>
                                   </a>
                                 )}
@@ -3679,6 +3961,22 @@ const Timeline = () => {
                         className="text-xs text-primary hover:underline"
                       >
                         {selectedRecord.sui_ref.slice(0, 16)}...
+                      </a>
+                    </div>
+                  )}
+                  {/* 如果是 NFT 記錄且有交易 digest，顯示鑄造交易鏈接 */}
+                  {selectedRecord.sui_ref && selectedRecord.id === selectedRecord.sui_ref && selectedRecord.transaction_digest && getSuiScanTransactionUrl(selectedRecord.transaction_digest) && (
+                    <div>
+                      <h4 className="text-xs font-semibold text-muted-foreground mb-1">鑄造交易</h4>
+                      <a
+                        href={getSuiScanTransactionUrl(selectedRecord.transaction_digest)!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-purple-500 hover:underline inline-flex items-center gap-1"
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        {selectedRecord.transaction_digest.slice(0, 16)}...
+                        <span>↗</span>
                       </a>
                     </div>
                   )}
@@ -3838,6 +4136,18 @@ const Timeline = () => {
                   />
                   <Label htmlFor="field-suiRef" className="cursor-pointer text-sm">
                     {t("timeline.exportFieldSuiRef") || "Sui 引用"}
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="field-transactionDigest"
+                    checked={customExportFields.transactionDigest}
+                    onCheckedChange={(checked) =>
+                      setCustomExportFields(prev => ({ ...prev, transactionDigest: checked as boolean }))
+                    }
+                  />
+                  <Label htmlFor="field-transactionDigest" className="cursor-pointer text-sm">
+                    {t("timeline.exportFieldTransactionDigest") || "鑄造交易"}
                   </Label>
                 </div>
               </div>

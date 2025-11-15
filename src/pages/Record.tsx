@@ -11,6 +11,7 @@ import { Sparkles, ArrowLeft, Loader2, Lock, Unlock, Database } from "lucide-rea
 import { useToast } from "@/hooks/use-toast";
 import { useCurrentAccount, useCurrentWallet } from "@mysten/dapp-kit";
 import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
+import { toBase64 } from "@mysten/sui/utils";
 import { encryptData, generateUserKey, generateUserKeyFromId, PUBLIC_SEAL_KEY } from "@/lib/encryption";
 import { prepareEmotionSnapshot, uploadToWalrusWithSDK, createSignerFromWallet } from "@/lib/walrus";
 import { validateAndSanitizeDescription, emotionSnapshotSchema } from "@/lib/validation";
@@ -18,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { addEmotionRecord, initializeEncryptedStorage } from "@/lib/localIndex";
 import type { EmotionRecord } from "@/lib/dataSchema";
 import { postEmotion } from "@/lib/api";
+import { getOrCreateJournal, mintEntry } from "@/lib/mintContract";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import WalletConnect from "@/components/WalletConnect";
 import { getOrCreateAnonymousUserKey, getOrCreateAnonymousUserId } from "@/lib/anonymousIdentity";
@@ -80,6 +82,7 @@ const Record = () => {
   const [isPublic, setIsPublic] = useState(false);
   const [saveLocally, setSaveLocally] = useState(true); // 默认保存到本地
   const [backupToDatabase, setBackupToDatabase] = useState(true); // 是否備份到 Supabase
+  const [mintAsNFT, setMintAsNFT] = useState(false); // 是否鑄造為 NFT
   const [epochs, setEpochs] = useState([200]); // Walrus 儲存期限（epochs），預設 200 epochs
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<"idle" | "encrypting" | "uploading" | "saving" | "success" | "error">("idle");
@@ -268,6 +271,14 @@ const Record = () => {
       });
       return;
     }
+
+    // Debug: Log all relevant states at submit time
+    console.log("[Record] 📝 Submit started with states:", {
+      mintAsNFT,
+      saveLocally,
+      currentAccount: currentAccount?.address,
+      walletConnected: !!currentWallet,
+    });
 
     setIsSubmitting(true);
     setUploadStatus("encrypting");
@@ -490,12 +501,190 @@ const Record = () => {
         checkWalletConnection();
         
         console.log("[Record] ✅ SDK upload successful:", sdkResult);
+        console.log("[Record] 🔍 Debug info:", {
+          mintAsNFT,
+          currentAccount: currentAccount?.address,
+          walletConnected: !!currentWallet,
+        });
+        
+        // Mint NFT if user selected the option
+        let nftId: string | null = null;
+        let nftTransactionDigest: string | null = null;
+        if (mintAsNFT) {
+          console.log("[Record] 🎨 NFT minting is ENABLED, starting process...");
+          try {
+            console.log("[Record] 🎨 Starting NFT minting process...");
+            setUploadStatus("uploading"); // Keep uploading status for NFT minting
+            
+            // Import checkContractDeployed
+            const { checkContractDeployed } = await import("@/lib/mintContract");
+            
+            // Check if contract is deployed
+            console.log("[Record] Checking if contract is deployed...");
+            const isDeployed = await checkContractDeployed();
+            if (!isDeployed) {
+              throw new Error("合約尚未部署到 testnet。請先部署合約或聯繫開發者。");
+            }
+            
+            // Get or create Journal
+            // Use signer's signAndExecuteTransaction method (from createSignerFromWallet)
+            const signAndExecute = async ({ transaction, chain }: any) => {
+              console.log("[Record] Signing transaction for NFT minting...");
+              try {
+                const result = await signer.signAndExecuteTransaction({
+                  transaction,
+                  client: suiClient,
+                });
+                console.log("[Record] Transaction signed and executed:", result.digest);
+                return result;
+              } catch (signError: any) {
+                console.error("[Record] Transaction signing error:", signError);
+                throw new Error(`交易簽名失敗: ${signError.message || "未知錯誤"}`);
+              }
+            };
+            
+            console.log("[Record] Getting or creating Journal...");
+            const journalId = await getOrCreateJournal(signAndExecute, currentAccount.address);
+            if (!journalId) {
+              throw new Error("無法獲取或創建 Journal，請檢查錢包連接和餘額");
+            }
+            console.log("[Record] Journal ID:", journalId);
+            
+            // 檢查今天是否已經鑄造過 NFT
+            const { checkTodayMinted } = await import("@/lib/mintContract");
+            const alreadyMintedToday = await checkTodayMinted(journalId);
+            if (alreadyMintedToday) {
+              throw new Error("今天已經鑄造過 NFT，每天只能鑄造一次。請明天再試。");
+            }
+            
+            // Calculate mood score (1-10) from intensity (0-100)
+            const moodScore = Math.max(1, Math.min(10, Math.round(intensityValue / 10)));
+            
+            // Prepare tags CSV
+            const tagsCsv = tags.length > 0 ? tags.join(",") : "";
+            
+            // Use Walrus URL as image URL (or empty if not available)
+            const imageUrl = sdkResult.walrusUrl || "";
+            const imageMime = "text/plain"; // Since we're storing encrypted data
+            
+            // Mint the NFT
+            console.log("[Record] Minting Entry NFT with params:", {
+              journalId,
+              moodScore,
+              descriptionLength: sanitizedDescription.length,
+              tagsCsv,
+              imageUrl: imageUrl ? `${imageUrl.substring(0, 50)}...` : "empty",
+            });
+            
+            const mintResult = await mintEntry(
+              signAndExecute,
+              journalId,
+              moodScore,
+              sanitizedDescription,
+              tagsCsv,
+              imageUrl,
+              imageMime,
+              undefined, // imageSha256 - optional
+              undefined, // audioUrl - optional
+              undefined, // audioMime - optional
+              undefined, // audioSha256 - optional
+              undefined, // audioDurationMs - optional
+              currentAccount.address // sender
+            );
+            
+            if (!mintResult || !mintResult.nftId) {
+              throw new Error("NFT 鑄造完成但未返回 NFT ID");
+            }
+            
+            nftId = mintResult.nftId;
+            nftTransactionDigest = mintResult.transactionDigest;
+            
+            console.log("[Record] ✅ NFT minted successfully! NFT ID:", nftId, "Transaction:", nftTransactionDigest);
+          } catch (nftError: any) {
+            console.error("[Record] ❌ NFT minting failed:", nftError);
+            console.error("[Record] Error details:", {
+              message: nftError?.message,
+              stack: nftError?.stack,
+              name: nftError?.name,
+              code: nftError?.code,
+              cause: nftError?.cause,
+            });
+            
+            // 記錄詳細錯誤信息到本地存儲（用於調試）
+            try {
+              const errorLog = {
+                timestamp: new Date().toISOString(),
+                error: {
+                  message: nftError?.message,
+                  name: nftError?.name,
+                  code: nftError?.code,
+                  stack: nftError?.stack?.substring(0, 500), // 限制長度
+                },
+                context: {
+                  walletAddress: currentAccount?.address,
+                  journalId: journalId || "unknown",
+                  moodScore,
+                },
+              };
+              const existingLogs = JSON.parse(localStorage.getItem("nft_mint_errors") || "[]");
+              existingLogs.push(errorLog);
+              // 只保留最近 10 條錯誤記錄
+              const recentLogs = existingLogs.slice(-10);
+              localStorage.setItem("nft_mint_errors", JSON.stringify(recentLogs));
+            } catch (logError) {
+              console.warn("[Record] Failed to log NFT error:", logError);
+            }
+            
+            // Don't fail the entire operation if NFT minting fails
+            // Show warning toast but continue
+            let errorMessage = nftError?.message || "未知錯誤";
+            
+            // 提供更友好的錯誤訊息
+            if (errorMessage.includes("合約尚未部署") || errorMessage.includes("Contract not found")) {
+              errorMessage = "合約尚未部署到 testnet，請聯繫開發者";
+            } else if (errorMessage.includes("餘額不足") || errorMessage.includes("Insufficient")) {
+              errorMessage = "錢包餘額不足，請確保有足夠的 SUI 代幣支付 Gas 費用";
+            } else if (errorMessage.includes("E_DUP_DAY") || errorMessage.includes("duplicate")) {
+              errorMessage = "今天已經鑄造過 NFT，每天只能鑄造一次";
+            } else if (errorMessage.includes("Missing transaction sender")) {
+              errorMessage = "交易發送者缺失，請重新連接錢包";
+            }
+            
+            toast({
+              title: t("record.errors.nftMintFailed") || "NFT 鑄造失敗",
+              description: errorMessage.length > 100 
+                ? `${errorMessage.substring(0, 100)}...` 
+                : errorMessage,
+              variant: "destructive",
+            });
+          }
+        } else {
+          console.log("[Record] ⚠️ NFT minting is DISABLED (mintAsNFT = false)");
+        }
         
         setUploadStatus("success");
-        toast({
-          title: t("record.success.recorded"),
-          description: t("record.success.recordedSDK", { blobId: sdkResult.blobId.slice(0, 8) }),
-        });
+        // Show success toast with NFT info if minted
+        // 如果用户选择了铸造 NFT 但失败了，需要明确告知
+        if (mintAsNFT && !nftId) {
+          // 用户选择了铸造但失败了，显示警告但记录已保存
+          toast({
+            title: t("record.success.recorded") || "記錄已保存",
+            description: t("record.success.recordedButNFTFailed") || "記錄已保存到 Walrus，但 NFT 鑄造失敗。您可以在 Timeline 中查看記錄，稍後可以重新嘗試鑄造。",
+            variant: "default",
+          });
+        } else if (nftId) {
+          // NFT 铸造成功
+          toast({
+            title: t("record.success.recorded"),
+            description: t("record.success.recordedWithNFT") || `記錄已保存並鑄造為 NFT！NFT ID: ${nftId.slice(0, 8)}...`,
+          });
+        } else {
+          // 没有选择铸造 NFT 或铸造成功
+          toast({
+            title: t("record.success.recorded"),
+            description: t("record.success.recordedSDK", { blobId: sdkResult.blobId.slice(0, 8) }),
+          });
+        }
         
         // Try to save metadata to backend and Supabase (optional)
         try {
@@ -517,26 +706,41 @@ const Record = () => {
               console.warn("[Record] ⚠️ Backup requested but no Supabase session.");
             } else {
               console.log("[Record] Backing up encrypted_data to Supabase after SDK upload...");
+              // 優先使用 NFT ID 作為 sui_ref（如果已鑄造），否則使用 Walrus blob 的 object ID
+              const suiRef = nftId || sdkResult.suiRef;
+              
+              // 準備插入數據，transaction_digest 是可選的
+              const recordData: any = {
+                user_id: backupSession.user.id,
+                emotion: selectedEmotion as any,
+                intensity: intensityValue,
+                blob_id: sdkResult.blobId,
+                walrus_url: `https://aggregator.testnet.walrus.space/v1/${sdkResult.blobId}`,
+                payload_hash: '',
+                encrypted_data: encryptedString,
+                is_public: isPublic,
+                proof_status: 'confirmed' as any,
+                sui_ref: suiRef, // 使用 NFT ID（如果已鑄造）或 Walrus blob object ID
+                wallet_address: currentAccount.address,
+              };
+              
+              // 只有在有 transaction_digest 時才添加（避免數據庫字段不存在時出錯）
+              if (nftTransactionDigest) {
+                recordData.transaction_digest = nftTransactionDigest;
+              }
+              
               const { error: backupError } = await supabase
                 .from('emotion_records')
-                .insert([{
-                  user_id: backupSession.user.id,
-                  emotion: selectedEmotion as any,
-                  intensity: intensityValue,
-                  blob_id: sdkResult.blobId,
-                  walrus_url: `https://aggregator.testnet.walrus.space/v1/${sdkResult.blobId}`,
-                  payload_hash: '',
-                  encrypted_data: encryptedString,
-                  is_public: isPublic,
-                  proof_status: 'confirmed' as any,
-                  sui_ref: sdkResult.suiRef,
-                  wallet_address: currentAccount.address,
-                }]);
+                .insert([recordData]);
               
               if (backupError) {
                 console.error("[Record] Failed to backup to Supabase:", backupError);
+                // 如果是 transaction_digest 字段不存在的錯誤，記錄但不影響主流程
+                if (backupError.message?.includes("transaction_digest") || backupError.message?.includes("column")) {
+                  console.warn("[Record] ⚠️ transaction_digest field may not exist in database. Please run migration.");
+                }
               } else {
-                console.log("[Record] ✅ Successfully backed up to Supabase");
+                console.log("[Record] ✅ Successfully backed up to Supabase", nftId ? `with NFT ID: ${nftId}` : "", nftTransactionDigest ? `and transaction: ${nftTransactionDigest.slice(0, 8)}...` : "");
               }
             }
           }
@@ -544,7 +748,11 @@ const Record = () => {
           console.warn("[Record] Metadata save failed (not critical):", metadataError);
         }
         
-        setTimeout(() => navigate("/timeline"), 1200);
+        // Wait a bit before navigating to show success message
+        // If NFT was minted, wait a bit longer to show the NFT ID
+        const delay = nftId ? 2000 : 1200;
+        console.log("[Record] Navigating to timeline in", delay, "ms, NFT ID:", nftId);
+        setTimeout(() => navigate("/timeline"), delay);
         return;
       } catch (sdkError: any) {
         console.error("[Record] SDK upload failed:", sdkError);
@@ -1159,6 +1367,34 @@ const Record = () => {
                         </div>
                       </div>
                     </div>
+                    
+                    {/* NFT Minting Option */}
+                    {currentAccount && (
+                      <Card className="p-4 border-border/50 bg-card/50">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-full bg-purple-500/10 flex items-center justify-center">
+                              <Sparkles className="h-5 w-5 text-purple-500" />
+                            </div>
+                            <div className="flex-1">
+                              <Label htmlFor="mintNFT" className="text-sm font-semibold cursor-pointer">
+                                {mintAsNFT ? (t("record.nft.mint") || "鑄造為 NFT") : (t("record.nft.mintDisabled") || "不鑄造 NFT")}
+                              </Label>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {mintAsNFT 
+                                  ? (t("record.nft.mintDesc") || "將此記錄鑄造為 Sui 鏈上 NFT，永久保存")
+                                  : (t("record.nft.mintDisabledDesc") || "僅保存到 Walrus，不鑄造 NFT")}
+                              </p>
+                            </div>
+                          </div>
+                          <Switch
+                            id="mintNFT"
+                            checked={mintAsNFT}
+                            onCheckedChange={setMintAsNFT}
+                          />
+                        </div>
+                      </Card>
+                    )}
                   </>
                 )}
                   </div>
