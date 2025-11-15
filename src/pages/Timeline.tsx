@@ -108,6 +108,7 @@ const Timeline = () => {
     privacy: true,
     status: true,
     suiRef: false,
+    transactionDigest: false,
   });
   const [dateFormat, setDateFormat] = useState<"locale" | "iso" | "custom">("locale");
 
