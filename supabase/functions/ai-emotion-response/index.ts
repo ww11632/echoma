@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
     let serviceClient: ReturnType<typeof createClient> | null = null;
 
     if (authHeader) {
-      // Authenticated user path
+      // Try authenticated user path first
       supabase = createClient(
         supabaseUrl ?? '',
         supabaseKey ?? '',
@@ -58,22 +58,21 @@ Deno.serve(async (req) => {
       });
       
       if (authError || !authData?.user) {
-        console.error('[AI Response] Authentication failed:', authError?.message);
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: 'Unauthorized',
-            errorCode: 'UNAUTHORIZED'
-          }),
-          {
-            status: 401,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          }
-        );
+        console.warn('[AI Response] Authentication failed, falling back to anonymous mode:', authError?.message);
+        // Fall back to anonymous mode instead of rejecting
+        isAnonymous = true;
+        
+        // Create service client for anonymous rate limiting
+        if (supabaseUrl && supabaseServiceKey) {
+          serviceClient = createClient(supabaseUrl, supabaseServiceKey);
+        }
+        
+        // Recreate client without auth
+        supabase = createClient(supabaseUrl ?? '', supabaseKey ?? '');
+      } else {
+        user = authData.user;
+        console.log('User authenticated:', user.id);
       }
-
-      user = authData.user;
-      console.log('User authenticated:', user.id);
     } else {
       // Anonymous user path - require anonymousId in request body
       isAnonymous = true;
