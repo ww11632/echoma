@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { ArrowLeft, Home, Sparkles, Shield, Clock, Lock, Unlock, Loader2, BookOpen, BarChart3, Filter, Eye, EyeOff, Search, Download, ArrowUpDown, X, MoreVertical, Trash2, Calendar as CalendarIcon, CheckSquare, Square, TrendingUp, Link2 } from "lucide-react";
 import type { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { getEncryptedEmotionByBlob } from "@/lib/api";
 import { readFromWalrus } from "@/lib/walrus";
 import { decryptDataWithMigration, generateUserKeyFromId, DecryptionError, DecryptionErrorType, PUBLIC_SEAL_KEY } from "@/lib/encryption";
 import type { EncryptedData } from "@/lib/encryption";
