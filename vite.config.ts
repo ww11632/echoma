@@ -67,6 +67,16 @@ export default defineConfig(({ mode }) => ({
         manualChunks: (id) => {
           // 将 node_modules 中的大型库分离
           if (id.includes("node_modules")) {
+            // React 和相关库必须在一起，确保加载顺序
+            if (
+              id.includes("react") || 
+              id.includes("react-dom") || 
+              id.includes("react/jsx-runtime") ||
+              id.includes("react-i18next") ||
+              id.includes("i18next")
+            ) {
+              return "vendor-react";
+            }
             if (id.includes("@mysten")) {
               return "vendor-sui";
             }
@@ -75,9 +85,6 @@ export default defineConfig(({ mode }) => ({
             }
             if (id.includes("@radix-ui")) {
               return "vendor-ui";
-            }
-            if (id.includes("react") || id.includes("react-dom")) {
-              return "vendor-react";
             }
             // 其他第三方库
             return "vendor";
