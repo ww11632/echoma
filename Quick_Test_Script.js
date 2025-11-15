@@ -253,7 +253,7 @@ function runAllTests() {
   console.log('  - 如果看到 ❌，表示发现问题');
   console.log('  - 如果看到 ⚠️，表示需要注意');
   console.log('  - 如果看到 ✅，表示测试通过');
-  console.log('\n📝 详细测试步骤请查看: 功能测试指南.md');
+  console.log('\n📝 详细测试步骤请查看: Functional_Test_Guide.md');
 }
 
 // 自动运行测试
