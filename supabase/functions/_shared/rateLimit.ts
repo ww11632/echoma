@@ -4,6 +4,7 @@
  */
 
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { corsHeaders } from './cors.ts';
 
 /**
  * Rate limit configuration
@@ -166,6 +167,7 @@ export function createRateLimitResponse(
     {
       status: 429,
       headers: {
+        ...corsHeaders,
         'Content-Type': 'application/json',
         'Retry-After': resetSeconds.toString(),
         'X-RateLimit-Limit': maxRequests.toString(),
