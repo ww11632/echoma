@@ -9,7 +9,7 @@ Each user owns a `Journal` object, and every day’s record becomes a unique `En
 
 | Item | Value |
 |------|-------|
-| **Package ID** | `0x164946ea72fa61a075956caaf80bde3a75fd2feb90a903f1bac8441830cba248` |
+| **Package ID** | `0x55f1c575f979ad2b16c264191627ca6716c9b0b397ab041280da1ad6bce37e71` |
 | **UpgradeCap ID** | `0xf7b8509d980301b3cf6e94f2336b86115ec5f6ca6e46522ddf52098c127eb7f5` |
 | **Module Name** | `diary` |
 | **Deployer** | `0x439bfbeeeecd537d47d4f09f63f53ea318962611ce4e26cbf140503728e4691d` |
@@ -43,14 +43,14 @@ sui move build
 
 ## Create Journal
 sui client call \
-  --package 0x164946ea72fa61a075956caaf80bde3a75fd2feb90a903f1bac8441830cba248 \
+  --package 0x55f1c575f979ad2b16c264191627ca6716c9b0b397ab041280da1ad6bce37e71 \
   --module diary \
   --function create_journal \
   --gas-budget 10000000
 
 ## Mint NFT
 sui client call \
-  --package 0x164946ea72fa61a075956caaf80bde3a75fd2feb90a903f1bac8441830cba248 \
+  --package 0x55f1c575f979ad2b16c264191627ca6716c9b0b397ab041280da1ad6bce37e71 \
   --module diary \
   --function mint_entry \
   --args \

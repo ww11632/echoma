@@ -2044,15 +2044,12 @@ const AuthTimeline = () => {
         {/* Testnet Warning Banner */}
         {records.some(r => !isLocalRecord(r)) && (
           <Card className="p-4 mb-4 bg-yellow-500/10 border-yellow-500/30">
-            <div className="flex items-start gap-3">
-              <div className="text-yellow-500 mt-0.5">⚠️</div>
-              <div className="flex-1 text-sm">
-                <div className="font-semibold text-yellow-600 dark:text-yellow-400 mb-1">
-                  {t("timeline.testnetWarning")}
-                </div>
-                <div className="text-muted-foreground">
-                  {t("timeline.testnetWarningDesc")}
-                </div>
+            <div className="text-sm">
+              <div className="font-semibold text-yellow-600 dark:text-yellow-400 mb-1">
+                {t("timeline.testnetWarning")}
+              </div>
+              <div className="text-muted-foreground">
+                {t("timeline.testnetWarningDesc")}
               </div>
             </div>
           </Card>

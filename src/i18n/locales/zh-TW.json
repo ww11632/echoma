@@ -175,7 +175,9 @@
       "dataTooLarge": "資料過大",
       "dataTooLargeDesc": "您輸入的內容過長。請縮短描述後再試。",
       "storageQuotaExceeded": "本地儲存空間不足",
-      "storageQuotaExceededDesc": "瀏覽器本地儲存空間已滿。請清理瀏覽器數據或刪除一些舊記錄後再試。"
+      "storageQuotaExceededDesc": "瀏覽器本地儲存空間已滿。請清理瀏覽器數據或刪除一些舊記錄後再試。",
+      "nftMintFailed": "NFT 鑄造失敗",
+      "nftMintFailedDesc": "記錄已保存到 Walrus，但 NFT 鑄造失敗"
     },
     "getAiResponse": "獲得 AI 情緒回應",
     "aiThinking": "AI 正在思考中...",
@@ -187,6 +189,8 @@
       "recordedWalrus": "已儲存至 Walrus：{{blobId}}...",
       "recordedLocalServer": "Walrus 服務暫時無法使用，資料已儲存到本地伺服器。",
       "recordedSDK": "已使用 SDK 儲存至 Walrus：{{blobId}}...",
+      "recordedWithNFT": "記錄已保存並鑄造為 NFT！NFT ID: {{nftId}}...",
+      "recordedButNFTFailed": "記錄已保存到 Walrus，但 NFT 鑄造失敗。您可以在 Timeline 中查看記錄，稍後可以重新嘗試鑄造。",
       "uploading": "上傳中...",
       "uploadingDesc": "正在加密並儲存您的情緒快照"
     },
@@ -197,6 +201,12 @@
       "signFailedDesc": "錢包簽名失敗，請重試。",
       "transactionCancelled": "交易已取消",
       "transactionCancelledDesc": "您已取消交易。"
+    },
+    "nft": {
+      "mint": "鑄造為 NFT",
+      "mintDisabled": "不鑄造 NFT",
+      "mintDesc": "將此記錄鑄造為 Sui 鏈上 NFT，永久保存並可驗證",
+      "mintDisabledDesc": "僅保存到 Walrus，不鑄造 NFT"
     }
   },
   "timeline": {
@@ -206,7 +216,7 @@
     "logout": "登出",
     "loggedOut": "已登出",
     "loggedOutDesc": "您已成功登出帳號",
-    "testnetWarning": "⚠️ Testnet 資料會在 epochs 到期後被刪除",
+    "testnetWarning": "Testnet 資料會在 epochs 到期後被刪除",
     "testnetWarningDesc": "建議啟用「備份到資料庫」以永久保存",
     "noRecords": "尚未記錄任何情緒",
     "noRecordsDesc": "開始記錄您的情緒旅程",
@@ -305,6 +315,7 @@
     "exportFieldPrivacy": "隱私設置",
     "exportFieldStatus": "狀態",
     "exportFieldSuiRef": "Sui 引用",
+    "exportFieldTransactionDigest": "鑄造交易",
     "exportDateFormat": "日期格式",
     "exportDateFormatLocale": "本地格式（根據系統語言）",
     "exportDateFormatISO": "ISO 8601 格式（YYYY-MM-DDTHH:mm:ss.sssZ）",

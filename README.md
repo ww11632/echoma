@@ -16,7 +16,7 @@ The app helps you track how you feel, but it does not provide medical diagnoses,
 
 - 🔒 **Client-side encryption** – AES-GCM encrypts entries before they ever leave your device
 - 🌊 **Walrus storage** – decentralized, tamper-evident blob storage
-- ⛓️ **Sui blockchain** – NFT proofs certify every record on-chain
+- ⛓️ **Sui blockchain** – NFT proofs certify every record on-chain (implemented with daily minting and transaction tracking)
 - 🤖 **AI-assisted analysis** – empathetic emotional insights in English or Traditional Chinese for both anonymous and authenticated users
 - 📊 **Timeline view** – highly optimized virtualized scrolling (1000+ entries stay smooth)
   - Full visualization suite (emotion distribution, trends, forecasts, correlation, mood calendar)
@@ -419,7 +419,13 @@ Echoma offers three flows tailored to different needs.
      - Default 200 epochs (~200 days)
      - Quick buttons: 5, 200, 365
      - Or use the slider
-  8. Click **Record & Mint NFT**
+  8. Enable **"Mint as NFT"** toggle (requires wallet connection)
+  9. Click **Record & Mint NFT**
+- **NFT Features:**
+  - Daily mint limit: one NFT per day per journal
+  - Automatic Journal creation on first mint
+  - View minting transaction on Sui Scan
+  - NFT records appear in Timeline with special badges
 - **Note** – if decryption fails the UI clarifies that data still lives on-chain but the testnet aggregator cannot serve it.
 
 #### 2. Authenticated Mode (Secure Mode)
@@ -603,11 +609,19 @@ Available in Anonymous *and* Authenticated modes.
 - Emotion analytics (distribution, storage split, time-series, forecast, correlation, calendar)
 - Complete decrypt + viewing UX (auto decrypt, batch decrypt, manual retry, detail dialog, hide content)
 
+### ✅ Recently Completed
+- **NFT Minting on Sui** – Fully implemented and deployed to testnet
+  - Daily mint limit (one NFT per day per journal)
+  - Automatic Journal creation and management
+  - Transaction digest tracking and Sui Scan links
+  - NFT records visible in Timeline with special badges
+  - Contract Package ID: `0x55f1c575f979ad2b16c264191627ca6716c9b0b397ab041280da1ad6bce37e71`
+  - See [nft_mint_test/README.md](./nft_mint_test/README.md) for contract details
+
 ### 🚧 In Progress / Planned
 - Full Argon2id support (currently falls back to enhanced PBKDF2)
 - User password/phrase input UI for stronger keys
   - `generateUserKey` already accepts `userPassword`; needs front-end controls
-- Sui Move contract for NFT minting
 - Multi-chain network switching
 - Realtime security monitoring alerts
 - Dynamic keyword updates for crisis detection
@@ -702,4 +716,4 @@ Configuration details are in [SECURITY_FEATURES.md](./SECURITY_FEATURES.md).
 
 ---
 
-**Heads-up:** the project is still in active development. Some features (such as full NFT minting) are on the roadmap, but the MVP experience is fully functional today.
+**Heads-up:** the project is still in active development. Core features including NFT minting are fully functional. The MVP experience is production-ready for testnet use.

@@ -175,7 +175,9 @@
       "dataTooLarge": "Data Too Large",
       "dataTooLargeDesc": "Your input is too long. Please shorten your description and try again.",
       "storageQuotaExceeded": "Local Storage Quota Exceeded",
-      "storageQuotaExceededDesc": "Browser local storage is full. Please clear browser data or delete some old records and try again."
+      "storageQuotaExceededDesc": "Browser local storage is full. Please clear browser data or delete some old records and try again.",
+      "nftMintFailed": "NFT Minting Failed",
+      "nftMintFailedDesc": "Record saved to Walrus, but NFT minting failed"
     },
     "getAiResponse": "Get AI Emotion Response",
     "aiThinking": "AI is thinking...",
@@ -187,6 +189,8 @@
       "recordedWalrus": "Saved to Walrus: {{blobId}}...",
       "recordedLocalServer": "Walrus service temporarily unavailable, data saved to local server.",
       "recordedSDK": "Saved to Walrus via SDK: {{blobId}}...",
+      "recordedWithNFT": "Record saved and minted as NFT! NFT ID: {{nftId}}...",
+      "recordedButNFTFailed": "Record saved to Walrus, but NFT minting failed. You can view the record in Timeline and retry minting later.",
       "uploading": "Uploading...",
       "uploadingDesc": "Encrypting and saving your emotion snapshot"
     },
@@ -197,6 +201,12 @@
       "signFailedDesc": "Wallet signature failed, please try again.",
       "transactionCancelled": "Transaction Cancelled",
       "transactionCancelledDesc": "You have cancelled the transaction."
+    },
+    "nft": {
+      "mint": "Mint as NFT",
+      "mintDisabled": "Don't Mint NFT",
+      "mintDesc": "Mint this record as an NFT on Sui blockchain, permanently saved and verifiable",
+      "mintDisabledDesc": "Only save to Walrus, don't mint NFT"
     }
   },
   "timeline": {
@@ -303,6 +313,7 @@
     "exportFieldPrivacy": "Privacy Settings",
     "exportFieldStatus": "Status",
     "exportFieldSuiRef": "Sui Reference",
+    "exportFieldTransactionDigest": "Mint Transaction",
     "exportDateFormat": "Date Format",
     "exportDateFormatLocale": "Locale format (based on system language)",
     "exportDateFormatISO": "ISO 8601 format (YYYY-MM-DDTHH:mm:ss.sssZ)",
