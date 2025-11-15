@@ -6,7 +6,7 @@ import en from './locales/en.json';
 
 // 語言映射：將各種中文變體映射到 zh-TW，英文變體映射到 en
 const normalizeLanguage = (lng: string): string => {
-  if (!lng) return 'zh-TW';
+  if (!lng) return 'en';
   
   const lang = lng.toLowerCase();
   
@@ -20,8 +20,8 @@ const normalizeLanguage = (lng: string): string => {
     return 'en';
   }
   
-  // 默認返回 zh-TW
-  return 'zh-TW';
+  // 默認返回 en
+  return 'en';
 };
 
 i18n
@@ -36,7 +36,7 @@ i18n
         translation: en,
       },
     },
-    fallbackLng: 'zh-TW',
+    fallbackLng: 'en',
     defaultNS: 'translation',
     interpolation: {
       escapeValue: false,
@@ -55,7 +55,7 @@ i18n
 const storedLang = localStorage.getItem('i18nextLng');
 if (!storedLang || (storedLang !== 'zh-TW' && storedLang !== 'en')) {
   // 檢測系統語言
-  const systemLang = navigator.language || (navigator as any).userLanguage || 'zh-TW';
+  const systemLang = navigator.language || (navigator as any).userLanguage || 'en';
   const normalizedLang = normalizeLanguage(systemLang);
   
   // 設置檢測到的語言
