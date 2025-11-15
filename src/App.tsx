@@ -11,7 +11,6 @@ import { ThemeProvider } from "next-themes";
 import { MedicalDisclaimer } from "@/components/MedicalDisclaimer";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Onboarding } from "@/components/Onboarding";
-import { useTranslation } from "react-i18next";
 import "@mysten/dapp-kit/dist/index.css";
 
 // 程式碼分割：懶載入頁面組件
@@ -43,19 +42,6 @@ const { networkConfig } = createNetworkConfig({
   mainnet: { url: getFullnodeUrl("mainnet") },
 });
 
-// Loading fallback component with i18n support
-const LoadingFallback = () => {
-  const { t } = useTranslation();
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent"></div>
-        <p className="mt-4 text-muted-foreground">{t("common.loading")}</p>
-      </div>
-    </div>
-  );
-};
-
 const App = () => (
   <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
   <QueryClientProvider client={queryClient}>
@@ -68,16 +54,16 @@ const App = () => (
           <BrowserRouter>
               <Onboarding />
               <ErrorBoundary>
-                <Suspense fallback={<LoadingFallback />}>
+                <Suspense fallback={
+                  <div className="min-h-screen flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent"></div>
+                      <p className="mt-4 text-muted-foreground">載入中...</p>
+                    </div>
+                  </div>
+                }>
             <Routes>
-              <Route 
-                path="/" 
-                element={
-                  <React.Suspense fallback={<LoadingFallback />}>
-                    <Index />
-                  </React.Suspense>
-                } 
-              />
+              <Route path="/" element={<Index />} />
               {/* Anonymous/Wallet Mode */}
               <Route path="/record" element={<Record />} />
               <Route path="/timeline" element={<Timeline />} />

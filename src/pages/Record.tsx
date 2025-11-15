@@ -346,8 +346,8 @@ const Record = () => {
             if (!session?.user?.id) {
               console.warn("[Record] ⚠️ Backup requested but no Supabase session. User needs to login.");
               toast({
-                title: t("record.storage.backup.failedTitle"),
-                description: t("record.storage.backup.failedDesc"),
+                title: "⚠️ 無法備份到資料庫",
+                description: "匿名模式需要登入 Supabase 才能備份。資料已上傳到 Walrus。",
                 variant: "default",
               });
             } else if (apiRes.record.blobId) {
@@ -371,8 +371,8 @@ const Record = () => {
                 if (backupError) {
                   console.error("[Record] Failed to backup to Supabase:", backupError);
                   toast({
-                    title: t("record.storage.backup.backupFailedTitle"),
-                    description: t("record.storage.backup.backupFailedDesc"),
+                    title: "⚠️ 備份失敗",
+                    description: "資料已上傳到 Walrus，但備份到資料庫失敗。",
                     variant: "default",
                   });
                 } else {
@@ -1032,16 +1032,16 @@ const Record = () => {
                   </div>
                   <div className="flex-1">
                     <Label htmlFor="backup" className="text-sm font-semibold cursor-pointer">
-                      {backupToDatabase ? t("record.storage.backup.enabled") : t("record.storage.backup.disabled")}
+                      {backupToDatabase ? "備份到資料庫" : "不備份到資料庫"}
                     </Label>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {backupToDatabase 
-                        ? t("record.storage.backup.enabledDesc")
-                        : t("record.storage.backup.disabledDesc")}
+                        ? "將加密資料備份到 Supabase，即使 Walrus 過期也能恢復"
+                        : "不備份，資料只存在於 Walrus（testnet 數據可能過期）"}
                     </p>
                     {backupToDatabase && !currentAccount && (
                       <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
-                        {t("record.storage.backup.anonymousWarning")}
+                        ⚠️ 匿名模式需登入 Supabase 才能備份
                       </p>
                     )}
                   </div>

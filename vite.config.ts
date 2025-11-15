@@ -46,50 +46,12 @@ export default defineConfig(({ mode }) => ({
   // Optimize dependencies for WebAssembly
   optimizeDeps: {
     exclude: ["@mysten/walrus-wasm"],
-    include: [
-      "react",
-      "react-dom",
-      "react-router-dom",
-      "@tanstack/react-query",
-      "@mysten/dapp-kit",
-      "i18next",
-      "react-i18next",
-    ],
   },
   // Configure build options for WebAssembly
   build: {
     target: "esnext",
-    minify: "esbuild", // 使用 esbuild 进行更快的压缩
-    cssMinify: true,
     rollupOptions: {
       output: {
-        // 优化代码分割
-        manualChunks: (id) => {
-          // 将 node_modules 中的大型库分离
-          if (id.includes("node_modules")) {
-            // React 和相关库必须在一起，确保加载顺序
-            if (
-              id.includes("react") || 
-              id.includes("react-dom") || 
-              id.includes("react/jsx-runtime") ||
-              id.includes("react-i18next") ||
-              id.includes("i18next")
-            ) {
-              return "vendor-react";
-            }
-            if (id.includes("@mysten")) {
-              return "vendor-sui";
-            }
-            if (id.includes("recharts")) {
-              return "vendor-charts";
-            }
-            if (id.includes("@radix-ui")) {
-              return "vendor-ui";
-            }
-            // 其他第三方库
-            return "vendor";
-          }
-        },
         // Ensure .wasm files are handled correctly
         assetFileNames: (assetInfo) => {
           if (assetInfo.name?.endsWith(".wasm")) {
@@ -97,12 +59,8 @@ export default defineConfig(({ mode }) => ({
           }
           return "assets/[name]-[hash][extname]";
         },
-        chunkFileNames: "assets/[name]-[hash].js",
-        entryFileNames: "assets/[name]-[hash].js",
       },
     },
-    // 增加 chunk 大小警告限制
-    chunkSizeWarningLimit: 1000,
   },
   // Worker configuration for WebAssembly
   worker: {

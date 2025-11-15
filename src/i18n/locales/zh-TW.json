@@ -122,18 +122,7 @@
       "walrusHint": "使用 Walrus 儲存代表您的情緒記錄會上鏈至去中心化儲存，任何第三方無法解密。",
       "epoch": "儲存期限（Epoch）",
       "epochDesc": "選擇資料在 Walrus Testnet 上儲存的 epoch 數量（1 epoch ≈ 1 天）",
-      "epochValue": "{{value}} epochs（約 {{days}} 天）",
-      "backup": {
-        "enabled": "備份到資料庫",
-        "disabled": "不備份到資料庫",
-        "enabledDesc": "將加密資料備份到 Supabase，即使 Walrus 過期也能恢復",
-        "disabledDesc": "不備份，資料只存在於 Walrus（testnet 數據可能過期）",
-        "anonymousWarning": "⚠️ 匿名模式需登入 Supabase 才能備份",
-        "failedTitle": "⚠️ 無法備份到資料庫",
-        "failedDesc": "匿名模式需要登入 Supabase 才能備份。資料已上傳到 Walrus。",
-        "backupFailedTitle": "⚠️ 備份失敗",
-        "backupFailedDesc": "資料已上傳到 Walrus，但備份到資料庫失敗。"
-      }
+      "epochValue": "{{value}} epochs（約 {{days}} 天）"
     },
     "status": {
       "encrypting": "正在加密...",
