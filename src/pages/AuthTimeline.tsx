@@ -562,7 +562,7 @@ const AuthTimeline = () => {
   const getStorageLabel = useCallback((record: EmotionRecord) => {
     const isDatabase = isLocalRecord(record);
     return isDatabase 
-      ? (t("timeline.filter.database") || t("timeline.filter.local") || "數據庫")
+      ? t("timeline.filter.database")
       : t("timeline.filter.walrus");
   }, [t]);
 
@@ -1185,7 +1185,7 @@ const AuthTimeline = () => {
   const storageChartData = useMemo(() => {
     return [
       {
-        name: t("timeline.filter.database") || t("timeline.filter.local") || "數據庫",
+        name: t("timeline.filter.database"),
         value: stats.database,
         color: "#8b5cf6",
       },
@@ -2381,7 +2381,7 @@ const AuthTimeline = () => {
             </Card>
             <Card className="p-4 glass-card">
               <div className="text-2xl font-bold">{stats.database}</div>
-              <div className="text-xs text-muted-foreground">{t("timeline.stats.database") || t("timeline.stats.local") || "數據庫"}</div>
+              <div className="text-xs text-muted-foreground">{t("timeline.stats.database")}</div>
             </Card>
             <Card className="p-4 glass-card">
               <div className="text-2xl font-bold">{stats.walrus}</div>

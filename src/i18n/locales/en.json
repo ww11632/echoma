@@ -350,11 +350,13 @@
     "filter": {
       "all": "All",
       "local": "Local Storage",
+      "database": "Database",
       "walrus": "Walrus Upload"
     },
     "stats": {
       "total": "Total Records",
       "local": "Local Records",
+      "database": "Database Records",
       "walrus": "Walrus Records",
       "emotions": "Emotion Distribution",
       "averageIntensity": "Average Intensity",

@@ -352,11 +352,13 @@
     "filter": {
       "all": "全部",
       "local": "本地儲存",
+      "database": "數據庫",
       "walrus": "Walrus 上傳"
     },
     "stats": {
       "total": "總記錄數",
       "local": "本地記錄",
+      "database": "數據庫記錄",
       "walrus": "Walrus 記錄",
       "emotions": "情緒分布",
       "averageIntensity": "平均強度",
