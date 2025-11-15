@@ -1,5 +1,33 @@
 {
+  "onboarding": {
+    "welcome": {
+      "title": "Welcome to Echoma",
+      "description": "Echoma is a secure, private emotion tracking app that helps you monitor and manage your emotional well-being."
+    },
+    "record": {
+      "title": "Record Your Emotions",
+      "description": "Select your current emotion, set the intensity, and add a description. Your data is encrypted and stored securely to ensure privacy."
+    },
+    "timeline": {
+      "title": "View Timeline",
+      "description": "View all your records in the timeline, use search and filter features to quickly find the records you need."
+    },
+    "ai": {
+      "title": "Get AI Suggestions",
+      "description": "After each record, you can get personalized AI analysis suggestions to help you better understand and manage your emotions."
+    },
+    "privacy": {
+      "title": "Privacy Protection",
+      "description": "All data is encrypted. You can choose to store locally or upload to the blockchain (Walrus), completely under your control."
+    },
+    "step": "Step {{current}} / {{total}}",
+    "skip": "Skip",
+    "getStarted": "Get Started"
+  },
   "common": {
+    "previous": "Previous",
+    "next": "Next",
+    "cancel": "Cancel",
     "back": "Back",
     "backToHome": "Back to Home",
     "home": "Home",
@@ -74,6 +102,9 @@
     "descriptionPlaceholder": "Describe the event that triggered this emotion... (will be encrypted)",
     "descriptionHint": "🔒 Your description will be encrypted on the client side before storage",
     "characters": "{{count}}/5000 characters",
+    "tags": "Tags/Categories",
+    "tagsDesc": "Add tags to categorize and find records (optional)",
+    "tagsPlaceholder": "Enter tag and press Enter...",
     "privacy": {
       "title": "Privacy Control (Seal Permissions)",
       "public": "Public Share",
@@ -237,6 +268,85 @@
       "dataCorrupted": "Data may be corrupted",
       "updateApp": "Please update the app to the latest version"
     },
+    "search": "Search Records",
+    "searchPlaceholder": "Search emotions, descriptions, or dates...",
+    "clearSearch": "Clear Search",
+    "results": "results",
+    "export": "Export",
+    "exportFormat": "Choose export format:\nOK = CSV, Cancel = JSON",
+    "exportSuccess": "Export Successful",
+    "exportSuccessDesc": "Exported {{count}} records",
+    "exportSuccessPDF": "Exported {{count}} records as PDF",
+    "exportSuccessMarkdown": "Exported {{count}} records as Markdown",
+    "exportDialogDesc": "Choose export format and options ({{count}} records total)",
+    "exportFormatCSV": "Table format, suitable for Excel",
+    "exportFormatJSON": "Structured data format",
+    "exportFormatPDF": "Printable document format",
+    "exportFormatMarkdown": "Document format, suitable for reading",
+    "exportFields": "Select fields to export",
+    "exportFieldDate": "Date",
+    "exportFieldEmotion": "Emotion",
+    "exportFieldIntensity": "Intensity",
+    "exportFieldDescription": "Description",
+    "exportFieldStorage": "Storage Type",
+    "exportFieldPrivacy": "Privacy Settings",
+    "exportFieldStatus": "Status",
+    "exportFieldSuiRef": "Sui Reference",
+    "exportDateFormat": "Date Format",
+    "exportDateFormatLocale": "Locale format (based on system language)",
+    "exportDateFormatISO": "ISO 8601 format (YYYY-MM-DDTHH:mm:ss.sssZ)",
+    "exportDateFormatCustom": "Custom format (YYYY-MM-DD HH:mm:ss)",
+    "tagsFilter": "Tags",
+    "selectTags": "Select Tags",
+    "clearTags": "Clear Tags",
+    "online": "Network Connected",
+    "onlineDesc": "You can continue using all features.",
+    "offline": "Network Disconnected",
+    "offlineDesc": "You can only view already loaded records.",
+    "sort": {
+      "date": "By Date",
+      "intensity": "By Intensity",
+      "emotion": "By Emotion"
+    },
+    "toggleSortOrder": "Toggle Sort Order",
+    "dateRange": "Date Range",
+    "batchMode": "Batch",
+    "select": "Select",
+    "deselect": "Deselect",
+    "selectAll": "Select All",
+    "deselectAll": "Deselect All",
+    "selectedCount": "{{count}} records selected",
+    "batchExport": "Batch Export",
+    "batchDelete": "Batch Delete",
+    "batchDeleteConfirm": "Are you sure you want to delete {{count}} records? This action cannot be undone.",
+    "batchDeleteComplete": "Batch Delete Complete",
+    "batchDeleteCompleteDesc": "Successfully deleted {{success}} records, {{fail}} failed",
+    "batchDeleteError": "Batch Delete Failed",
+    "batchDeleteErrorDesc": "Unable to delete records",
+    "noSelection": "No Selection",
+    "noSelectionDesc": "Please select records to export first",
+    "viewDetails": "View Details",
+    "delete": "Delete",
+    "deleteConfirmTitle": "Confirm Delete",
+    "deleteConfirmDesc": "Are you sure you want to delete this record? This action cannot be undone.",
+    "deleting": "Deleting...",
+    "deleteSuccess": "Delete Successful",
+    "deleteSuccessDesc": "Record has been deleted",
+    "deleteError": "Delete Failed",
+    "deleteErrorDesc": "Unable to delete record",
+    "intensity": "Intensity",
+    "description": "Description",
+    "noDescription": "No description",
+    "aiResponse": "AI Response",
+    "storage": "Storage Location",
+    "privacy": "Privacy",
+    "suiRef": "Sui Reference",
+    "noResults": "No Results Found",
+    "noResultsDesc": "Try adjusting your search criteria or filters",
+    "clearFilters": "Clear Filters",
+    "getStarted": "Get Started",
+    "getStartedDesc": "Select an emotion, fill in a description, and save your first record.",
+    "viewTutorial": "View Tutorial",
     "filter": {
       "all": "All",
       "local": "Local Storage",
@@ -254,7 +364,29 @@
     "chart": {
       "emotionDistribution": "Emotion Distribution",
       "storageDistribution": "Storage Distribution",
-      "timelineChart": "Timeline Trend"
+      "timelineChart": "Timeline Trend",
+      "emotionTrend": "Emotion Trend Prediction",
+      "emotionCorrelation": "Emotion Correlation Analysis",
+      "emotionCalendar": "Emotion Calendar"
+    },
+    "viewPeriod": {
+      "week": "Week",
+      "month": "Month",
+      "year": "Year"
+    },
+    "trend": {
+      "up": "Up",
+      "down": "Down",
+      "stable": "Stable"
+    },
+    "calendar": {
+      "hasRecord": "Has Record",
+      "noRecord": "No Record",
+      "highIntensity": "High Intensity (≥70%)",
+      "mediumIntensity": "Medium Intensity (40-69%)",
+      "lowIntensity": "Low Intensity (<40%)",
+      "records": "records",
+      "avgIntensity": "Avg Intensity"
     },
     "decryptAll": {
       "button": "🔓 Decrypt All",
@@ -292,6 +424,7 @@
     "errors": {
       "missingInfo": "Missing Information",
       "missingInfoDesc": "Please enter both email and password.",
+      "invalidEmail": "Please enter a valid email address",
       "invalidPassword": "Invalid Password",
       "invalidPasswordDesc": "Password must be at least 6 characters long.",
       "signupFailed": "Signup Failed",
@@ -318,6 +451,16 @@
     "title": "404",
     "message": "Oops! Page not found",
     "returnHome": "Return to Home"
+  },
+  "tags": {
+    "work": "Work",
+    "family": "Family",
+    "health": "Health",
+    "study": "Study",
+    "relationship": "Relationship",
+    "finance": "Finance",
+    "hobby": "Hobby",
+    "travel": "Travel"
   },
   "emotions": {
     "joy": "😊 Joy",

@@ -1,3 +1,4 @@
+import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
@@ -70,9 +71,9 @@ const Index = () => {
             </div>
 
             {/* Mode Selection Cards */}
-            <div className="grid md:grid-cols-2 gap-6 pt-4 max-w-4xl mx-auto">
+            <div className="grid md:grid-cols-2 gap-4 md:gap-6 pt-4 max-w-4xl mx-auto">
               {/* Anonymous Mode */}
-              <Card className="glass-card p-6 space-y-4 hover:scale-[1.02] transition-all duration-300">
+              <Card className="glass-card p-4 md:p-6 space-y-3 md:space-y-4 hover:scale-[1.02] transition-all duration-300">
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-secondary/30">
                   <Unlock className="w-6 h-6 text-secondary" />
                 </div>
@@ -99,7 +100,7 @@ const Index = () => {
               </Card>
 
               {/* Secure Mode */}
-              <Card className="glass-card p-6 space-y-4 hover:scale-[1.02] transition-all duration-300">
+              <Card className="glass-card p-4 md:p-6 space-y-3 md:space-y-4 hover:scale-[1.02] transition-all duration-300">
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/30">
                   <Lock className="w-6 h-6 text-primary" />
                 </div>
@@ -133,7 +134,7 @@ const Index = () => {
           </div>
 
           {/* Features Grid */}
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-3 gap-4 md:gap-6">
             {features.map((feature, index) => {
               const Icon = feature.icon;
               return (
@@ -155,9 +156,9 @@ const Index = () => {
           </div>
 
           {/* How It Works */}
-          <Card className="mt-16 glass-card p-8 space-y-6">
-            <h2 className="text-2xl font-bold text-center">{t("index.howItWorks")}</h2>
-            <div className="grid md:grid-cols-4 gap-6">
+          <Card className="mt-12 md:mt-16 glass-card p-6 md:p-8 space-y-4 md:space-y-6">
+            <h2 className="text-xl md:text-2xl font-bold text-center">{t("index.howItWorks")}</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
               {[
                 { num: "1", text: t("index.step1") },
                 { num: "2", text: t("index.step2") },
@@ -194,4 +195,5 @@ const Index = () => {
   );
 };
 
-export default Index;
+// 使用 React.memo 优化性能
+export default React.memo(Index);

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import { postEmotion } from "@/lib/api";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import WalletConnect from "@/components/WalletConnect";
 import { getOrCreateAnonymousUserKey, getOrCreateAnonymousUserId } from "@/lib/anonymousIdentity";
+import { TagInput } from "@/components/TagInput";
 
 const isBackendUnavailable = (error: unknown) => {
   if (!(error instanceof Error)) return false;
@@ -40,6 +41,29 @@ const Record = () => {
   const { t, i18n } = useTranslation();
   const currentAccount = useCurrentAccount();
   const { currentWallet } = useCurrentWallet();
+  
+  // Track if component is mounted to prevent navigation after unmount
+  const isMountedRef = useRef(true);
+  
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+  
+  // Safe navigation function that checks if component is still mounted
+  const navigateToTimeline = () => {
+    if (isMountedRef.current) {
+      navigate("/timeline");
+    }
+  };
+  
+  // Check wallet connection before critical operations
+  const checkWalletConnection = () => {
+    if (!currentWallet || !currentAccount) {
+      throw new Error("Wallet disconnected during operation. Please reconnect your wallet and try again.");
+    }
+  };
 
   const emotionTags = [
     { label: t("emotions.joy"), value: "joy", color: "from-yellow-400 to-orange-400" },
@@ -52,6 +76,7 @@ const Record = () => {
   const [selectedEmotion, setSelectedEmotion] = useState<string>("");
   const [intensity, setIntensity] = useState([50]);
   const [description, setDescription] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
   const [isPublic, setIsPublic] = useState(false);
   const [saveLocally, setSaveLocally] = useState(true); // 默认保存到本地
   const [backupToDatabase, setBackupToDatabase] = useState(true); // 是否備份到 Supabase
@@ -60,6 +85,18 @@ const Record = () => {
   const [uploadStatus, setUploadStatus] = useState<"idle" | "encrypting" | "uploading" | "saving" | "success" | "error">("idle");
   const [aiResponse, setAiResponse] = useState<string>("");
   const [isAiLoading, setIsAiLoading] = useState(false);
+
+  // 標籤建議（可以從本地存儲中獲取常用標籤）
+  const tagSuggestions = [
+    t("tags.work") || "工作",
+    t("tags.family") || "家庭",
+    t("tags.health") || "健康",
+    t("tags.study") || "學習",
+    t("tags.relationship") || "關係",
+    t("tags.finance") || "財務",
+    t("tags.hobby") || "興趣",
+    t("tags.travel") || "旅行",
+  ];
 
   const getAiResponse = async () => {
     // 檢查是否有輸入描述
@@ -163,36 +200,26 @@ const Record = () => {
     sanitizedDescription: string,
     emotionValue: string,
     isPublicValue: boolean,
-    intensityValue?: number
+    intensityValue?: number,
+    tagsValue?: string[]
   ) => {
-    // Initialize encrypted storage for all users (anonymous or with wallet)
-    // Use the same key generation logic as Walrus upload
-    // Public records: use shared public key (anyone can decrypt)
-    // Private records: use user-specific key (only user can decrypt)
-    let encryptionKey: string;
-    
-    if (isPublicValue) {
-      // 公開記錄：使用共享公開金鑰
-      encryptionKey = PUBLIC_SEAL_KEY;
-    } else if (currentAccount) {
-      // 私密記錄 + 有錢包：使用錢包地址生成密鑰
-      encryptionKey = await generateUserKey(currentAccount.address);
-    } else {
-      // 私密記錄 + 匿名用戶：優先使用 Supabase session，否則使用本地匿名 ID
-      const { data: { session } } = await supabase.auth.getSession();
-      encryptionKey = session?.user?.id
-        ? await generateUserKeyFromId(session.user.id)
-        : await getOrCreateAnonymousUserKey();
+    // Validate intensity value if provided
+    if (intensityValue !== undefined) {
+      if (intensityValue < 0 || intensityValue > 100) {
+        throw new Error("Intensity must be between 0 and 100");
+      }
     }
-    
-    // Initialize encrypted storage with the encryption key
-    initializeEncryptedStorage(encryptionKey);
 
     // Validate and map emotion type (support all emotion types)
     const validEmotions: EmotionRecord["emotion"][] = ["joy", "sadness", "anger", "anxiety", "confusion", "peace"];
     const emotion = validEmotions.includes(emotionValue as EmotionRecord["emotion"])
       ? (emotionValue as EmotionRecord["emotion"])
       : "joy"; // Default to joy if invalid
+
+    // Note: We don't initialize encrypted storage here anymore.
+    // The addEmotionRecord function will handle encryption key selection and storage initialization
+    // based on the record's privacy setting and user context.
+    // This ensures consistency between public and private records.
 
     const localRecord: EmotionRecord = {
       id: crypto.randomUUID(),
@@ -203,9 +230,11 @@ const Record = () => {
       version: "1.0.0",
       isPublic: isPublicValue,
       intensity: intensityValue, // 保存強度值（如果提供）
+      tags: tagsValue && tagsValue.length > 0 ? tagsValue : [], // 統一使用空數組表示無標籤
     };
 
-    // This will now use encrypted storage since we initialized it
+    // The addEmotionRecord function will handle encryption key selection and storage
+    // based on the record's privacy setting and user context
     try {
       await addEmotionRecord(localRecord, currentAccount?.address);
     } catch (error: any) {
@@ -265,7 +294,7 @@ const Record = () => {
         if (saveLocally) {
           console.log("[Record] Anonymous user chose to save locally only, skipping Walrus upload");
           setUploadStatus("saving");
-          await saveToLocalIndex(sanitizedDescription, selectedEmotion, isPublic, intensityValue);
+          await saveToLocalIndex(sanitizedDescription, selectedEmotion, isPublic, intensityValue, tags);
           setUploadStatus("success");
           
           toast({
@@ -273,7 +302,7 @@ const Record = () => {
             description: t("record.success.recordedLocalDesc"),
             variant: "default",
           });
-          setTimeout(() => navigate("/timeline"), 1200);
+          setTimeout(navigateToTimeline, 1200);
           return;
         }
         
@@ -282,7 +311,7 @@ const Record = () => {
           emotion: selectedEmotion,
           intensity: intensityValue,
           description: sanitizedDescription,
-          timestamp: Date.now(),
+          timestamp: new Date().toISOString(), // 統一使用 ISO 字符串格式
           walletAddress: null,
           version: "1.0.0",
         };
@@ -370,14 +399,14 @@ const Record = () => {
               description: t("record.success.recordedWalrus", { blobId: apiRes.record.blobId.slice(0, 8) }),
             });
           }
-          setTimeout(() => navigate("/timeline"), 1200);
+          setTimeout(navigateToTimeline, 1200);
           return;
         } catch (apiError) {
           // Only fallback to local if backend is unavailable (not if user explicitly chose not to save locally)
           if (isBackendUnavailable(apiError)) {
             console.log("[Client] API failed, saving to local storage as fallback");
             setUploadStatus("saving");
-            await saveToLocalIndex(sanitizedDescription, selectedEmotion, isPublic, intensityValue);
+            await saveToLocalIndex(sanitizedDescription, selectedEmotion, isPublic, intensityValue, tags);
             setUploadStatus("success");
             
             toast({
@@ -385,7 +414,7 @@ const Record = () => {
               description: t("record.success.recordedLocalDesc"),
               variant: "default",
             });
-            setTimeout(() => navigate("/timeline"), 1200);
+            setTimeout(navigateToTimeline, 1200);
             return;
           }
           throw apiError;
@@ -419,7 +448,7 @@ const Record = () => {
         // User chose to save locally only - skip Walrus upload
         console.log("[Record] User chose to save locally only, skipping Walrus upload");
         setUploadStatus("saving");
-        await saveToLocalIndex(sanitizedDescription, selectedEmotion, isPublic);
+        await saveToLocalIndex(sanitizedDescription, selectedEmotion, isPublic, intensityValue, tags);
         setUploadStatus("success");
         
         toast({
@@ -439,12 +468,13 @@ const Record = () => {
       });
 
       // If user chose Walrus upload, wallet must be connected
-      if (!currentWallet || !currentAccount) {
-        throw new Error("Wallet connection required for Walrus upload. Please connect your wallet first.");
-      }
+      checkWalletConnection();
 
       // Try SDK method first (this will trigger transaction popup)
       try {
+        // Check wallet connection again before SDK upload
+        checkWalletConnection();
+        
         console.log("[Record] Attempting SDK upload with wallet - THIS WILL TRIGGER TRANSACTION POPUP");
         console.log("[Record] Wallet:", currentWallet?.name, "Account:", currentAccount.address);
         
@@ -455,6 +485,9 @@ const Record = () => {
         const signer = createSignerFromWallet(currentWallet, currentAccount.address, suiClient);
         const selectedEpochs = epochs[0];
         const sdkResult = await uploadToWalrusWithSDK(encryptedString, signer, selectedEpochs);
+        
+        // Check wallet connection again after SDK upload
+        checkWalletConnection();
         
         console.log("[Record] ✅ SDK upload successful:", sdkResult);
         
@@ -555,6 +588,8 @@ const Record = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         // 沒有 Supabase session：走自建 API（後端存 Walrus + 本地檔案）作為主線
+        // Check wallet connection before API call
+        checkWalletConnection();
         try {
           const selectedEpochs = epochs[0];
           const apiRes = await postEmotion({
@@ -617,7 +652,7 @@ const Record = () => {
               description: t("record.success.recordedWalrus", { blobId: apiRes.record.blobId.slice(0, 8) }),
             });
           }
-          setTimeout(() => navigate("/timeline"), 1200);
+          setTimeout(navigateToTimeline, 1200);
           return;
         } catch (apiError) {
           // If user chose Walrus upload (saveLocally = false), don't fallback to local storage
@@ -626,7 +661,7 @@ const Record = () => {
             // User chose local storage, so fallback is OK
             console.log("[Client] API failed, saving to local storage as fallback");
             setUploadStatus("saving");
-            await saveToLocalIndex(sanitizedDescription, selectedEmotion, isPublic, intensityValue);
+            await saveToLocalIndex(sanitizedDescription, selectedEmotion, isPublic, intensityValue, tags);
             setUploadStatus("success");
             
             toast({
@@ -634,7 +669,7 @@ const Record = () => {
               description: t("record.success.recordedLocalDesc"),
               variant: "default",
             });
-            setTimeout(() => navigate("/timeline"), 1200);
+            setTimeout(navigateToTimeline, 1200);
             return;
           } else if (isBackendUnavailable(apiError)) {
             // Backend is completely unavailable, but user chose Walrus upload
@@ -672,7 +707,7 @@ const Record = () => {
       });
 
       // Navigate to timeline
-      setTimeout(() => navigate("/timeline"), 1500);
+      setTimeout(navigateToTimeline, 1500);
     } catch (error) {
       console.error("[INTERNAL] Error recording emotion:", error);
       
@@ -772,7 +807,7 @@ const Record = () => {
   };
 
   return (
-    <div className="min-h-screen p-6">
+    <div className="min-h-screen p-4 md:p-6">
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center justify-between mb-6">
         <Button
@@ -808,13 +843,14 @@ const Record = () => {
                   {t("record.selectEmotionFirst")}
                 </p>
               )}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {emotionTags.map((emotion) => (
                   <button
                     key={emotion.value}
                     onClick={() => setSelectedEmotion(emotion.value)}
                     className={`
-                      p-4 rounded-xl border-2 transition-all duration-300
+                      p-3 md:p-4 rounded-xl border-2 transition-all duration-300 min-h-[80px] md:min-h-[100px]
+                      active:scale-[0.98] touch-manipulation
                       ${
                         selectedEmotion === emotion.value
                           ? "border-primary bg-primary/10 scale-[1.02] shadow-sm"
@@ -823,9 +859,11 @@ const Record = () => {
                           : "border-border hover:border-primary/30 bg-card"
                       }
                     `}
+                    aria-label={emotion.label}
+                    aria-pressed={selectedEmotion === emotion.value}
                   >
-                    <div className="text-2xl mb-1">{emotion.label.split(" ")[0]}</div>
-                    <div className="text-sm font-medium">{emotion.label.split(" ")[1]}</div>
+                    <div className="text-xl md:text-2xl mb-1">{emotion.label.split(" ")[0]}</div>
+                    <div className="text-xs md:text-sm font-medium">{emotion.label.split(" ")[1]}</div>
                   </button>
                 ))}
               </div>
@@ -872,16 +910,28 @@ const Record = () => {
                   }
                 }}
                 maxLength={5000}
-                className={`glass-input min-h-[150px] resize-none ${
+                className={`glass-input min-h-[120px] md:min-h-[150px] resize-none ${
                   !description.trim() ? "border-destructive/50 focus:border-destructive" : ""
                 }`}
+                aria-invalid={!description.trim()}
+                aria-describedby="description-hint description-count"
               />
               <div className="flex justify-between items-center">
-                <p className="text-xs text-muted-foreground">
+                <p id="description-hint" className="text-xs text-muted-foreground">
                   {t("record.descriptionHint")}
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  {t("record.characters", { count: description.length })}
+                <p 
+                  id="description-count" 
+                  className={`text-xs ${
+                    description.length > 4500 
+                      ? "text-destructive" 
+                      : description.length > 4000 
+                      ? "text-yellow-600 dark:text-yellow-400" 
+                      : "text-muted-foreground"
+                  }`}
+                  aria-live="polite"
+                >
+                  {t("record.characters", { count: description.length })} / 5000
                 </p>
               </div>
 
@@ -924,6 +974,23 @@ const Record = () => {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Tags */}
+            <div className="space-y-3">
+              <Label className="text-base font-semibold">
+                {t("record.tags") || "標籤/分類"}
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                {t("record.tagsDesc") || "為記錄添加標籤以便分類和查找（可選）"}
+              </p>
+              <TagInput
+                value={tags}
+                onChange={setTags}
+                suggestions={tagSuggestions}
+                placeholder={t("record.tagsPlaceholder") || "輸入標籤並按 Enter..."}
+                maxTags={10}
+              />
             </div>
 
             {/* Privacy Control */}
@@ -1153,8 +1220,9 @@ const Record = () => {
             <Button
               onClick={handleSubmit}
               disabled={isSubmitting || !selectedEmotion || !description.trim()}
-              className="w-full h-12 text-base font-semibold gradient-emotion hover:opacity-95 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full h-12 md:h-14 text-base font-semibold gradient-emotion hover:opacity-95 shadow-md disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
               size="lg"
+              aria-busy={isSubmitting}
             >
               {isSubmitting ? (
                 <>
@@ -1188,4 +1256,5 @@ const Record = () => {
   );
 };
 
-export default Record;
+// 使用 React.memo 优化性能
+export default React.memo(Record);

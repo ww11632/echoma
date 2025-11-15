@@ -7,6 +7,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Globe } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const LanguageSwitcher = () => {
   const { i18n } = useTranslation();
@@ -23,6 +24,8 @@ const LanguageSwitcher = () => {
   };
 
   return (
+    <div className="flex items-center gap-2">
+      <ThemeToggle />
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="sm" className="gap-2">
@@ -42,6 +45,7 @@ const LanguageSwitcher = () => {
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
+    </div>
   );
 };
 

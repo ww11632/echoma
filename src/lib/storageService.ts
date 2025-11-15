@@ -11,6 +11,32 @@ export interface StorageAdapter {
 const LOCAL_KEY = "echoma_mvp_records";
 const ENCRYPTED_LOCAL_KEY = "echoma_encrypted_mvp_records";
 
+// Lock mechanism to prevent race conditions in localStorage operations
+// Each storage key has its own lock
+const saveLocks = new Map<string, boolean>();
+
+/**
+ * Acquire a lock for a storage key to prevent concurrent modifications
+ */
+async function acquireLock(key: string, maxWaitTime: number = 5000): Promise<void> {
+  const startTime = Date.now();
+  while (saveLocks.get(key)) {
+    if (Date.now() - startTime > maxWaitTime) {
+      throw new Error(`Lock timeout for key: ${key}`);
+    }
+    // Wait 10ms before retrying
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  saveLocks.set(key, true);
+}
+
+/**
+ * Release a lock for a storage key
+ */
+function releaseLock(key: string): void {
+  saveLocks.set(key, false);
+}
+
 export class LocalJsonAdapter implements StorageAdapter {
   async save(record: EmotionRecord): Promise<void> {
       // Validate record before saving
@@ -26,19 +52,27 @@ export class LocalJsonAdapter implements StorageAdapter {
         throw error;
       }
     
-    const list = await this.list();
+    // Acquire lock to prevent race conditions
+    await acquireLock(LOCAL_KEY);
     
-    // Check for duplicate ID (prevent accidental duplicates)
-    const existingIndex = list.findIndex(r => r.id === record.id);
-    if (existingIndex >= 0) {
-      console.warn(`[LocalJsonAdapter] Record with ID ${record.id} already exists, updating instead of creating duplicate`);
-      // Update existing record instead of creating duplicate
-      list[existingIndex] = record;
-    } else {
-      list.push(record);
+    try {
+      const list = await this.list();
+      
+      // Check for duplicate ID (prevent accidental duplicates)
+      const existingIndex = list.findIndex(r => r.id === record.id);
+      if (existingIndex >= 0) {
+        console.warn(`[LocalJsonAdapter] Record with ID ${record.id} already exists, updating instead of creating duplicate`);
+        // Update existing record instead of creating duplicate
+        list[existingIndex] = record;
+      } else {
+        list.push(record);
+      }
+      
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(list));
+    } finally {
+      // Always release lock, even if save fails
+      releaseLock(LOCAL_KEY);
     }
-    
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(list));
   }
 
   async list(): Promise<EmotionRecord[]> {
@@ -95,6 +129,9 @@ export class EncryptedLocalAdapter implements StorageAdapter {
   }
 
   async save(record: EmotionRecord): Promise<void> {
+    // Acquire lock to prevent race conditions
+    await acquireLock(ENCRYPTED_LOCAL_KEY);
+    
     try {
       // Validate record before saving
       if (!record.id || !record.timestamp || !record.emotion) {
@@ -144,6 +181,9 @@ export class EncryptedLocalAdapter implements StorageAdapter {
         throw error;
       }
       throw new Error("保存記錄失敗：" + (error as any)?.message || "未知錯誤");
+    } finally {
+      // Always release lock, even if save fails
+      releaseLock(ENCRYPTED_LOCAL_KEY);
     }
   }
 

@@ -7,17 +7,22 @@ import { SuiClientProvider, WalletProvider } from "@mysten/dapp-kit";
 import { getFullnodeUrl } from "@mysten/sui/client";
 import { createNetworkConfig } from "@mysten/dapp-kit";
 import React, { lazy, Suspense } from "react";
-import Index from "./pages/Index";
-import Record from "./pages/Record";
-import Timeline from "./pages/Timeline";
-import Auth from "./pages/Auth";
-import AuthRecord from "./pages/AuthRecord";
-import AuthTimeline from "./pages/AuthTimeline";
-import NotFound from "./pages/NotFound";
-import MvpRecord from "./pages/MvpRecord";
-import MvpTimeline from "./pages/MvpTimeline";
+import { ThemeProvider } from "next-themes";
 import { MedicalDisclaimer } from "@/components/MedicalDisclaimer";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { Onboarding } from "@/components/Onboarding";
 import "@mysten/dapp-kit/dist/index.css";
+
+// 程式碼分割：懶載入頁面組件
+const Index = lazy(() => import("./pages/Index"));
+const Record = lazy(() => import("./pages/Record"));
+const Timeline = lazy(() => import("./pages/Timeline"));
+const Auth = lazy(() => import("./pages/Auth"));
+const AuthRecord = lazy(() => import("./pages/AuthRecord"));
+const AuthTimeline = lazy(() => import("./pages/AuthTimeline"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const MvpRecord = lazy(() => import("./pages/MvpRecord"));
+const MvpTimeline = lazy(() => import("./pages/MvpTimeline"));
 
 const queryClient = new QueryClient();
 
@@ -38,6 +43,7 @@ const { networkConfig } = createNetworkConfig({
 });
 
 const App = () => (
+  <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
   <QueryClientProvider client={queryClient}>
     <SuiClientProvider networks={networkConfig} defaultNetwork="testnet">
       <WalletProvider autoConnect>
@@ -46,6 +52,16 @@ const App = () => (
           <Sonner />
           <MedicalDisclaimer />
           <BrowserRouter>
+              <Onboarding />
+              <ErrorBoundary>
+                <Suspense fallback={
+                  <div className="min-h-screen flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent"></div>
+                      <p className="mt-4 text-muted-foreground">載入中...</p>
+                    </div>
+                  </div>
+                }>
             <Routes>
               <Route path="/" element={<Index />} />
               {/* Anonymous/Wallet Mode */}
@@ -72,11 +88,14 @@ const App = () => (
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+                </Suspense>
+              </ErrorBoundary>
           </BrowserRouter>
         </TooltipProvider>
       </WalletProvider>
     </SuiClientProvider>
   </QueryClientProvider>
+  </ThemeProvider>
 );
 
 export default App;

@@ -4,6 +4,26 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 import zhTW from './locales/zh-TW.json';
 import en from './locales/en.json';
 
+// 語言映射：將各種中文變體映射到 zh-TW，英文變體映射到 en
+const normalizeLanguage = (lng: string): string => {
+  if (!lng) return 'zh-TW';
+  
+  const lang = lng.toLowerCase();
+  
+  // 中文變體都映射到 zh-TW
+  if (lang.startsWith('zh')) {
+    return 'zh-TW';
+  }
+  
+  // 英文變體都映射到 en
+  if (lang.startsWith('en')) {
+    return 'en';
+  }
+  
+  // 默認返回 zh-TW
+  return 'zh-TW';
+};
+
 i18n
   .use(LanguageDetector)
   .use(initReactI18next)
@@ -22,10 +42,25 @@ i18n
       escapeValue: false,
     },
     detection: {
+      // 檢測順序：1. localStorage（用戶手動設置） 2. navigator（系統語言）
       order: ['localStorage', 'navigator'],
+      // 緩存到 localStorage，這樣用戶手動設置後會記住
       caches: ['localStorage'],
+      // 將檢測到的語言標準化為我們支持的語言
+      convertDetectedLanguage: normalizeLanguage,
     },
   });
+
+// 如果沒有手動設置語言，自動檢測並設置系統語言
+const storedLang = localStorage.getItem('i18nextLng');
+if (!storedLang || (storedLang !== 'zh-TW' && storedLang !== 'en')) {
+  // 檢測系統語言
+  const systemLang = navigator.language || (navigator as any).userLanguage || 'zh-TW';
+  const normalizedLang = normalizeLanguage(systemLang);
+  
+  // 設置檢測到的語言
+  i18n.changeLanguage(normalizedLang);
+}
 
 export default i18n;
 

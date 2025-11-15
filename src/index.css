@@ -56,6 +56,53 @@ All colors MUST be HSL.
     --shadow-soft: 0 2px 12px hsl(30 15% 40% / 0.08);
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
+
+  .dark {
+    /* Dark mode - warm, comforting dark tones */
+    --background: 30 15% 10%;
+    --foreground: 30 10% 90%;
+
+    /* Soft card surfaces with gentle warmth */
+    --card: 30 20% 15%;
+    --card-foreground: 30 10% 90%;
+
+    --popover: 30 20% 15%;
+    --popover-foreground: 30 10% 90%;
+
+    /* Primary: Soft sage green (calming, therapeutic) - slightly brighter for dark mode */
+    --primary: 150 35% 55%;
+    --primary-foreground: 30 20% 98%;
+
+    /* Secondary: Gentle sky blue (peace, tranquility) */
+    --secondary: 200 55% 70%;
+    --secondary-foreground: 30 20% 98%;
+
+    /* Muted soft surfaces */
+    --muted: 30 20% 20%;
+    --muted-foreground: 30 10% 70%;
+
+    /* Accent: Warm peach (warmth, comfort) */
+    --accent: 25 65% 80%;
+    --accent-foreground: 30 15% 15%;
+
+    --destructive: 0 65% 60%;
+    --destructive-foreground: 30 20% 98%;
+
+    /* Soft borders */
+    --border: 30 20% 25%;
+    --input: 30 20% 25%;
+    --ring: 150 35% 55%;
+
+    /* Custom Echoma variables - dark mode */
+    --glass-bg: 30 20% 15% / 0.85;
+    --glass-border: 30 20% 25% / 0.5;
+    --gradient-emotion: linear-gradient(135deg, hsl(150 35% 55%), hsl(160 40% 60%));
+    --gradient-warmth: linear-gradient(135deg, hsl(25 65% 80%), hsl(35 70% 85%));
+    --gradient-cool: linear-gradient(135deg, hsl(200 55% 70%), hsl(150 35% 55%));
+    --shadow-glow: 0 4px 20px hsl(150 35% 55% / 0.25);
+    --shadow-glow-accent: 0 4px 20px hsl(25 65% 80% / 0.25);
+    --shadow-soft: 0 2px 12px hsl(30 15% 60% / 0.15);
+  }
 }
 
 @layer base {
@@ -67,6 +114,10 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
     background: linear-gradient(135deg, hsl(30 20% 96%), hsl(35 25% 98%));
     min-height: 100vh;
+  }
+
+  .dark body {
+    background: linear-gradient(135deg, hsl(30 15% 10%), hsl(30 20% 12%));
   }
 }
 

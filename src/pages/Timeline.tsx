@@ -1,21 +1,36 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Home, Sparkles, Shield, Clock, Lock, Unlock, Loader2, BookOpen, BarChart3, Filter, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Home, Sparkles, Shield, Clock, Lock, Unlock, Loader2, BookOpen, BarChart3, Filter, Eye, EyeOff, Search, Download, ArrowUpDown, X, MoreVertical, Trash2, Calendar as CalendarIcon, CheckSquare, Square, TrendingUp, Link2 } from "lucide-react";
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import { supabase } from "@/integrations/supabase/client";
-import { listEmotionRecords, initializeEncryptedStorage, listEmotionRecordsWithAllKeys } from "@/lib/localIndex";
+import { listEmotionRecords, initializeEncryptedStorage, listEmotionRecordsWithAllKeys, deleteEmotionRecord } from "@/lib/localIndex";
 import { getEmotions, getEmotionsByWallet, getEncryptedEmotionByBlob } from "@/lib/api";
 import { queryWalrusBlobsByOwner, getWalrusUrl, readFromWalrus } from "@/lib/walrus";
-import { decryptData, decryptDataWithMigration, generateUserKey, generateUserKeyFromId, DecryptionError, DecryptionErrorType } from "@/lib/encryption";
+import { decryptData, decryptDataWithMigration, generateUserKey, generateUserKeyFromId, DecryptionError, DecryptionErrorType, PUBLIC_SEAL_KEY } from "@/lib/encryption";
 import type { EncryptedData } from "@/lib/encryption";
 import { getAnonymousUserKey, getOrCreateAnonymousUserKey } from "@/lib/anonymousIdentity";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Legend } from "recharts";
+import { PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Legend, CartesianGrid } from "recharts";
 import { useToast } from "@/hooks/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { format } from "date-fns";
+import { zhTW, enUS } from "date-fns/locale";
+import jsPDF from "jspdf";
 
 interface EmotionRecord {
   id: string;
@@ -31,9 +46,13 @@ interface EmotionRecord {
   created_at: string;
   wallet_address?: string | null;
   encrypted_data?: string | null;
+  tags?: string[];
 }
 
 type FilterType = "all" | "local" | "walrus";
+type SortBy = "date" | "intensity" | "emotion";
+type SortOrder = "asc" | "desc";
+type ViewPeriod = "week" | "month" | "year";
 
 const Timeline = () => {
   const navigate = useNavigate();
@@ -41,7 +60,54 @@ const Timeline = () => {
   const { t, i18n } = useTranslation();
   const { toast } = useToast();
   const [filter, setFilter] = useState<FilterType>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<SortBy>("date");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [session, setSession] = useState<any>(null);
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
+  
+  // 虛擬滾動容器引用
+  const parentRef = useRef<HTMLDivElement>(null);
+  
+  // 批量操作狀態
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  
+  // 日期範圍過濾
+  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date } | undefined>();
+  
+  // 視圖切換（周/月/年）
+  const [viewPeriod, setViewPeriod] = useState<ViewPeriod>("week");
+  
+  // 刪除確認對話框
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState<EmotionRecord | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  // 記錄詳情對話框
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState<EmotionRecord | null>(null);
+  
+  // 導出格式選擇對話框
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<"csv" | "json" | "pdf" | "markdown">("csv");
+  const [recordsToExport, setRecordsToExport] = useState<EmotionRecord[]>([]);
+  const [descriptionsToExport, setDescriptionsToExport] = useState<Record<string, string>>({});
+  
+  // 自定義導出格式配置
+  const [customExportFields, setCustomExportFields] = useState({
+    date: true,
+    emotion: true,
+    intensity: true,
+    description: true,
+    storage: true,
+    privacy: true,
+    status: true,
+    suiRef: false,
+  });
+  const [dateFormat, setDateFormat] = useState<"locale" | "iso" | "custom">("locale");
 
   const emotionLabels = {
     joy: { label: t("emotions.joy"), emoji: "😊", gradient: "from-yellow-400 to-orange-400", color: "#fbbf24" },
@@ -84,6 +150,56 @@ const Timeline = () => {
     });
   }, []);
 
+  // 網路狀態檢測
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      toast({
+        title: t("timeline.online") || "網路已連接",
+        description: t("timeline.onlineDesc") || "您可以繼續使用所有功能。",
+      });
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      toast({
+        title: t("timeline.offline") || "網路已斷開",
+        description: t("timeline.offlineDesc") || "您只能查看已載入的記錄。",
+        variant: "default",
+      });
+    };
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [toast, t]);
+
+  // 鍵盤快捷鍵支援
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + K: 聚焦搜尋框
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      // Ctrl/Cmd + N: 新建記錄
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        e.preventDefault();
+        navigate('/record');
+      }
+      // Escape: 清除搜尋
+      if (e.key === 'Escape' && document.activeElement === searchInputRef.current) {
+        setSearchQuery("");
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [navigate]);
+
   useEffect(() => {
     const loadRecords = async () => {
       setIsLoading(true);
@@ -109,7 +225,7 @@ const Timeline = () => {
           const convertedLocalRecords: EmotionRecord[] = localRecords.map((r) => ({
             id: r.id,
             emotion: r.emotion,
-            intensity: r.intensity ?? 50, // 使用保存的強度值，如果沒有則使用默認值 50
+            intensity: r.intensity ?? 50, // 使用儲存的強度值，如果沒有則使用預設值 50
             description: r.note,
             blob_id: `local_${r.id.slice(0, 8)}`,
             walrus_url: `local://${r.id}`,
@@ -265,8 +381,9 @@ const Timeline = () => {
                     // 創建新的鏈上記錄
                     // 注意：鏈上記錄可能沒有 emotion/intensity 等資訊，這些在加密的 blob 中
                     // 我們可以嘗試從 blob 讀取，或使用預設值
+                    // 使用 objectId 本身作為 id，確保唯一性
                     const onChainRecord: EmotionRecord = {
-                      id: `onchain_${blob.objectId}`,
+                      id: blob.objectId, // 使用 objectId 本身，確保唯一性
                       emotion: "encrypted", // 加密資料尚未解密前提示為已加密
                       intensity: 50, // 預設值
                       description: "", // 加密內容，需要解密才能顯示
@@ -337,47 +454,101 @@ const Timeline = () => {
         // 3. 去重并排序（按时间倒序）
         console.log(`[Timeline] Starting deduplication with ${allRecords.length} total records`);
         
-        // 分析 blob_id 重複情況
+        // 優先使用 id 作為去重鍵（唯一標識符）
+        // blob_id 作為輔助查找鍵（可能為空或重複）
+        const deduplicationMap = new Map<string, EmotionRecord>();
+        const blobIdToRecordMap = new Map<string, EmotionRecord>(); // 輔助映射：blob_id -> record
+        
+        for (const record of allRecords) {
+          // 優先使用 id 作為主鍵
+          const primaryKey = record.id;
+          const existingById = deduplicationMap.get(primaryKey);
+          
+          if (!existingById) {
+            // 新記錄，添加到主映射
+            deduplicationMap.set(primaryKey, record);
+            
+            // 如果 blob_id 存在且不同於 id，也建立輔助映射（用於查找）
+            if (record.blob_id && record.blob_id !== primaryKey) {
+              blobIdToRecordMap.set(record.blob_id, record);
+            }
+          } else {
+            // id 已存在，比較時間戳，保留最新的
+            const existingTime = new Date(existingById.created_at).getTime();
+            const recordTime = new Date(record.created_at).getTime();
+            
+            if (!Number.isNaN(recordTime) && recordTime > existingTime) {
+              console.log(`[Timeline] Dedup: replacing ${existingById.id} with ${record.id} (same id, newer timestamp)`);
+              deduplicationMap.set(primaryKey, record);
+              
+              // 更新輔助映射
+              if (record.blob_id && record.blob_id !== primaryKey) {
+                blobIdToRecordMap.set(record.blob_id, record);
+              }
+            } else {
+              console.log(`[Timeline] Dedup: keeping ${existingById.id} (same id, older or equal timestamp), skipping ${record.id}`);
+            }
+          }
+          
+          // 檢查 blob_id 衝突（不同 id 但相同 blob_id）
+          if (record.blob_id && record.blob_id !== record.id) {
+            const existingByBlobId = blobIdToRecordMap.get(record.blob_id);
+            if (existingByBlobId && existingByBlobId.id !== record.id) {
+              // 發現 blob_id 衝突：兩個不同的記錄有相同的 blob_id
+              // 保留 id 在 deduplicationMap 中的記錄（主映射優先）
+              const recordInMainMap = deduplicationMap.get(record.id);
+              const existingInMainMap = deduplicationMap.get(existingByBlobId.id);
+              
+              if (recordInMainMap && !existingInMainMap) {
+                // 當前記錄在主映射中，但衝突記錄不在，更新輔助映射
+                blobIdToRecordMap.set(record.blob_id, record);
+              } else if (!recordInMainMap && existingInMainMap) {
+                // 衝突記錄在主映射中，當前記錄不在，不更新輔助映射
+                console.log(`[Timeline] Dedup: blob_id conflict - keeping ${existingByBlobId.id}, skipping ${record.id} (same blob_id)`);
+              }
+            } else if (!existingByBlobId) {
+              // 沒有衝突，添加輔助映射
+              blobIdToRecordMap.set(record.blob_id, record);
+            }
+          }
+        }
+        
+        // 分析重複情況（用於日誌）
+        const idCounts = new Map<string, number>();
         const blobIdCounts = new Map<string, number>();
         allRecords.forEach(record => {
-          const key = record.blob_id || record.id;
-          blobIdCounts.set(key, (blobIdCounts.get(key) || 0) + 1);
+          idCounts.set(record.id, (idCounts.get(record.id) || 0) + 1);
+          if (record.blob_id) {
+            blobIdCounts.set(record.blob_id, (blobIdCounts.get(record.blob_id) || 0) + 1);
+          }
         });
         
-        const duplicateBlobIds = Array.from(blobIdCounts.entries())
-          .filter(([_, count]) => count > 1)
-          .sort((a, b) => b[1] - a[1]);
+        const duplicateIds = Array.from(idCounts.entries()).filter(([_, count]) => count > 1);
+        const duplicateBlobIds = Array.from(blobIdCounts.entries()).filter(([_, count]) => count > 1);
+        
+        if (duplicateIds.length > 0) {
+          console.log(`[Timeline] Found ${duplicateIds.length} duplicate IDs (should not happen):`);
+          duplicateIds.forEach(([id, count]) => {
+            console.log(`  - ${id.substring(0, 20)}... appears ${count} times`);
+          });
+        }
         
         if (duplicateBlobIds.length > 0) {
-          console.log(`[Timeline] Found ${duplicateBlobIds.length} blob_ids with duplicates:`);
+          console.log(`[Timeline] Found ${duplicateBlobIds.length} blob_ids with duplicates (expected for multiple Sui objects referencing same blob):`);
           duplicateBlobIds.forEach(([blobId, count]) => {
             console.log(`  - ${blobId.substring(0, 20)}... appears ${count} times`);
           });
         }
         
-        const deduplicationMap = allRecords.reduce((map, record) => {
-          const key = record.blob_id || record.id;
-          const existing = map.get(key);
-          if (!existing) {
-            map.set(key, record);
-            return map;
-          }
-
-          const existingTime = new Date(existing.created_at).getTime();
-          const recordTime = new Date(record.created_at).getTime();
-          if (!Number.isNaN(recordTime) && recordTime > existingTime) {
-            console.log(`[Timeline] Dedup: replacing ${existing.id} with ${record.id} for key ${key}`);
-            map.set(key, record);
-          } else {
-            console.log(`[Timeline] Dedup: keeping ${existing.id} for key ${key}, skipping ${record.id}`);
-          }
-          return map;
-        }, new Map<string, EmotionRecord>());
+        // 最後只保留以 id 為鍵的記錄（確保唯一性）
+        const uniqueRecords = sortRecordsByDate(
+          Array.from(deduplicationMap.values()).filter((record, index, self) => 
+            index === self.findIndex(r => r.id === record.id)
+          )
+        );
         
-        console.log(`[Timeline] After deduplication: ${deduplicationMap.size} unique records (removed ${allRecords.length - deduplicationMap.size} duplicates)`);
-        console.log(`[Timeline] This is EXPECTED: Multiple Sui objects can reference the same Walrus blob`);
-        
-        const uniqueRecords = sortRecordsByDate(Array.from(deduplicationMap.values()));
+        console.log(`[Timeline] After deduplication: ${uniqueRecords.length} unique records (removed ${allRecords.length - uniqueRecords.length} duplicates)`);
+        console.log(`[Timeline] Note: Multiple Sui objects can reference the same Walrus blob (same blob_id, different id)`);
 
         // 統計資訊
         const localCount = uniqueRecords.filter(r => 
@@ -433,6 +604,24 @@ const Timeline = () => {
     // Sui Scan testnet URL format: https://suiscan.xyz/testnet/object/{objectId}
     return `https://suiscan.xyz/testnet/object/${objectId}`;
   };
+
+  // 指數退避重試函數
+  const retryWithBackoff = useCallback(async <T,>(
+    fn: () => Promise<T>,
+    maxRetries: number = 3,
+    baseDelay: number = 1000
+  ): Promise<T> => {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        return await fn();
+      } catch (error) {
+        if (i === maxRetries - 1) throw error;
+        const delay = baseDelay * Math.pow(2, i);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+    throw new Error("Retry failed");
+  }, []);
 
   // 判斷記錄是否為本地儲存
   const isLocalRecord = (record: EmotionRecord) => {
@@ -492,18 +681,30 @@ const Timeline = () => {
     setDecryptingRecords(prev => new Set(prev).add(record.id));
 
     try {
-      // 優先使用資料庫中的 encrypted_data，否則從 Walrus 讀取
+      // 優先使用資料庫中的 encrypted_data，否則從 Walrus 讀取（帶重試）
       let encryptedDataString: string;
       if (record.encrypted_data) {
         console.log(`[Timeline] Using encrypted_data from database for record ${record.id}`);
         encryptedDataString = record.encrypted_data;
       } else {
-        // 從 Walrus 讀取加密資料（失敗時回退到本地伺服器備份）
+        // 從 Walrus 讀取加密資料（帶重試機制）
         try {
-          encryptedDataString = await readFromWalrus(record.blob_id);
+          encryptedDataString = await retryWithBackoff(
+            () => readFromWalrus(record.blob_id),
+            3,
+            1000
+          );
         } catch (walrusError) {
           console.warn(`[Timeline] Walrus fetch failed for ${record.blob_id}, falling back to server backup`, walrusError);
-          encryptedDataString = await getEncryptedEmotionByBlob(record.blob_id);
+          try {
+            encryptedDataString = await retryWithBackoff(
+              () => getEncryptedEmotionByBlob(record.blob_id),
+              2,
+              500
+            );
+          } catch (backupError) {
+            throw new Error(`無法從 Walrus 或備份伺服器讀取資料：${(backupError as Error).message}`);
+          }
         }
       }
       
@@ -804,23 +1005,127 @@ const Timeline = () => {
         return next;
       });
     }
-  }, [decryptedDescriptions, decryptingRecords, currentAccount, toast, t, isLocalRecord]);
+  }, [decryptedDescriptions, decryptingRecords, currentAccount, toast, t, isLocalRecord, retryWithBackoff]);
 
-  // 篩選後的記錄（需要在 decryptAllRecords 之前定義）
+  // 獲取所有可用的標籤
+  const availableTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    records.forEach(record => {
+      if (record.tags && record.tags.length > 0) {
+        record.tags.forEach(tag => tagSet.add(tag));
+      }
+    });
+    return Array.from(tagSet).sort();
+  }, [records]);
+
+  // 篩選、搜尋和排序後的記錄（需要在 decryptAllRecords 之前定義）
   const filteredRecords = useMemo(() => {
-    if (filter === "all") return records;
+    let filtered = records;
     
-    // 內聯 isLocalRecord 邏輯以確保正確過濾
+    // 1. 儲存類型過濾
     const isLocal = (record: EmotionRecord) => {
       const blobId = record.blob_id || "";
       const walrusUrl = record.walrus_url || "";
       return blobId.startsWith("local_") || walrusUrl.startsWith("local://");
     };
     
-    if (filter === "local") return records.filter(isLocal);
-    if (filter === "walrus") return records.filter(r => !isLocal(r));
-    return records;
-  }, [records, filter]);
+    if (filter === "local") {
+      filtered = filtered.filter(isLocal);
+    } else if (filter === "walrus") {
+      filtered = filtered.filter(r => !isLocal(r));
+    }
+    
+    // 2. 日期範圍過濾
+    if (dateRange?.from || dateRange?.to) {
+      filtered = filtered.filter(record => {
+        const recordDate = new Date(record.created_at);
+        if (dateRange.from && recordDate < dateRange.from) return false;
+        if (dateRange.to) {
+          const toDate = new Date(dateRange.to);
+          toDate.setHours(23, 59, 59, 999); // 包含結束日期的整天
+          if (recordDate > toDate) return false;
+        }
+        return true;
+      });
+    }
+    
+    // 3. 標籤過濾
+    if (selectedTags.length > 0) {
+      filtered = filtered.filter(record => {
+        const recordTags = record.tags || [];
+        // 記錄必須包含所有選中的標籤（AND 邏輯）
+        return selectedTags.every(tag => recordTags.includes(tag));
+      });
+    }
+    
+    // 4. 搜尋過濾
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(record => {
+        const emotionMatch = record.emotion.toLowerCase().includes(query);
+        const descriptionMatch = decryptedDescriptions[record.id]?.toLowerCase().includes(query);
+        const dateMatch = new Date(record.created_at).toLocaleDateString(i18n.language === 'zh-TW' ? 'zh-TW' : 'en-US').includes(query);
+        const tagsMatch = record.tags?.some(tag => tag.toLowerCase().includes(query));
+        return emotionMatch || descriptionMatch || dateMatch || tagsMatch;
+      });
+    }
+    
+    // 4. 排序
+    const sorted = [...filtered].sort((a, b) => {
+      let comparison = 0;
+      
+      switch (sortBy) {
+        case "date":
+          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          break;
+        case "intensity":
+          comparison = a.intensity - b.intensity;
+          break;
+        case "emotion":
+          comparison = a.emotion.localeCompare(b.emotion, i18n.language);
+          break;
+      }
+      
+      return sortOrder === "asc" ? comparison : -comparison;
+    });
+    
+    return sorted;
+  }, [records, filter, searchQuery, selectedTags, sortBy, sortOrder, decryptedDescriptions, i18n.language, dateRange]);
+
+  // 虛擬滾動器配置
+  // 使用動態高度估計以提升滾動準確性
+  const virtualizer = useVirtualizer({
+    count: filteredRecords.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: useCallback((index: number) => {
+      // 根據記錄內容動態估計高度
+      const record = filteredRecords[index];
+      if (!record) return 200;
+      
+      // 基礎高度
+      let estimatedHeight = 150;
+      
+      // 如果有描述，增加高度
+      const hasDescription = decryptedDescriptions[record.id] || record.description;
+      if (hasDescription) {
+        const descLength = (decryptedDescriptions[record.id] || record.description || '').length;
+        estimatedHeight += Math.min(descLength / 3, 150); // 最多增加150px
+      }
+      
+      // 如果有標籤，增加高度
+      if (record.tags && record.tags.length > 0) {
+        estimatedHeight += record.tags.length * 8;
+      }
+      
+      // 如果有錯誤信息，增加高度
+      if (decryptErrors[record.id]) {
+        estimatedHeight += 50;
+      }
+      
+      return Math.max(estimatedHeight, 200); // 最小200px
+    }, [filteredRecords, decryptedDescriptions, decryptErrors]),
+    overscan: 5, // 預渲染額外 5 條記錄以提升滾動體驗
+  });
 
   // 批量解密所有記錄
   const decryptAllRecords = useCallback(async () => {
@@ -990,33 +1295,213 @@ const Timeline = () => {
     ];
   }, [stats.local, stats.walrus, t]);
 
-  // 時間趨勢資料（最近7天）
+  // 時間趨勢資料（支持周/月/年視圖）
   const timelineChartData = useMemo(() => {
-    const days = 7;
-    const data = [];
     const now = new Date();
+    const data = [];
+    let days = 7;
+    let dateFormat: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
+    
+    if (viewPeriod === "week") {
+      days = 7;
+      dateFormat = { month: 'short', day: 'numeric' };
+    } else if (viewPeriod === "month") {
+      days = 30;
+      dateFormat = { month: 'short', day: 'numeric' };
+    } else if (viewPeriod === "year") {
+      days = 365;
+      dateFormat = { month: 'short' };
+    }
     
     for (let i = days - 1; i >= 0; i--) {
       const date = new Date(now);
-      date.setDate(date.getDate() - i);
+      if (viewPeriod === "year") {
+        date.setMonth(date.getMonth() - i);
+      } else {
+        date.setDate(date.getDate() - i);
+      }
       date.setHours(0, 0, 0, 0);
       
       const nextDate = new Date(date);
-      nextDate.setDate(nextDate.getDate() + 1);
+      if (viewPeriod === "year") {
+        nextDate.setMonth(nextDate.getMonth() + 1);
+      } else {
+        nextDate.setDate(nextDate.getDate() + 1);
+      }
       
-      const count = records.filter(r => {
+      const periodRecords = records.filter(r => {
         const recordDate = new Date(r.created_at);
         return recordDate >= date && recordDate < nextDate;
-      }).length;
+      });
+      
+      const count = periodRecords.length;
+      const avgIntensity = periodRecords.length > 0
+        ? Math.round(periodRecords.reduce((sum, r) => sum + r.intensity, 0) / periodRecords.length)
+        : 0;
       
       data.push({
-        date: date.toLocaleDateString(i18n.language === 'zh-TW' ? 'zh-TW' : 'en-US', { month: 'short', day: 'numeric' }),
+        date: date.toLocaleDateString(i18n.language === 'zh-TW' ? 'zh-TW' : 'en-US', dateFormat),
         count,
+        avgIntensity,
       });
     }
     
     return data;
-  }, [records, i18n.language]);
+  }, [records, i18n.language, viewPeriod]);
+
+  // 情緒趨勢預測（基於線性回歸）
+  const emotionTrendData = useMemo(() => {
+    if (records.length < 3) return null;
+    
+    const emotionCounts: Record<string, number[]> = {};
+    const now = new Date();
+    const days = viewPeriod === "week" ? 7 : viewPeriod === "month" ? 30 : 365;
+    
+    // 收集歷史數據
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date(now);
+      if (viewPeriod === "year") {
+        date.setMonth(date.getMonth() - i);
+      } else {
+        date.setDate(date.getDate() - i);
+      }
+      date.setHours(0, 0, 0, 0);
+      
+      const nextDate = new Date(date);
+      if (viewPeriod === "year") {
+        nextDate.setMonth(nextDate.getMonth() + 1);
+      } else {
+        nextDate.setDate(nextDate.getDate() + 1);
+      }
+      
+      const periodRecords = records.filter(r => {
+        const recordDate = new Date(r.created_at);
+        return recordDate >= date && recordDate < nextDate;
+      });
+      
+      periodRecords.forEach(r => {
+        if (!emotionCounts[r.emotion]) {
+          emotionCounts[r.emotion] = new Array(days).fill(0);
+        }
+        emotionCounts[r.emotion][days - 1 - i] = (emotionCounts[r.emotion][days - 1 - i] || 0) + 1;
+      });
+    }
+    
+    // 計算趨勢和預測
+    const result: Record<string, { actual: number[], predicted: number[], trend: 'up' | 'down' | 'stable' }> = {};
+    
+    Object.entries(emotionCounts).forEach(([emotion, counts]) => {
+      const nonZeroCounts = counts.filter(c => c > 0);
+      if (nonZeroCounts.length < 2) return;
+      
+      // 簡單線性回歸
+      const n = counts.length;
+      let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+      
+      counts.forEach((y, x) => {
+        sumX += x;
+        sumY += y;
+        sumXY += x * y;
+        sumX2 += x * x;
+      });
+      
+      const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+      const intercept = (sumY - slope * sumX) / n;
+      
+      // 預測未來3個週期
+      const predicted = [];
+      for (let i = 0; i < 3; i++) {
+        predicted.push(Math.max(0, Math.round(slope * (n + i) + intercept)));
+      }
+      
+      // 判斷趨勢
+      const recentAvg = counts.slice(-3).reduce((a, b) => a + b, 0) / 3;
+      const earlierAvg = counts.slice(0, 3).reduce((a, b) => a + b, 0) / 3;
+      let trend: 'up' | 'down' | 'stable' = 'stable';
+      if (recentAvg > earlierAvg * 1.2) trend = 'up';
+      else if (recentAvg < earlierAvg * 0.8) trend = 'down';
+      
+      result[emotion] = {
+        actual: counts,
+        predicted,
+        trend,
+      };
+    });
+    
+    return result;
+  }, [records, viewPeriod]);
+
+  // 情緒關聯分析
+  const emotionCorrelationData = useMemo(() => {
+    if (records.length < 2) return null;
+    
+    const transitions: Record<string, Record<string, number>> = {};
+    
+    // 按時間排序
+    const sortedRecords = [...records].sort((a, b) => 
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+    
+    // 計算情緒轉換
+    for (let i = 0; i < sortedRecords.length - 1; i++) {
+      const from = sortedRecords[i].emotion;
+      const to = sortedRecords[i + 1].emotion;
+      
+      if (!transitions[from]) {
+        transitions[from] = {};
+      }
+      transitions[from][to] = (transitions[from][to] || 0) + 1;
+    }
+    
+    // 計算關聯強度
+    const correlations: Array<{ from: string; to: string; strength: number; count: number }> = [];
+    
+    Object.entries(transitions).forEach(([from, tos]) => {
+      const totalFrom = Object.values(tos).reduce((a, b) => a + b, 0);
+      
+      Object.entries(tos).forEach(([to, count]) => {
+        if (from !== to && count > 0) {
+          const strength = count / totalFrom;
+          correlations.push({
+            from,
+            to,
+            strength: Math.round(strength * 100),
+            count,
+          });
+        }
+      });
+    });
+    
+    // 排序並返回前10個最強的關聯
+    return correlations
+      .sort((a, b) => b.strength - a.strength)
+      .slice(0, 10);
+  }, [records]);
+
+  // 情緒日曆熱力圖數據
+  const emotionCalendarData = useMemo(() => {
+    const data: Record<string, { count: number; avgIntensity: number; dominantEmotion: string }> = {};
+    
+    records.forEach(record => {
+      const date = new Date(record.created_at);
+      const dateKey = format(date, 'yyyy-MM-dd');
+      
+      if (!data[dateKey]) {
+        data[dateKey] = {
+          count: 0,
+          avgIntensity: 0,
+          dominantEmotion: record.emotion,
+        };
+      }
+      
+      data[dateKey].count += 1;
+      data[dateKey].avgIntensity = Math.round(
+        (data[dateKey].avgIntensity * (data[dateKey].count - 1) + record.intensity) / data[dateKey].count
+      );
+    });
+    
+    return data;
+  }, [records]);
 
   const chartConfig = {
     count: {
@@ -1024,6 +1509,612 @@ const Timeline = () => {
       color: "hsl(var(--chart-1))",
     },
   };
+
+  // 打開導出格式選擇對話框
+  const handleExportClick = useCallback((records: EmotionRecord[], descriptions: Record<string, string>) => {
+    setRecordsToExport(records);
+    setDescriptionsToExport(descriptions);
+    setExportDialogOpen(true);
+  }, []);
+
+  // 格式化日期
+  const formatDate = useCallback((dateStr: string) => {
+    const date = new Date(dateStr);
+    if (dateFormat === "iso") {
+      return date.toISOString();
+    } else if (dateFormat === "custom") {
+      return format(date, "yyyy-MM-dd HH:mm:ss", { locale: i18n.language === 'zh-TW' ? zhTW : enUS });
+    } else {
+      return date.toLocaleString(i18n.language === 'zh-TW' ? 'zh-TW' : 'en-US');
+    }
+  }, [dateFormat, i18n.language]);
+
+  // 執行導出
+  const executeExport = useCallback((format: "csv" | "json" | "pdf" | "markdown") => {
+    setExportDialogOpen(false);
+    const records = recordsToExport;
+    const descriptions = descriptionsToExport;
+    const isZh = i18n.language === 'zh-TW';
+
+    if (format === "csv") {
+      // 匯出為 CSV - 支持自定義字段
+      const fieldLabels: Record<string, string> = {
+        date: isZh ? "日期" : "Date",
+        emotion: isZh ? "情緒" : "Emotion",
+        intensity: isZh ? "強度" : "Intensity",
+        description: isZh ? "描述" : "Description",
+        storage: isZh ? "儲存類型" : "Storage",
+        privacy: isZh ? "是否公開" : "Privacy",
+        status: isZh ? "狀態" : "Status",
+        suiRef: isZh ? "Sui 引用" : "Sui Reference",
+      };
+
+      const headers: string[] = [];
+      const fieldOrder: Array<keyof typeof customExportFields> = ["date", "emotion", "intensity", "description", "storage", "privacy", "status", "suiRef"];
+      
+      fieldOrder.forEach(field => {
+        if (customExportFields[field]) {
+          headers.push(fieldLabels[field]);
+        }
+      });
+
+      const rows = records.map(record => {
+        const isLocal = isLocalRecord(record);
+        const row: string[] = [];
+        
+        if (customExportFields.date) {
+          row.push(formatDate(record.created_at));
+        }
+        if (customExportFields.emotion) {
+          row.push(emotionLabels[record.emotion as keyof typeof emotionLabels]?.label || record.emotion);
+        }
+        if (customExportFields.intensity) {
+          row.push(record.intensity.toString());
+        }
+        if (customExportFields.description) {
+          row.push(descriptions[record.id] || record.description || "");
+        }
+        if (customExportFields.storage) {
+          row.push(isLocal ? t("timeline.filter.local") : t("timeline.filter.walrus"));
+        }
+        if (customExportFields.privacy) {
+          row.push(record.is_public ? t("timeline.publicRecord") : t("timeline.privateRecord"));
+        }
+        if (customExportFields.status) {
+          row.push(record.proof_status === "confirmed" ? t("timeline.verified") : record.proof_status === "pending" ? t("timeline.pending") : t("timeline.failed"));
+        }
+        if (customExportFields.suiRef && record.sui_ref) {
+          row.push(record.sui_ref);
+        }
+        
+        return row;
+      });
+
+      const csvContent = [
+        headers.join(","),
+        ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      ].join("\n");
+
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `emotion-records-${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: t("timeline.exportSuccess") || "匯出成功",
+        description: (t("timeline.exportSuccessDesc", { count: records.length }) || `已匯出 ${records.length} 條記錄為 CSV 格式`).replace("{{count}}", records.length.toString()),
+      });
+    } else if (format === "json") {
+      // 匯出為 JSON - 支持自定義字段
+      const jsonData = records.map(record => {
+        const isLocal = isLocalRecord(record);
+        const data: any = {};
+        
+        if (customExportFields.date) {
+          data.date = formatDate(record.created_at);
+        }
+        if (customExportFields.emotion) {
+          data.emotion = record.emotion;
+          data.emotionLabel = emotionLabels[record.emotion as keyof typeof emotionLabels]?.label || record.emotion;
+        }
+        if (customExportFields.intensity) {
+          data.intensity = record.intensity;
+        }
+        if (customExportFields.description) {
+          data.description = descriptions[record.id] || record.description || "";
+        }
+        if (customExportFields.storage) {
+          data.storage = isLocal ? "local" : "walrus";
+        }
+        if (customExportFields.privacy) {
+          data.isPublic = record.is_public;
+        }
+        if (customExportFields.status) {
+          data.proofStatus = record.proof_status;
+        }
+        if (customExportFields.suiRef && record.sui_ref) {
+          data.suiRef = record.sui_ref;
+        }
+        
+        // 始終包含 ID（用於追蹤）
+        data.id = record.id;
+        
+        return data;
+      });
+
+      const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: "application/json" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `emotion-records-${new Date().toISOString().split('T')[0]}.json`);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: t("timeline.exportSuccess") || "匯出成功",
+        description: (t("timeline.exportSuccessDesc", { count: records.length }) || `已匯出 ${records.length} 條記錄為 JSON 格式`).replace("{{count}}", records.length.toString()),
+      });
+    } else if (format === "pdf") {
+      // 匯出為 PDF - 支持自定義字段
+      const doc = new jsPDF();
+      
+      // 設置字體（jsPDF 默認不支持中文，需要特殊處理）
+      // 這裡使用簡化版本，實際生產環境可能需要添加中文字體支持
+      doc.setFontSize(16);
+      doc.text(isZh ? "情緒記錄報告" : "Emotion Records Report", 14, 20);
+      
+      doc.setFontSize(10);
+      const exportDate = new Date().toLocaleString(i18n.language === 'zh-TW' ? 'zh-TW' : 'en-US');
+      doc.text(`${isZh ? "導出日期" : "Export Date"}: ${exportDate}`, 14, 30);
+      doc.text(`${isZh ? "記錄數量" : "Total Records"}: ${records.length}`, 14, 36);
+      
+      let yPos = 50;
+      const pageHeight = doc.internal.pageSize.height;
+      const margin = 14;
+      const lineHeight = 8;
+      
+      records.forEach((record, index) => {
+        // 檢查是否需要新頁面
+        if (yPos > pageHeight - 40) {
+          doc.addPage();
+          yPos = margin;
+        }
+        
+        const isLocal = isLocalRecord(record);
+        const emotionLabel = emotionLabels[record.emotion as keyof typeof emotionLabels]?.label || record.emotion;
+        const emotionEmoji = emotionLabels[record.emotion as keyof typeof emotionLabels]?.emoji || "😊";
+        const dateStr = formatDate(record.created_at);
+        const description = descriptions[record.id] || record.description || (isZh ? "無描述" : "No description");
+        
+        // 記錄標題
+        if (customExportFields.emotion) {
+          doc.setFontSize(12);
+          doc.text(`${emotionEmoji} ${emotionLabel}`, margin, yPos);
+          yPos += lineHeight;
+        }
+        
+        // 根據自定義字段顯示內容
+        doc.setFontSize(10);
+        if (customExportFields.date) {
+          doc.text(`${isZh ? "日期" : "Date"}: ${dateStr}`, margin, yPos);
+          yPos += lineHeight;
+        }
+        if (customExportFields.intensity) {
+          doc.text(`${isZh ? "強度" : "Intensity"}: ${record.intensity}%`, margin, yPos);
+          yPos += lineHeight;
+        }
+        if (customExportFields.description) {
+          const maxDescWidth = 180;
+          const descLines = doc.splitTextToSize(`${isZh ? "描述" : "Description"}: ${description}`, maxDescWidth);
+          doc.text(descLines, margin, yPos);
+          yPos += lineHeight * descLines.length;
+        }
+        if (customExportFields.storage) {
+          doc.text(`${isZh ? "儲存" : "Storage"}: ${isLocal ? (isZh ? "本地" : "Local") : "Walrus"}`, margin, yPos);
+          yPos += lineHeight;
+        }
+        if (customExportFields.privacy) {
+          doc.text(`${isZh ? "隱私" : "Privacy"}: ${record.is_public ? (isZh ? "公開" : "Public") : (isZh ? "私有" : "Private")}`, margin, yPos);
+          yPos += lineHeight;
+        }
+        if (customExportFields.status) {
+          const statusText = record.proof_status === "confirmed" ? (isZh ? "已驗證" : "Verified") : 
+                           record.proof_status === "pending" ? (isZh ? "待處理" : "Pending") : 
+                           (isZh ? "失敗" : "Failed");
+          doc.text(`${isZh ? "狀態" : "Status"}: ${statusText}`, margin, yPos);
+          yPos += lineHeight;
+        }
+        if (customExportFields.suiRef && record.sui_ref) {
+          doc.text(`${isZh ? "Sui 引用" : "Sui Reference"}: ${record.sui_ref}`, margin, yPos);
+          yPos += lineHeight;
+        }
+        
+        yPos += 5;
+        
+        // 分隔線
+        if (index < records.length - 1) {
+          doc.setDrawColor(200, 200, 200);
+          doc.line(margin, yPos, 200 - margin, yPos);
+          yPos += 5;
+        }
+      });
+      
+      doc.save(`emotion-records-${new Date().toISOString().split('T')[0]}.pdf`);
+      
+      toast({
+        title: t("timeline.exportSuccess") || "匯出成功",
+        description: (t("timeline.exportSuccessPDF", { count: records.length }) || `已匯出 ${records.length} 條記錄為 PDF 格式`).replace("{{count}}", records.length.toString()),
+      });
+    } else if (format === "markdown") {
+      // 匯出為 Markdown - 支持自定義字段
+      const mdContent: string[] = [];
+      
+      // 標題
+      mdContent.push(`# ${isZh ? "情緒記錄報告" : "Emotion Records Report"}\n`);
+      mdContent.push(`${isZh ? "導出日期" : "Export Date"}: ${new Date().toLocaleString(i18n.language === 'zh-TW' ? 'zh-TW' : 'en-US')}\n`);
+      mdContent.push(`${isZh ? "記錄數量" : "Total Records"}: ${records.length}\n\n`);
+      mdContent.push("---\n\n");
+      
+      // 記錄列表
+      records.forEach((record, index) => {
+        const isLocal = isLocalRecord(record);
+        const emotionLabel = emotionLabels[record.emotion as keyof typeof emotionLabels]?.label || record.emotion;
+        const emotionEmoji = emotionLabels[record.emotion as keyof typeof emotionLabels]?.emoji || "😊";
+        const dateStr = formatDate(record.created_at);
+        const description = descriptions[record.id] || record.description || (isZh ? "無描述" : "No description");
+        
+        // 根據自定義字段顯示內容
+        if (customExportFields.emotion) {
+          mdContent.push(`## ${emotionEmoji} ${emotionLabel}\n\n`);
+        }
+        
+        if (customExportFields.date) {
+          mdContent.push(`**${isZh ? "日期" : "Date"}**: ${dateStr}  \n`);
+        }
+        if (customExportFields.intensity) {
+          mdContent.push(`**${isZh ? "強度" : "Intensity"}**: ${record.intensity}%  \n`);
+        }
+        if (customExportFields.description) {
+          mdContent.push(`**${isZh ? "描述" : "Description"}**: ${description}  \n`);
+        }
+        if (customExportFields.storage) {
+          mdContent.push(`**${isZh ? "儲存" : "Storage"}**: ${isLocal ? (isZh ? "本地" : "Local") : "Walrus"}  \n`);
+        }
+        if (customExportFields.privacy) {
+          mdContent.push(`**${isZh ? "隱私" : "Privacy"}**: ${record.is_public ? (isZh ? "公開" : "Public") : (isZh ? "私有" : "Private")}  \n`);
+        }
+        if (customExportFields.status) {
+          const statusText = record.proof_status === "confirmed" ? (isZh ? "已驗證" : "Verified") : 
+                           record.proof_status === "pending" ? (isZh ? "待處理" : "Pending") : 
+                           (isZh ? "失敗" : "Failed");
+          mdContent.push(`**${isZh ? "狀態" : "Status"}**: ${statusText}  \n`);
+        }
+        if (customExportFields.suiRef && record.sui_ref) {
+          mdContent.push(`**${isZh ? "Sui 引用" : "Sui Reference"}**: ${record.sui_ref}  \n`);
+        }
+        
+        mdContent.push("\n---\n\n");
+      });
+      
+      const blob = new Blob([mdContent.join("")], { type: "text/markdown;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `emotion-records-${new Date().toISOString().split('T')[0]}.md`);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: t("timeline.exportSuccess") || "匯出成功",
+        description: (t("timeline.exportSuccessMarkdown", { count: records.length }) || `已匯出 ${records.length} 條記錄為 Markdown 格式`).replace("{{count}}", records.length.toString()),
+      });
+    }
+  }, [t, i18n.language, emotionLabels, isLocalRecord, recordsToExport, descriptionsToExport, customExportFields, dateFormat, formatDate]);
+
+  // 舊的導出函數（保持向後兼容）
+  const exportData = useCallback((recordsToExport: EmotionRecord[], descriptions: Record<string, string>) => {
+    handleExportClick(recordsToExport, descriptions);
+  }, [handleExportClick]);
+
+  // 刪除記錄
+  const handleDeleteClick = useCallback((record: EmotionRecord) => {
+    setRecordToDelete(record);
+    setDeleteDialogOpen(true);
+  }, []);
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!recordToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      const isLocal = isLocalRecord(recordToDelete);
+      
+      // CRITICAL: Execute deletion first, only update state if deletion succeeds
+      // This prevents state inconsistency if deletion fails
+      if (isLocal) {
+        // 本地記錄：從本地儲存刪除
+        await deleteEmotionRecord(recordToDelete.id, currentAccount?.address || null);
+      } else {
+        // Walrus 記錄：從 Supabase 刪除（鏈上資料無法真正刪除，只能標記）
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && recordToDelete.id) {
+          const { error } = await supabase
+            .from('emotion_records')
+            .delete()
+            .eq('id', recordToDelete.id);
+          
+          if (error) throw error;
+        }
+      }
+      
+      // Only update state after successful deletion
+      setRecords(prev => prev.filter(r => r.id !== recordToDelete.id));
+      setDecryptedDescriptions(prev => {
+        const next = { ...prev };
+        delete next[recordToDelete.id];
+        return next;
+      });
+      setDecryptedAiResponses(prev => {
+        const next = { ...prev };
+        delete next[recordToDelete.id];
+        return next;
+      });
+      
+      toast({
+        title: t("timeline.deleteSuccess") || "刪除成功",
+        description: t("timeline.deleteSuccessDesc") || "記錄已刪除",
+      });
+      
+      setDeleteDialogOpen(false);
+      setRecordToDelete(null);
+    } catch (error: any) {
+      console.error("[Timeline] Delete error:", error);
+      toast({
+        title: t("timeline.deleteError") || "刪除失敗",
+        description: error?.message || t("timeline.deleteErrorDesc") || "無法刪除記錄",
+        variant: "destructive",
+      });
+      // Don't update state if deletion failed - record should still be visible
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [recordToDelete, currentAccount, toast, t, isLocalRecord]);
+
+  // 批量操作
+  const toggleSelection = useCallback((recordId: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(recordId)) {
+        next.delete(recordId);
+      } else {
+        next.add(recordId);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    if (selectedIds.size === filteredRecords.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredRecords.map(r => r.id)));
+    }
+  }, [selectedIds.size, filteredRecords]);
+
+  const handleBatchDelete = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+    
+    const confirmMessage = t("timeline.batchDeleteConfirm", { count: selectedIds.size }) || 
+      `確定要刪除 ${selectedIds.size} 條記錄嗎？此操作無法撤銷。`;
+    
+    if (!window.confirm(confirmMessage)) return;
+    
+    const idsToDelete = Array.from(selectedIds);
+    
+    // Use Promise.allSettled to handle partial failures gracefully
+    const deletePromises = idsToDelete.map(async (id) => {
+      const record = records.find(r => r.id === id);
+      if (!record) {
+        return { id, status: 'rejected' as const, error: new Error('Record not found') };
+      }
+      
+      try {
+        const isLocal = isLocalRecord(record);
+        if (isLocal) {
+          await deleteEmotionRecord(id, currentAccount?.address || null);
+        } else {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            const { error } = await supabase.from('emotion_records').delete().eq('id', id);
+            if (error) throw error;
+          } else {
+            throw new Error('No session for deleting remote record');
+          }
+        }
+        return { id, status: 'fulfilled' as const };
+      } catch (error) {
+        console.error(`[Timeline] Failed to delete record ${id}:`, error);
+        return { id, status: 'rejected' as const, error: error instanceof Error ? error : new Error(String(error)) };
+      }
+    });
+    
+    const results = await Promise.allSettled(deletePromises);
+    
+    // Extract successful and failed deletions
+    const successfulIds: string[] = [];
+    const failedIds: string[] = [];
+    
+    results.forEach((result, index) => {
+      const id = idsToDelete[index];
+      if (result.status === 'fulfilled' && result.value.status === 'fulfilled') {
+        successfulIds.push(id);
+      } else {
+        failedIds.push(id);
+      }
+    });
+    
+    // Only remove successfully deleted records from state
+    if (successfulIds.length > 0) {
+      setRecords(prev => prev.filter(r => !successfulIds.includes(r.id)));
+      setDecryptedDescriptions(prev => {
+        const next = { ...prev };
+        successfulIds.forEach(id => delete next[id]);
+        return next;
+      });
+      setDecryptedAiResponses(prev => {
+        const next = { ...prev };
+        successfulIds.forEach(id => delete next[id]);
+        return next;
+      });
+    }
+    
+    // Clear selection only if all deletions succeeded
+    if (failedIds.length === 0) {
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+    } else {
+      // Keep only failed IDs in selection so user can retry
+      setSelectedIds(new Set(failedIds));
+    }
+    
+    // Show appropriate toast message
+    if (successfulIds.length === idsToDelete.length) {
+      toast({
+        title: t("timeline.batchDeleteComplete") || "批量刪除完成",
+        description: t("timeline.batchDeleteCompleteDesc", { success: successfulIds.length, fail: 0 }) || 
+          `成功刪除 ${successfulIds.length} 條記錄`,
+      });
+    } else if (successfulIds.length > 0) {
+      toast({
+        title: t("timeline.batchDeletePartial") || "部分刪除成功",
+        description: t("timeline.batchDeleteCompleteDesc", { 
+          success: successfulIds.length, 
+          fail: failedIds.length 
+        }) || `成功刪除 ${successfulIds.length} 條，失敗 ${failedIds.length} 條`,
+        variant: "default",
+      });
+    } else {
+      toast({
+        title: t("timeline.batchDeleteError") || "批量刪除失敗",
+        description: t("timeline.batchDeleteErrorDesc") || `所有 ${failedIds.length} 條記錄刪除失敗`,
+        variant: "destructive",
+      });
+    }
+  }, [selectedIds, records, currentAccount, toast, t, isLocalRecord]);
+
+  const handleBatchExport = useCallback(() => {
+    const recordsToExport = filteredRecords.filter(r => selectedIds.has(r.id));
+    if (recordsToExport.length === 0) {
+      toast({
+        title: t("timeline.noSelection") || "未選擇記錄",
+        description: t("timeline.noSelectionDesc") || "請先選擇要匯出的記錄",
+      });
+      return;
+    }
+    exportData(recordsToExport, decryptedDescriptions);
+  }, [selectedIds, filteredRecords, decryptedDescriptions, exportData, toast, t]);
+
+  // 查看記錄詳情
+  const handleViewDetails = useCallback((record: EmotionRecord) => {
+    setSelectedRecord(record);
+    setDetailDialogOpen(true);
+  }, []);
+
+  // 監聽對話框關閉，強制清理 overlay 和 body lock
+  useEffect(() => {
+    if (!detailDialogOpen) {
+      // 對話框已關閉，立即強制清理所有可能阻塞的元素
+      const cleanup = () => {
+        // 1. 確保 body 樣式完全恢復（最優先）
+        document.body.style.removeProperty('pointer-events');
+        document.body.style.removeProperty('overflow');
+        document.body.classList.remove('overflow-hidden');
+        
+        // 2. 移除所有已關閉的 Radix portal（包括 overlay 和 content）
+        const portals = document.querySelectorAll('[data-radix-portal]');
+        portals.forEach(portal => {
+          const hasClosedContent = portal.querySelector('[data-radix-dialog-content][data-state="closed"]');
+          const hasClosedOverlay = portal.querySelector('[data-state="closed"]');
+          if (hasClosedContent || hasClosedOverlay) {
+            try {
+              portal.remove();
+            } catch (e) {
+              try {
+                if (portal.parentNode) {
+                  portal.parentNode.removeChild(portal);
+                }
+              } catch (e2) {
+                // 忽略錯誤
+              }
+            }
+          }
+        });
+        
+        // 3. 移除所有可能殘留的 overlay（直接查找所有可能的 overlay）
+        const allOverlays = document.querySelectorAll('[data-radix-dialog-overlay], .fixed.inset-0.z-50');
+        allOverlays.forEach(overlay => {
+          const htmlEl = overlay as HTMLElement;
+          const state = htmlEl.getAttribute('data-state');
+          if (state === 'closed' || (!state && htmlEl.style.opacity === '0')) {
+            try {
+              htmlEl.remove();
+            } catch (e) {
+              try {
+                if (htmlEl.parentNode) {
+                  htmlEl.parentNode.removeChild(htmlEl);
+                }
+              } catch (e2) {
+                // 忽略錯誤
+              }
+            }
+          }
+        });
+        
+        // 4. 移除所有可能殘留的 focus guard
+        const focusGuards = document.querySelectorAll('[data-radix-focus-guard]');
+        focusGuards.forEach(guard => {
+          try {
+            guard.remove();
+          } catch (e) {
+            try {
+              if (guard.parentNode) {
+                guard.parentNode.removeChild(guard);
+              }
+            } catch (e2) {
+              // 忽略錯誤
+            }
+          }
+        });
+        
+        // 5. 強制重新啟用所有交互元素
+        const interactiveElements = document.querySelectorAll('button, a, input, textarea, select, [role="button"], [tabindex]:not([tabindex="-1"])');
+        interactiveElements.forEach(el => {
+          const htmlEl = el as HTMLElement;
+          if (htmlEl.style.pointerEvents === 'none') {
+            htmlEl.style.pointerEvents = '';
+          }
+        });
+      };
+      
+      // 立即執行清理
+      cleanup();
+      // 再延遲執行一次確保清理（等待動畫完成）
+      const timeoutId = setTimeout(cleanup, 300);
+      
+      return () => {
+        clearTimeout(timeoutId);
+      };
+    }
+  }, [detailDialogOpen]);
 
   return (
     <div className="min-h-screen p-6 bg-gradient-to-br from-background via-background to-muted/20">
@@ -1040,6 +2131,23 @@ const Timeline = () => {
             </Button>
           </div>
         </div>
+
+        {/* Offline Status Banner */}
+        {!isOnline && (
+          <Card className="p-4 mb-4 bg-orange-500/10 border-orange-500/30">
+            <div className="flex items-start gap-3">
+              <div className="text-orange-500 mt-0.5">📡</div>
+              <div className="flex-1 text-sm">
+                <div className="font-semibold text-orange-600 dark:text-orange-400 mb-1">
+                  {t("timeline.offline") || "網路已斷開"}
+                </div>
+                <div className="text-muted-foreground">
+                  {t("timeline.offlineDesc") || "您只能查看已載入的記錄。"}
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
 
         {/* Testnet Warning Banner */}
         {records.some(r => !isLocalRecord(r)) && (
@@ -1099,53 +2207,282 @@ const Timeline = () => {
             <p className="text-muted-foreground">{t("timeline.subtitle")}</p>
           </div>
 
-          {/* Filter Buttons and Decrypt All */}
-          <div className="flex items-center gap-3 justify-center mb-6 flex-wrap">
-            <Filter className="w-4 h-4 text-muted-foreground" />
-            <div className="flex gap-2">
-              {(["all", "local", "walrus"] as FilterType[]).map((filterType) => (
+          {/* Search, Filter, Sort and Export */}
+          <div className="space-y-4 mb-6">
+            {/* Search Bar */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                ref={searchInputRef}
+                type="text"
+                placeholder={t("timeline.searchPlaceholder") || "搜尋情緒、描述或日期..."}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-10"
+                aria-label={t("timeline.search") || "搜尋記錄"}
+              />
+              {searchQuery && (
                 <Button
-                  key={filterType}
-                  variant={filter === filterType ? "default" : "outline"}
+                  variant="ghost"
                   size="sm"
-                  onClick={() => setFilter(filterType)}
-                  className={filter === filterType ? "gradient-emotion" : ""}
+                  className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0"
+                  onClick={() => setSearchQuery("")}
+                  aria-label={t("timeline.clearSearch") || "清除搜尋"}
                 >
-                  {t(`timeline.filter.${filterType}`)}
+                  <X className="h-4 w-4" />
                 </Button>
-              ))}
+              )}
+              {searchQuery && (
+                <div className="absolute right-12 top-1/2 transform -translate-y-1/2 text-xs text-muted-foreground">
+                  {filteredRecords.length} {t("timeline.results") || "结果"}
+                </div>
+              )}
             </div>
-            {/* 一鍵解密按鈕 */}
-            {filteredRecords.some(r => 
-              !r.is_public && 
-              !decryptedDescriptions[r.id] && 
-              !(isLocalRecord(r) && !r.encrypted_data) &&
-              (r.encrypted_data || (r.blob_id && !r.blob_id.startsWith("local_")))
-            ) && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={decryptAllRecords}
-                disabled={isDecryptingAll}
-                className="ml-2"
-              >
-                {isDecryptingAll ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    {t("timeline.decryptAll.decrypting")}
-                  </>
-                ) : (
-                  <>
-                    <Unlock className="w-4 h-4 mr-2" />
-                    {t("timeline.decryptAll.button")}
-                  </>
+
+            {/* Filter, Sort and Export */}
+            <div className="flex items-center gap-3 justify-between flex-wrap">
+              <div className="flex items-center gap-3 flex-wrap">
+                <Filter className="w-4 h-4 text-muted-foreground" />
+                <div className="flex gap-2">
+                  {(["all", "local", "walrus"] as FilterType[]).map((filterType) => (
+                    <Button
+                      key={filterType}
+                      variant={filter === filterType ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setFilter(filterType)}
+                      className={filter === filterType ? "gradient-emotion" : ""}
+                    >
+                      {t(`timeline.filter.${filterType}`)}
+                    </Button>
+                  ))}
+                </div>
+                
+                {/* Date Range */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-2">
+                      <CalendarIcon className="h-4 w-4" />
+                      {dateRange?.from ? (
+                        dateRange.to ? (
+                          <>
+                            {format(dateRange.from, "yyyy-MM-dd", { locale: i18n.language === 'zh-TW' ? zhTW : enUS })} - {format(dateRange.to, "yyyy-MM-dd", { locale: i18n.language === 'zh-TW' ? zhTW : enUS })}
+                          </>
+                        ) : (
+                          format(dateRange.from, "yyyy-MM-dd", { locale: i18n.language === 'zh-TW' ? zhTW : enUS })
+                        )
+                      ) : (
+                        t("timeline.dateRange") || "日期范围"
+                      )}
+                      {dateRange?.from && (
+                        <X 
+                          className="h-3 w-3 ml-1" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDateRange(undefined);
+                          }}
+                        />
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="range"
+                      selected={{ from: dateRange?.from, to: dateRange?.to }}
+                      onSelect={(range) => setDateRange(range)}
+                      numberOfMonths={2}
+                      locale={i18n.language === 'zh-TW' ? zhTW : enUS}
+                    />
+                  </PopoverContent>
+                </Popover>
+
+                {/* Tags Filter */}
+                {availableTags.length > 0 && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-2">
+                        <Filter className="h-4 w-4" />
+                        {selectedTags.length > 0 ? (
+                          <>
+                            {t("timeline.tagsFilter") || "標籤"} ({selectedTags.length})
+                          </>
+                        ) : (
+                          t("timeline.tagsFilter") || "標籤"
+                        )}
+                        {selectedTags.length > 0 && (
+                          <X 
+                            className="h-3 w-3 ml-1" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedTags([]);
+                            }}
+                          />
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64" align="start">
+                      <div className="space-y-2">
+                        <Label className="text-sm font-semibold">
+                          {t("timeline.selectTags") || "選擇標籤"}
+                        </Label>
+                        <div className="flex flex-wrap gap-2 max-h-[200px] overflow-y-auto">
+                          {availableTags.map(tag => (
+                            <button
+                              key={tag}
+                              type="button"
+                              onClick={() => {
+                                setSelectedTags(prev => 
+                                  prev.includes(tag) 
+                                    ? prev.filter(t => t !== tag)
+                                    : [...prev, tag]
+                                );
+                              }}
+                              className={`px-2 py-1 rounded-md text-xs border transition-colors ${
+                                selectedTags.includes(tag)
+                                  ? "bg-primary text-primary-foreground border-primary"
+                                  : "bg-background hover:bg-muted border-border"
+                              }`}
+                            >
+                              {tag}
+                            </button>
+                          ))}
+                        </div>
+                        {selectedTags.length > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSelectedTags([])}
+                            className="w-full mt-2"
+                          >
+                            {t("timeline.clearTags") || "清除標籤"}
+                          </Button>
+                        )}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 )}
-              </Button>
+                
+                {/* Sort */}
+                <div className="flex items-center gap-2">
+                  <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
+                  <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortBy)}>
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="date">{t("timeline.sort.date") || "按日期"}</SelectItem>
+                      <SelectItem value="intensity">{t("timeline.sort.intensity") || "按强度"}</SelectItem>
+                      <SelectItem value="emotion">{t("timeline.sort.emotion") || "按情绪"}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+                    aria-label={t("timeline.toggleSortOrder") || "切换排序顺序"}
+                  >
+                    {sortOrder === "asc" ? "↑" : "↓"}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {/* Batch Selection Toggle */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSelectionMode(!selectionMode);
+                    setSelectedIds(new Set());
+                  }}
+                  className={selectionMode ? "bg-primary text-primary-foreground" : ""}
+                >
+                  {selectionMode ? <CheckSquare className="mr-2 h-4 w-4" /> : <Square className="mr-2 h-4 w-4" />}
+                  {t("timeline.batchMode") || "批量"}
+                </Button>
+                
+                {/* Export Button */}
+                {filteredRecords.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => exportData(filteredRecords, decryptedDescriptions)}
+                    className="gap-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    {t("timeline.export") || "匯出"}
+                  </Button>
+                )}
+                
+                {/* 一鍵解密按鈕 */}
+                {filteredRecords.some(r => 
+                  !r.is_public && 
+                  !decryptedDescriptions[r.id] && 
+                  !(isLocalRecord(r) && !r.encrypted_data) &&
+                  (r.encrypted_data || (r.blob_id && !r.blob_id.startsWith("local_")))
+                ) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={decryptAllRecords}
+                    disabled={isDecryptingAll}
+                  >
+                    {isDecryptingAll ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        {t("timeline.decryptAll.decrypting")}
+                      </>
+                    ) : (
+                      <>
+                        <Unlock className="w-4 h-4 mr-2" />
+                        {t("timeline.decryptAll.button")}
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+            </div>
+            
+            {/* Batch Operations Toolbar */}
+            {selectionMode && selectedIds.size > 0 && (
+              <Card className="p-4 mb-4 bg-primary/10 border-primary/30">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium">
+                      {t("timeline.selectedCount", { count: selectedIds.size }) || `已選擇 ${selectedIds.size} 條記錄`}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={toggleSelectAll}
+                    >
+                      {selectedIds.size === filteredRecords.length ? t("timeline.deselectAll") || "取消全選" : t("timeline.selectAll") || "全選"}
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleBatchExport}
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      {t("timeline.batchExport") || "批量匯出"}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleBatchDelete}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      {t("timeline.batchDelete") || "批量刪除"}
+                    </Button>
+                  </div>
+                </div>
+              </Card>
             )}
           </div>
 
           {/* Statistics Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
             <Card className="p-4 glass-card">
               <div className="text-2xl font-bold">{stats.total}</div>
               <div className="text-xs text-muted-foreground">{t("timeline.stats.total")}</div>
@@ -1166,7 +2503,7 @@ const Timeline = () => {
 
           {/* Charts */}
           {records.length > 0 && (
-            <div className="grid md:grid-cols-2 gap-4 mb-6">
+            <div className="grid md:grid-cols-2 gap-4 mb-6 overflow-x-auto">
               {/* Emotion Distribution Pie Chart */}
               {emotionChartData.length > 0 && (
                 <Card className="p-6 glass-card overflow-hidden">
@@ -1221,45 +2558,355 @@ const Timeline = () => {
             </div>
           )}
 
-          {/* Timeline Chart */}
+          {/* Timeline Chart with View Period Toggle */}
           {records.length > 0 && timelineChartData.some(d => d.count > 0) && (
             <Card className="p-6 glass-card mb-6 overflow-hidden">
-              <h3 className="text-lg font-semibold mb-4">{t("timeline.chart.timelineChart")}</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">{t("timeline.chart.timelineChart")}</h3>
+                <div className="flex gap-2">
+                  <Button
+                    variant={viewPeriod === "week" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setViewPeriod("week")}
+                  >
+                    {t("timeline.viewPeriod.week") || "週"}
+                  </Button>
+                  <Button
+                    variant={viewPeriod === "month" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setViewPeriod("month")}
+                  >
+                    {t("timeline.viewPeriod.month") || "月"}
+                  </Button>
+                  <Button
+                    variant={viewPeriod === "year" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setViewPeriod("year")}
+                  >
+                    {t("timeline.viewPeriod.year") || "年"}
+                  </Button>
+                </div>
+              </div>
               <ChartContainer config={chartConfig} className="h-[200px] w-full overflow-hidden">
-                <BarChart data={timelineChartData} margin={{ left: 0, right: 0 }}>
+                <AreaChart data={timelineChartData} margin={{ left: 0, right: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
                   <XAxis dataKey="date" />
                   <YAxis />
                   <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="count" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
-                </BarChart>
+                  <Area 
+                    type="monotone" 
+                    dataKey="count" 
+                    stroke="hsl(var(--primary))" 
+                    fill="hsl(var(--primary))" 
+                    fillOpacity={0.3}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="avgIntensity" 
+                    stroke="hsl(var(--chart-2))" 
+                    fill="hsl(var(--chart-2))" 
+                    fillOpacity={0.2}
+                  />
+                </AreaChart>
               </ChartContainer>
+            </Card>
+          )}
+
+          {/* Emotion Trend Prediction */}
+          {emotionTrendData && Object.keys(emotionTrendData).length > 0 && (
+            <Card className="p-6 glass-card mb-6 overflow-hidden">
+              <div className="flex items-center gap-2 mb-4">
+                <TrendingUp className="h-5 w-5" />
+                <h3 className="text-lg font-semibold">{t("timeline.chart.emotionTrend") || "情緒趨勢預測"}</h3>
+              </div>
+              <div className="space-y-4">
+                {Object.entries(emotionTrendData).slice(0, 3).map(([emotion, data]) => {
+                  const config = emotionLabels[emotion as keyof typeof emotionLabels];
+                  if (!config) return null;
+                  
+                  const actualData = data.actual.map((value, index) => ({ 
+                    period: index + 1, 
+                    value, 
+                    predicted: null
+                  }));
+                  const predictedData = data.predicted.map((value, index) => ({ 
+                    period: data.actual.length + index + 1, 
+                    value: null,
+                    predicted: value
+                  }));
+                  const chartData = [...actualData, ...predictedData];
+                  
+                  return (
+                    <div key={emotion} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">{config.emoji}</span>
+                          <span className="font-medium">{config.label}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm ${
+                            data.trend === 'up' ? 'text-green-500' : 
+                            data.trend === 'down' ? 'text-red-500' : 
+                            'text-muted-foreground'
+                          }`}>
+                            {data.trend === 'up' ? '↑' : data.trend === 'down' ? '↓' : '→'} 
+                            {t(`timeline.trend.${data.trend}`) || data.trend}
+                          </span>
+                        </div>
+                      </div>
+                      <ChartContainer config={chartConfig} className="h-[120px] w-full">
+                        <LineChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
+                          <XAxis dataKey="period" hide />
+                          <YAxis hide />
+                          <ChartTooltip content={<ChartTooltipContent />} />
+                          <Line 
+                            type="monotone" 
+                            dataKey="value" 
+                            stroke={config.color}
+                            strokeWidth={2}
+                            dot={false}
+                            connectNulls={false}
+                          />
+                          <Line 
+                            type="monotone" 
+                            dataKey="predicted" 
+                            stroke={config.color}
+                            strokeWidth={2}
+                            strokeDasharray="5 5"
+                            dot={false}
+                            connectNulls={false}
+                          />
+                        </LineChart>
+                      </ChartContainer>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+
+          {/* Emotion Correlation Analysis */}
+          {emotionCorrelationData && emotionCorrelationData.length > 0 && (
+            <Card className="p-6 glass-card mb-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Link2 className="h-5 w-5" />
+                <h3 className="text-lg font-semibold">{t("timeline.chart.emotionCorrelation") || "情緒關聯分析"}</h3>
+              </div>
+              <div className="space-y-2">
+                {emotionCorrelationData.slice(0, 5).map((correlation, index) => {
+                  const fromConfig = emotionLabels[correlation.from as keyof typeof emotionLabels];
+                  const toConfig = emotionLabels[correlation.to as keyof typeof emotionLabels];
+                  if (!fromConfig || !toConfig) return null;
+                  
+                  return (
+                    <div key={index} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+                      <div className="flex items-center gap-2 flex-1">
+                        <span className="text-lg">{fromConfig.emoji}</span>
+                        <span className="font-medium">{fromConfig.label}</span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-1 justify-end">
+                        <span className="font-medium">{toConfig.label}</span>
+                        <span className="text-lg">{toConfig.emoji}</span>
+                      </div>
+                      <div className="flex items-center gap-2 min-w-[120px] justify-end">
+                        <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-primary rounded-full"
+                            style={{ width: `${correlation.strength}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-medium w-12 text-right">
+                          {correlation.strength}%
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+
+          {/* Emotion Calendar Heatmap */}
+          {Object.keys(emotionCalendarData).length > 0 && (
+            <Card className="p-6 glass-card mb-6">
+              <div className="flex items-center gap-2 mb-4">
+                <CalendarIcon className="h-5 w-5" />
+                <h3 className="text-lg font-semibold">{t("timeline.chart.emotionCalendar") || "情緒日曆"}</h3>
+              </div>
+              <div className="space-y-4">
+                <Calendar
+                  mode="single"
+                  className="rounded-md border"
+                  modifiers={{
+                    hasRecord: (date) => {
+                      const dateKey = format(date, 'yyyy-MM-dd');
+                      return !!emotionCalendarData[dateKey];
+                    },
+                    highIntensity: (date) => {
+                      const dateKey = format(date, 'yyyy-MM-dd');
+                      const data = emotionCalendarData[dateKey];
+                      return data && data.avgIntensity >= 70;
+                    },
+                    mediumIntensity: (date) => {
+                      const dateKey = format(date, 'yyyy-MM-dd');
+                      const data = emotionCalendarData[dateKey];
+                      return data && data.avgIntensity >= 40 && data.avgIntensity < 70;
+                    },
+                    lowIntensity: (date) => {
+                      const dateKey = format(date, 'yyyy-MM-dd');
+                      const data = emotionCalendarData[dateKey];
+                      return data && data.avgIntensity < 40;
+                    },
+                  }}
+                  modifiersStyles={{
+                    hasRecord: {
+                      backgroundColor: 'hsl(var(--primary) / 0.2)',
+                    },
+                    highIntensity: {
+                      backgroundColor: 'hsl(var(--primary) / 0.5)',
+                    },
+                    mediumIntensity: {
+                      backgroundColor: 'hsl(var(--primary) / 0.3)',
+                    },
+                    lowIntensity: {
+                      backgroundColor: 'hsl(var(--primary) / 0.15)',
+                    },
+                  }}
+                  classNames={{
+                    day: "relative",
+                  }}
+                />
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded bg-primary/50" />
+                    <span>{t("timeline.calendar.highIntensity") || "高強度 (≥70%)"}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded bg-primary/30" />
+                    <span>{t("timeline.calendar.mediumIntensity") || "中強度 (40-69%)"}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded bg-primary/15" />
+                    <span>{t("timeline.calendar.lowIntensity") || "低強度 (<40%)"}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded bg-muted" />
+                    <span>{t("timeline.calendar.noRecord") || "無記錄"}</span>
+                  </div>
+                </div>
+              </div>
             </Card>
           )}
         </div>
 
         {/* Records List */}
-        <div className="glass-card rounded-2xl p-8">
+        <div className="glass-card rounded-2xl p-4 md:p-8">
           {isLoading ? (
-            <div className="text-center py-12">
-              <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
-              <p className="mt-4 text-muted-foreground">{t("common.loading")}</p>
+            <div className="space-y-4">
+              {/* 骨架屏：统计卡片 */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                {[1, 2, 3, 4].map((i) => (
+                  <Card key={i} className="p-4">
+                    <Skeleton className="h-8 w-16 mb-2" />
+                    <Skeleton className="h-4 w-20" />
+                  </Card>
+                ))}
+              </div>
+              {/* 骨架屏：记录列表 */}
+              {[1, 2, 3].map((i) => (
+                <Card key={i} className="p-4 md:p-6">
+                  <div className="flex items-start gap-4">
+                    <Skeleton className="w-16 h-16 rounded-full flex-shrink-0" />
+                    <div className="flex-1 space-y-3">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-2">
+                          <Skeleton className="h-6 w-32" />
+                          <Skeleton className="h-4 w-24" />
+                        </div>
+                        <Skeleton className="h-4 w-20" />
+                      </div>
+                      <Skeleton className="h-20 w-full" />
+                      <div className="flex gap-2">
+                        <Skeleton className="h-6 w-16" />
+                        <Skeleton className="h-6 w-16" />
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+              <div className="text-center py-4">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
+                <p className="mt-2 text-sm text-muted-foreground">{t("common.loading")}</p>
+              </div>
             </div>
           ) : (
             <>
               {filteredRecords.length === 0 ? (
-                <Card className="p-8 text-center border-dashed">
-                  <Sparkles className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="text-lg font-semibold mb-2">
-                    {filter === "all" ? t("timeline.noRecords") : t("timeline.noRecords")}
+                <Card className="p-12 text-center border-dashed">
+                  <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-muted/30 flex items-center justify-center">
+                    <Sparkles className="w-12 h-12 text-muted-foreground" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2">
+                    {searchQuery || dateRange?.from || filter !== "all" 
+                      ? t("timeline.noResults") || "沒有找到記錄"
+                      : t("timeline.noRecords") || "還沒有記錄"}
                   </h3>
-                  <p className="text-muted-foreground mb-4">{t("timeline.noRecordsDesc")}</p>
-                  <Button onClick={() => navigate("/record")} className="gradient-emotion">
-                    {t("timeline.recordFirst")}
-                  </Button>
+                  <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                    {searchQuery || dateRange?.from || filter !== "all"
+                      ? t("timeline.noResultsDesc") || "嘗試調整搜尋條件或篩選器"
+                      : t("timeline.noRecordsDesc") || "開始記錄您的情緒，追蹤您的情感變化，獲得 AI 分析建議。"}
+                  </p>
+                  <div className="flex gap-3 justify-center">
+                    {searchQuery || dateRange?.from || filter !== "all" ? (
+                      <>
+                        <Button 
+                          variant="outline" 
+                          onClick={() => {
+                            setSearchQuery("");
+                            setDateRange(undefined);
+                            setFilter("all");
+                          }}
+                        >
+                          {t("timeline.clearFilters") || "清除篩選"}
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button onClick={() => navigate("/record")} className="gradient-emotion">
+                          <Sparkles className="mr-2 h-4 w-4" />
+                          {t("timeline.recordFirst") || "記錄第一條情緒"}
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          onClick={() => {
+                            // 可以添加教程或幫助
+                            toast({
+                              title: t("timeline.getStarted") || "開始使用",
+                              description: t("timeline.getStartedDesc") || "選擇情緒、填寫描述，然後儲存您的第一條記錄。",
+                            });
+                          }}
+                        >
+                          {t("timeline.viewTutorial") || "查看使用教程"}
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </Card>
               ) : (
-                <div className="space-y-4">
-              {filteredRecords.map((record) => {
+                <div 
+                  ref={parentRef}
+                  className="overflow-auto relative"
+                  style={{ 
+                    height: 'calc(100vh - 420px)', 
+                    minHeight: '300px',
+                    maxHeight: 'calc(100vh - 200px)',
+                  }}
+                >
+              {filteredRecords.length > 0 && virtualizer.getVirtualItems().map((virtualItem) => {
+                const record = filteredRecords[virtualItem.index];
+                // 安全檢查：確保記錄存在
+                if (!record) return null;
+                
                 const emotionKey = record.emotion as keyof typeof emotionLabels;
                 const emotionConfig = emotionLabels[emotionKey] || {
                   label: record.emotion.charAt(0).toUpperCase() + record.emotion.slice(1),
@@ -1270,28 +2917,81 @@ const Timeline = () => {
                 const isLocal = isLocalRecord(record);
                 
                 return (
-                  <Card key={record.id} className="p-6 hover:border-primary/50 transition-all">
-                    <div className="flex items-start gap-4">
-                      <div className={`w-16 h-16 rounded-full flex items-center justify-center bg-gradient-to-br ${emotionConfig.gradient} shadow-md flex-shrink-0`}>
-                        <span className="text-2xl">{emotionConfig.emoji}</span>
+                  <div
+                    key={virtualItem.key}
+                    data-index={virtualItem.index}
+                    ref={virtualizer.measureElement}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualItem.start}px)`,
+                    }}
+                  >
+                    <Card className={`p-4 md:p-6 hover:border-primary/50 transition-all mb-3 md:mb-4 ${selectionMode && selectedIds.has(record.id) ? 'border-primary bg-primary/5' : ''}`}>
+                    <div className="flex items-start gap-3 md:gap-4">
+                      {/* Selection Checkbox */}
+                      {selectionMode && (
+                        <button
+                          onClick={() => toggleSelection(record.id)}
+                          className="mt-2 flex-shrink-0"
+                          aria-label={selectedIds.has(record.id) ? t("timeline.deselect") || "取消選擇" : t("timeline.select") || "選擇"}
+                        >
+                          {selectedIds.has(record.id) ? (
+                            <CheckSquare className="h-5 w-5 text-primary" />
+                          ) : (
+                            <Square className="h-5 w-5 text-muted-foreground" />
+                          )}
+                        </button>
+                      )}
+                      
+                      <div className={`w-12 h-12 md:w-16 md:h-16 rounded-full flex items-center justify-center bg-gradient-to-br ${emotionConfig.gradient} shadow-md flex-shrink-0`}>
+                        <span className="text-xl md:text-2xl">{emotionConfig.emoji}</span>
                       </div>
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <h3 className="font-semibold text-lg">{emotionConfig.label}</h3>
-                            <p className="text-sm text-muted-foreground">{t("timeline.intensityValue", { value: record.intensity })}</p>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between mb-2 gap-2">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="font-semibold text-base md:text-lg truncate">{emotionConfig.label}</h3>
+                            <p className="text-xs md:text-sm text-muted-foreground">{t("timeline.intensityValue", { value: record.intensity })}</p>
                           </div>
-                          <div className="text-right">
-                            <span className="text-xs text-muted-foreground block">
-                              {new Date(record.created_at).toLocaleDateString(i18n.language === 'zh-TW' ? 'zh-TW' : 'en-US')}
-                            </span>
-                            <span className={`text-xs px-2 py-1 rounded-full mt-1 inline-block ${
-                              isLocal 
-                                ? "bg-purple-500/10 text-purple-500" 
-                                : "bg-cyan-500/10 text-cyan-500"
-                            }`}>
-                              {isLocal ? "💾 " + t("timeline.filter.local") : "☁️ " + t("timeline.filter.walrus")}
-                            </span>
+                          <div className="text-right flex-shrink-0 flex items-center gap-2">
+                            <div className="flex flex-col items-end gap-1">
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(record.created_at).toLocaleDateString(i18n.language === 'zh-TW' ? 'zh-TW' : 'en-US')}
+                              </span>
+                              <span className={`text-xs px-2 py-1 rounded-full inline-block ${
+                                isLocal 
+                                  ? "bg-purple-500/10 text-purple-500" 
+                                  : "bg-cyan-500/10 text-cyan-500"
+                              }`}>
+                                {isLocal ? "💾 " + t("timeline.filter.local") : "☁️ " + t("timeline.filter.walrus")}
+                              </span>
+                            </div>
+                            {/* Actions Menu */}
+                            {!selectionMode && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleViewDetails(record)}>
+                                    <Eye className="mr-2 h-4 w-4" />
+                                    {t("timeline.viewDetails") || "查看詳情"}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem 
+                                    onClick={() => handleDeleteClick(record)}
+                                    className="text-destructive focus:text-destructive"
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    {t("timeline.delete") || "刪除"}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
                           </div>
                         </div>
                         <div className="mb-2">
@@ -1307,6 +3007,19 @@ const Timeline = () => {
                             </div>
                           )}
                         </div>
+                        {/* Tags */}
+                        {record.tags && record.tags.length > 0 && (
+                          <div className="mb-3 flex flex-wrap gap-2">
+                            {record.tags.map(tag => (
+                              <span
+                                key={tag}
+                                className="px-2 py-1 rounded-md text-xs bg-primary/10 text-primary border border-primary/20"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                         {record.is_public && (
                           <div className="mb-3 space-y-2">
                             {/* 公開記錄：如果已有 description，直接顯示 */}
@@ -1793,7 +3506,7 @@ const Timeline = () => {
                             </div>
                           )}
                           <div className="flex items-center gap-2 flex-wrap">
-                            {/* 本地存储的记录不显示状态（用户已明确选择本地存储） */}
+                            {/* 本地儲存的記錄不顯示狀態（用戶已明確選擇本地儲存） */}
                             {!isLocal && (
                               <>
                                 {record.proof_status === "confirmed" ? (
@@ -1826,14 +3539,352 @@ const Timeline = () => {
                       </div>
                     </div>
                   </Card>
+                  </div>
                 );
               })}
+              {/* 虛擬滾動的總高度佔位 - 只在有記錄時顯示 */}
+              {filteredRecords.length > 0 && (
+                <div style={{ height: `${virtualizer.getTotalSize()}px`, width: '100%' }} />
+              )}
             </div>
               )}
             </>
           )}
         </div>
       </div>
+      
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("timeline.deleteConfirmTitle") || "確認刪除"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("timeline.deleteConfirmDesc") || "確定要刪除這條記錄嗎？此操作無法撤銷。"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel") || "取消"}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {t("timeline.deleting") || "刪除中..."}
+                </>
+              ) : (
+                t("timeline.delete") || "刪除"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      {/* Record Details Dialog */}
+      {selectedRecord && (
+        <Dialog 
+          key={selectedRecord.id}
+          open={detailDialogOpen} 
+          onOpenChange={(open) => {
+            if (!open) {
+              setDetailDialogOpen(false);
+              // 立即清理狀態
+              setSelectedRecord(null);
+            } else {
+              setDetailDialogOpen(true);
+            }
+          }}
+        >
+          <DialogContent 
+            className="max-w-2xl max-h-[80vh] overflow-y-auto"
+            onOpenAutoFocus={(e) => {
+              // 防止自動聚焦導致問題
+              e.preventDefault();
+            }}
+          >
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <span className="text-2xl">
+                    {emotionLabels[selectedRecord.emotion as keyof typeof emotionLabels]?.emoji || "😊"}
+                  </span>
+                  {emotionLabels[selectedRecord.emotion as keyof typeof emotionLabels]?.label || selectedRecord.emotion}
+                </DialogTitle>
+                <DialogDescription>
+                  {new Date(selectedRecord.created_at).toLocaleString(i18n.language === 'zh-TW' ? 'zh-TW' : 'en-US')}
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-4 mt-4">
+                <div>
+                  <h4 className="text-sm font-semibold mb-2">{t("timeline.intensity") || "強度"}</h4>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-primary to-primary/60 rounded-full"
+                        style={{ width: `${selectedRecord.intensity}%` }}
+                      />
+                    </div>
+                    <span className="text-sm font-medium">{selectedRecord.intensity}%</span>
+                  </div>
+                </div>
+                
+                <div>
+                  <h4 className="text-sm font-semibold mb-2">{t("timeline.description") || "描述"}</h4>
+                  <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
+                    <p className="text-sm whitespace-pre-wrap break-words">
+                      {decryptedDescriptions[selectedRecord.id] || selectedRecord.description || t("timeline.noDescription") || "無描述"}
+                    </p>
+                  </div>
+                </div>
+                
+                {decryptedAiResponses[selectedRecord.id] && (
+                  <div>
+                    <h4 className="text-sm font-semibold mb-2">{t("timeline.aiResponse") || "AI 建議"}</h4>
+                    <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+                      <p className="text-sm whitespace-pre-wrap break-words">
+                        {decryptedAiResponses[selectedRecord.id]}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                  <div>
+                    <h4 className="text-xs font-semibold text-muted-foreground mb-1">{t("timeline.storage") || "儲存位置"}</h4>
+                    <p className="text-sm">
+                      {isLocalRecord(selectedRecord) ? "💾 " + t("timeline.filter.local") : "☁️ " + t("timeline.filter.walrus")}
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-semibold text-muted-foreground mb-1">{t("timeline.privacy") || "隱私"}</h4>
+                    <p className="text-sm">
+                      {selectedRecord.is_public ? "🔓 " + t("timeline.publicRecord") : "🔒 " + t("timeline.privateRecord")}
+                    </p>
+                  </div>
+                  {selectedRecord.blob_id && (
+                    <div>
+                      <h4 className="text-xs font-semibold text-muted-foreground mb-1">Blob ID</h4>
+                      <p className="text-xs font-mono break-all">{selectedRecord.blob_id}</p>
+                    </div>
+                  )}
+                  {selectedRecord.sui_ref && (
+                    <div>
+                      <h4 className="text-xs font-semibold text-muted-foreground mb-1">{t("timeline.suiRef") || "Sui 引用"}</h4>
+                      <a
+                        href={getSuiScanUrl(selectedRecord.sui_ref) || "#"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-primary hover:underline"
+                      >
+                        {selectedRecord.sui_ref.slice(0, 16)}...
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+          </DialogContent>
+        </Dialog>
+      )}
+      
+      {/* Export Format Dialog */}
+      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t("timeline.export") || "匯出"}</DialogTitle>
+            <DialogDescription>
+              {t("timeline.exportDialogDesc", { count: recordsToExport.length }) || `選擇匯出格式和選項（共 ${recordsToExport.length} 條記錄）`}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6 mt-4">
+            {/* 格式選擇 */}
+            <div>
+              <Label className="text-sm font-semibold mb-3 block">
+                {t("timeline.exportFormat") || "匯出格式"}
+              </Label>
+              <RadioGroup value={exportFormat} onValueChange={(value) => setExportFormat(value as "csv" | "json" | "pdf" | "markdown")}>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
+                    <RadioGroupItem value="csv" id="format-csv" />
+                    <Label htmlFor="format-csv" className="cursor-pointer flex-1">
+                      <div className="font-medium">CSV</div>
+                      <div className="text-xs text-muted-foreground">{t("timeline.exportFormatCSV") || "表格格式，適合 Excel"}</div>
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
+                    <RadioGroupItem value="json" id="format-json" />
+                    <Label htmlFor="format-json" className="cursor-pointer flex-1">
+                      <div className="font-medium">JSON</div>
+                      <div className="text-xs text-muted-foreground">{t("timeline.exportFormatJSON") || "結構化數據格式"}</div>
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
+                    <RadioGroupItem value="pdf" id="format-pdf" />
+                    <Label htmlFor="format-pdf" className="cursor-pointer flex-1">
+                      <div className="font-medium">PDF</div>
+                      <div className="text-xs text-muted-foreground">{t("timeline.exportFormatPDF") || "可打印文檔格式"}</div>
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
+                    <RadioGroupItem value="markdown" id="format-markdown" />
+                    <Label htmlFor="format-markdown" className="cursor-pointer flex-1">
+                      <div className="font-medium">Markdown</div>
+                      <div className="text-xs text-muted-foreground">{t("timeline.exportFormatMarkdown") || "文檔格式，適合閱讀"}</div>
+                    </Label>
+                  </div>
+                </div>
+              </RadioGroup>
+            </div>
+
+            {/* 自定義字段選擇 */}
+            <div>
+              <Label className="text-sm font-semibold mb-3 block">
+                {t("timeline.exportFields") || "選擇要匯出的字段"}
+              </Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="field-date"
+                    checked={customExportFields.date}
+                    onCheckedChange={(checked) =>
+                      setCustomExportFields(prev => ({ ...prev, date: checked as boolean }))
+                    }
+                  />
+                  <Label htmlFor="field-date" className="cursor-pointer text-sm">
+                    {t("timeline.exportFieldDate") || "日期"}
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="field-emotion"
+                    checked={customExportFields.emotion}
+                    onCheckedChange={(checked) =>
+                      setCustomExportFields(prev => ({ ...prev, emotion: checked as boolean }))
+                    }
+                  />
+                  <Label htmlFor="field-emotion" className="cursor-pointer text-sm">
+                    {t("timeline.exportFieldEmotion") || "情緒"}
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="field-intensity"
+                    checked={customExportFields.intensity}
+                    onCheckedChange={(checked) =>
+                      setCustomExportFields(prev => ({ ...prev, intensity: checked as boolean }))
+                    }
+                  />
+                  <Label htmlFor="field-intensity" className="cursor-pointer text-sm">
+                    {t("timeline.exportFieldIntensity") || "強度"}
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="field-description"
+                    checked={customExportFields.description}
+                    onCheckedChange={(checked) =>
+                      setCustomExportFields(prev => ({ ...prev, description: checked as boolean }))
+                    }
+                  />
+                  <Label htmlFor="field-description" className="cursor-pointer text-sm">
+                    {t("timeline.exportFieldDescription") || "描述"}
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="field-storage"
+                    checked={customExportFields.storage}
+                    onCheckedChange={(checked) =>
+                      setCustomExportFields(prev => ({ ...prev, storage: checked as boolean }))
+                    }
+                  />
+                  <Label htmlFor="field-storage" className="cursor-pointer text-sm">
+                    {t("timeline.exportFieldStorage") || "儲存類型"}
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="field-privacy"
+                    checked={customExportFields.privacy}
+                    onCheckedChange={(checked) =>
+                      setCustomExportFields(prev => ({ ...prev, privacy: checked as boolean }))
+                    }
+                  />
+                  <Label htmlFor="field-privacy" className="cursor-pointer text-sm">
+                    {t("timeline.exportFieldPrivacy") || "隱私設置"}
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="field-status"
+                    checked={customExportFields.status}
+                    onCheckedChange={(checked) =>
+                      setCustomExportFields(prev => ({ ...prev, status: checked as boolean }))
+                    }
+                  />
+                  <Label htmlFor="field-status" className="cursor-pointer text-sm">
+                    {t("timeline.exportFieldStatus") || "狀態"}
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="field-suiRef"
+                    checked={customExportFields.suiRef}
+                    onCheckedChange={(checked) =>
+                      setCustomExportFields(prev => ({ ...prev, suiRef: checked as boolean }))
+                    }
+                  />
+                  <Label htmlFor="field-suiRef" className="cursor-pointer text-sm">
+                    {t("timeline.exportFieldSuiRef") || "Sui 引用"}
+                  </Label>
+                </div>
+              </div>
+            </div>
+
+            {/* 日期格式選擇 */}
+            <div>
+              <Label className="text-sm font-semibold mb-3 block">
+                {t("timeline.exportDateFormat") || "日期格式"}
+              </Label>
+              <RadioGroup value={dateFormat} onValueChange={(value) => setDateFormat(value as "locale" | "iso" | "custom")}>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2 p-2 border rounded-lg hover:bg-muted/50 cursor-pointer">
+                    <RadioGroupItem value="locale" id="date-locale" />
+                    <Label htmlFor="date-locale" className="cursor-pointer flex-1 text-sm">
+                      {t("timeline.exportDateFormatLocale") || "本地格式（根據系統語言）"}
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2 p-2 border rounded-lg hover:bg-muted/50 cursor-pointer">
+                    <RadioGroupItem value="iso" id="date-iso" />
+                    <Label htmlFor="date-iso" className="cursor-pointer flex-1 text-sm">
+                      {t("timeline.exportDateFormatISO") || "ISO 8601 格式（YYYY-MM-DDTHH:mm:ss.sssZ）"}
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2 p-2 border rounded-lg hover:bg-muted/50 cursor-pointer">
+                    <RadioGroupItem value="custom" id="date-custom" />
+                    <Label htmlFor="date-custom" className="cursor-pointer flex-1 text-sm">
+                      {t("timeline.exportDateFormatCustom") || "自定義格式（YYYY-MM-DD HH:mm:ss）"}
+                    </Label>
+                  </div>
+                </div>
+              </RadioGroup>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExportDialogOpen(false)}>
+              {t("common.cancel") || "取消"}
+            </Button>
+            <Button onClick={() => executeExport(exportFormat)}>
+              <Download className="w-4 h-4 mr-2" />
+              {t("timeline.export") || "匯出"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,22 @@ const AuthRecord = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [aiResponse, setAiResponse] = useState<string>("");
   const [isAiLoading, setIsAiLoading] = useState(false);
+  
+  // Track component mount status to prevent navigation after unmount
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Safe navigation function that checks mount status
+  const navigateToTimeline = () => {
+    if (isMountedRef.current) {
+      navigate("/auth-timeline");
+    }
+  };
 
   useEffect(() => {
     // Check authentication
@@ -281,9 +297,7 @@ const AuthRecord = () => {
       setAiResponse("");
 
       // Navigate to timeline
-      setTimeout(() => {
-        navigate("/auth-timeline");
-      }, 1500);
+      setTimeout(navigateToTimeline, 1500);
     } catch (error: any) {
       console.error("Upload error:", error);
       

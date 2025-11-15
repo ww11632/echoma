@@ -1,5 +1,33 @@
 {
+  "onboarding": {
+    "welcome": {
+      "title": "歡迎使用 Echoma",
+      "description": "Echoma 是一個安全、私密的情緒記錄應用，幫助您追蹤和管理您的情感健康。"
+    },
+    "record": {
+      "title": "記錄您的情緒",
+      "description": "選擇您當前的情緒、設置強度，並添加描述。您的數據會被加密存儲，確保隱私安全。"
+    },
+    "timeline": {
+      "title": "查看時間線",
+      "description": "在時間線中查看所有記錄，使用搜索和過濾功能快速找到您需要的記錄。"
+    },
+    "ai": {
+      "title": "獲得 AI 建議",
+      "description": "每次記錄後，您可以獲得個性化的 AI 分析建議，幫助您更好地理解和管理情緒。"
+    },
+    "privacy": {
+      "title": "隱私保護",
+      "description": "所有數據都經過加密處理。您可以選擇本地存儲或上傳到區塊鏈（Walrus），完全由您控制。"
+    },
+    "step": "步驟 {{current}} / {{total}}",
+    "skip": "跳過",
+    "getStarted": "開始使用"
+  },
   "common": {
+    "previous": "上一步",
+    "next": "下一步",
+    "cancel": "取消",
     "back": "返回",
     "backToHome": "返回首頁",
     "home": "首頁",
@@ -74,6 +102,9 @@
     "descriptionPlaceholder": "描述觸發這個情緒的事件...（將被加密）",
     "descriptionHint": "🔒 您的描述在儲存前會在客戶端加密",
     "characters": "{{count}}/5000 字元",
+    "tags": "標籤/分類",
+    "tagsDesc": "為記錄添加標籤以便分類和查找（可選）",
+    "tagsPlaceholder": "輸入標籤並按 Enter...",
     "privacy": {
       "title": "隱私控制（Seal 權限）",
       "public": "公開分享",
@@ -239,6 +270,85 @@
       "dataCorrupted": "資料可能已損壞",
       "updateApp": "請更新應用程式到最新版本"
     },
+    "search": "搜尋記錄",
+    "searchPlaceholder": "搜尋情緒、描述或日期...",
+    "clearSearch": "清除搜尋",
+    "results": "結果",
+    "export": "匯出",
+    "exportFormat": "選擇匯出格式：\n確定 = CSV，取消 = JSON",
+    "exportSuccess": "匯出成功",
+    "exportSuccessDesc": "已匯出 {{count}} 條記錄",
+    "exportSuccessPDF": "已匯出 {{count}} 條記錄為 PDF 格式",
+    "exportSuccessMarkdown": "已匯出 {{count}} 條記錄為 Markdown 格式",
+    "exportDialogDesc": "選擇匯出格式和選項（共 {{count}} 條記錄）",
+    "exportFormatCSV": "表格格式，適合 Excel",
+    "exportFormatJSON": "結構化數據格式",
+    "exportFormatPDF": "可打印文檔格式",
+    "exportFormatMarkdown": "文檔格式，適合閱讀",
+    "exportFields": "選擇要匯出的字段",
+    "exportFieldDate": "日期",
+    "exportFieldEmotion": "情緒",
+    "exportFieldIntensity": "強度",
+    "exportFieldDescription": "描述",
+    "exportFieldStorage": "儲存類型",
+    "exportFieldPrivacy": "隱私設置",
+    "exportFieldStatus": "狀態",
+    "exportFieldSuiRef": "Sui 引用",
+    "exportDateFormat": "日期格式",
+    "exportDateFormatLocale": "本地格式（根據系統語言）",
+    "exportDateFormatISO": "ISO 8601 格式（YYYY-MM-DDTHH:mm:ss.sssZ）",
+    "exportDateFormatCustom": "自定義格式（YYYY-MM-DD HH:mm:ss）",
+    "tagsFilter": "標籤",
+    "selectTags": "選擇標籤",
+    "clearTags": "清除標籤",
+    "online": "網路已連接",
+    "onlineDesc": "您可以繼續使用所有功能。",
+    "offline": "網路已斷開",
+    "offlineDesc": "您只能查看已載入的記錄。",
+    "sort": {
+      "date": "按日期",
+      "intensity": "按強度",
+      "emotion": "按情緒"
+    },
+    "toggleSortOrder": "切換排序順序",
+    "dateRange": "日期範圍",
+    "batchMode": "批量",
+    "select": "選擇",
+    "deselect": "取消選擇",
+    "selectAll": "全選",
+    "deselectAll": "取消全選",
+    "selectedCount": "已選擇 {{count}} 條記錄",
+    "batchExport": "批量匯出",
+    "batchDelete": "批量刪除",
+    "batchDeleteConfirm": "確定要刪除 {{count}} 條記錄嗎？此操作無法撤銷。",
+    "batchDeleteComplete": "批量刪除完成",
+    "batchDeleteCompleteDesc": "成功刪除 {{success}} 條，失敗 {{fail}} 條",
+    "batchDeleteError": "批量刪除失敗",
+    "batchDeleteErrorDesc": "無法刪除記錄",
+    "noSelection": "未選擇記錄",
+    "noSelectionDesc": "請先選擇要匯出的記錄",
+    "viewDetails": "查看詳情",
+    "delete": "刪除",
+    "deleteConfirmTitle": "確認刪除",
+    "deleteConfirmDesc": "確定要刪除這條記錄嗎？此操作無法撤銷。",
+    "deleting": "刪除中...",
+    "deleteSuccess": "刪除成功",
+    "deleteSuccessDesc": "記錄已刪除",
+    "deleteError": "刪除失敗",
+    "deleteErrorDesc": "無法刪除記錄",
+    "intensity": "強度",
+    "description": "描述",
+    "noDescription": "無描述",
+    "aiResponse": "AI 建議",
+    "storage": "儲存位置",
+    "privacy": "隱私",
+    "suiRef": "Sui 引用",
+    "noResults": "沒有找到記錄",
+    "noResultsDesc": "嘗試調整搜尋條件或篩選器",
+    "clearFilters": "清除篩選",
+    "getStarted": "開始使用",
+    "getStartedDesc": "選擇情緒、填寫描述，然後儲存您的第一條記錄。",
+    "viewTutorial": "查看使用教程",
     "filter": {
       "all": "全部",
       "local": "本地儲存",
@@ -256,7 +366,29 @@
     "chart": {
       "emotionDistribution": "情緒分布",
       "storageDistribution": "儲存方式分布",
-      "timelineChart": "時間趨勢"
+      "timelineChart": "時間趨勢",
+      "emotionTrend": "情緒趨勢預測",
+      "emotionCorrelation": "情緒關聯分析",
+      "emotionCalendar": "情緒日曆"
+    },
+    "viewPeriod": {
+      "week": "週",
+      "month": "月",
+      "year": "年"
+    },
+    "trend": {
+      "up": "上升",
+      "down": "下降",
+      "stable": "穩定"
+    },
+    "calendar": {
+      "hasRecord": "有記錄",
+      "noRecord": "無記錄",
+      "highIntensity": "高強度 (≥70%)",
+      "mediumIntensity": "中強度 (40-69%)",
+      "lowIntensity": "低強度 (<40%)",
+      "records": "條記錄",
+      "avgIntensity": "平均強度"
     },
     "decryptAll": {
       "button": "🔓 一鍵解密所有",
@@ -294,6 +426,7 @@
     "errors": {
       "missingInfo": "缺少資訊",
       "missingInfoDesc": "請輸入電子郵件和密碼。",
+      "invalidEmail": "請輸入有效的電子郵件地址",
       "invalidPassword": "無效的密碼",
       "invalidPasswordDesc": "密碼長度必須至少為 6 個字元。",
       "signupFailed": "註冊失敗",
