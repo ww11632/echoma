@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { listEmotionRecords, clearEmotionRecords } from "@/lib/localIndex";
@@ -8,6 +9,7 @@ import { ArrowLeft, Clock, Sparkles, Trash2 } from "lucide-react";
 
 const MvpTimeline = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [records, setRecords] = useState<EmotionRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -52,7 +54,7 @@ const MvpTimeline = () => {
           </div>
 
           {loading ? (
-            <div className="text-center py-12 text-muted-foreground">載入中...</div>
+            <div className="text-center py-12 text-muted-foreground">{t("common.loading")}</div>
           ) : records.length === 0 ? (
             <Card className="p-8 text-center border-dashed">
               <Sparkles className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
