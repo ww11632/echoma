@@ -7,10 +7,11 @@ import { Card } from "@/components/ui/card";
 import { ArrowLeft, Home, Sparkles, Shield, Clock, Lock, Unlock, Loader2, BookOpen, BarChart3, Filter, Eye, EyeOff, Search, Download, ArrowUpDown, X, MoreVertical, Trash2, Calendar as CalendarIcon, CheckSquare, Square, TrendingUp, Link2 } from "lucide-react";
 import type { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { readFromWalrus } from "@/lib/walrus";
-import { decryptDataWithMigration, generateUserKeyFromId, DecryptionError, DecryptionErrorType, PUBLIC_SEAL_KEY } from "@/lib/encryption";
+import { getEmotions, getEmotionsByWallet, getEncryptedEmotionByBlob } from "@/lib/api";
+import { queryWalrusBlobsByOwner, getWalrusUrl, readFromWalrus } from "@/lib/walrus";
+import { decryptData, decryptDataWithMigration, generateUserKey, generateUserKeyFromId, DecryptionError, DecryptionErrorType, PUBLIC_SEAL_KEY } from "@/lib/encryption";
 import type { EncryptedData } from "@/lib/encryption";
-import { getAnonymousUserKey } from "@/lib/anonymousIdentity";
+import { getAnonymousUserKey, getOrCreateAnonymousUserKey } from "@/lib/anonymousIdentity";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Legend, CartesianGrid } from "recharts";
@@ -47,7 +48,7 @@ interface EmotionRecord {
   tags?: string[];
 }
 
-type FilterType = "all" | "database" | "walrus"; // database = 数据库存储, walrus = Walrus 去中心化存储
+type FilterType = "all" | "local" | "walrus";
 type SortBy = "date" | "intensity" | "emotion";
 type SortOrder = "asc" | "desc";
 type ViewPeriod = "week" | "month" | "year";
@@ -68,9 +69,6 @@ const AuthTimeline = () => {
   
   // 虛擬滾動容器引用
   const parentRef = useRef<HTMLDivElement>(null);
-  
-  // 實時同步輪詢間隔引用（用於清理）
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
   // 批量操作狀態
   const [selectionMode, setSelectionMode] = useState(false);
@@ -220,9 +218,8 @@ const AuthTimeline = () => {
 
   const loadRecords = useCallback(async () => {
     setIsLoading(true);
-    const currentUserId = user?.id; // 捕获当前的 user.id，避免竞态条件
     try {
-      if (!currentUserId) {
+      if (!user) {
         setRecords([]);
         return;
       }
@@ -231,16 +228,10 @@ const AuthTimeline = () => {
       const { data, error } = await supabase
         .from('emotion_records')
         .select('id, created_at, emotion, intensity, description, is_public, walrus_url, blob_id, encrypted_data, payload_hash, proof_status, sui_ref')
-        .eq('user_id', currentUserId)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-
-      // 再次检查 user 是否仍然匹配（避免竞态条件）
-      if (user?.id !== currentUserId) {
-        console.log('[AuthTimeline] User changed during load, ignoring results');
-        return;
-      }
 
       const allRecords: EmotionRecord[] = (data || []).map((r: any) => {
         // 如果 blob_id 或 walrus_url 是 null/undefined，視為本地記錄
@@ -272,7 +263,6 @@ const AuthTimeline = () => {
           created_at: r.created_at,
           wallet_address: null,
           encrypted_data: r.encrypted_data || null,
-          tags: undefined, // Tags 存储在加密的 snapshot 中，解密后才会被设置
         };
       });
 
@@ -281,12 +271,7 @@ const AuthTimeline = () => {
         Array.from(new Map(allRecords.map(r => [r.id, r])).values())
       );
 
-      // 最后一次检查 user 是否仍然匹配
-      if (user?.id === currentUserId) {
-        setRecords(uniqueRecords);
-      } else {
-        console.log('[AuthTimeline] User changed after processing, ignoring results');
-      }
+      setRecords(uniqueRecords);
     } catch (error: any) {
       console.error("Error loading records:", error);
       toast({
@@ -305,213 +290,6 @@ const AuthTimeline = () => {
       loadRecords();
     }
   }, [user, loadRecords]);
-
-  // 實時同步數據變化（使用 Supabase Realtime）
-  useEffect(() => {
-    if (!user) return;
-
-    const currentUserId = user.id; // 捕获当前的 user.id，避免闭包问题
-
-    const channel = supabase
-      .channel('emotion_records_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'emotion_records',
-          filter: `user_id=eq.${currentUserId}`,
-        },
-        async (payload) => {
-          console.log('[AuthTimeline] Realtime update:', payload);
-          
-          try {
-            if (payload.eventType === 'INSERT') {
-              // 新增記錄：從數據庫獲取完整記錄
-              const { data: newRecord, error } = await supabase
-                .from('emotion_records')
-                .select('id, created_at, emotion, intensity, description, is_public, walrus_url, blob_id, encrypted_data, payload_hash, proof_status, sui_ref')
-                .eq('id', payload.new.id)
-                .single();
-              
-              if (error) {
-                console.error('[AuthTimeline] Failed to fetch new record:', error);
-                toast({
-                  title: t("timeline.realtimeError") || "同步錯誤",
-                  description: t("timeline.realtimeErrorDesc") || "無法獲取新記錄，將重新載入",
-                  variant: "destructive",
-                });
-                loadRecords();
-                return;
-              }
-              
-              if (newRecord) {
-                const hasWalrusData = newRecord.blob_id && newRecord.walrus_url;
-                const blobId = hasWalrusData 
-                  ? newRecord.blob_id 
-                  : `local_${newRecord.id.slice(0, 8)}`;
-                const walrusUrl = hasWalrusData
-                  ? newRecord.walrus_url
-                  : `local://${newRecord.id}`;
-                
-                const record: EmotionRecord = {
-                  id: newRecord.id,
-                  emotion: newRecord.emotion || "encrypted",
-                  intensity: newRecord.intensity || 50,
-                  description: newRecord.description,
-                  blob_id: blobId,
-                  walrus_url: walrusUrl,
-                  payload_hash: newRecord.payload_hash || "",
-                  is_public: newRecord.is_public || false,
-                  proof_status: newRecord.proof_status || "pending",
-                  sui_ref: newRecord.sui_ref || null,
-                  created_at: newRecord.created_at,
-                  wallet_address: null,
-                  encrypted_data: newRecord.encrypted_data || null,
-                  tags: undefined, // Tags 存储在加密的 snapshot 中，解密后才会被设置
-                };
-                
-                setRecords(prev => sortRecordsByDate([record, ...prev]));
-                toast({
-                  title: t("timeline.newRecordAdded") || "新記錄已添加",
-                  description: t("timeline.newRecordAddedDesc") || "時間線已更新",
-                });
-              }
-            } else if (payload.eventType === 'UPDATE') {
-              // 更新記錄：只更新變化的字段
-              const updatedRecord = payload.new;
-              let encryptedDataChanged = false;
-              
-              setRecords(prev => {
-                const currentRecord = prev.find(r => r.id === updatedRecord.id);
-                // 檢查 encrypted_data 是否真的改變了
-                encryptedDataChanged = currentRecord !== undefined &&
-                                      updatedRecord.encrypted_data !== undefined && 
-                                      updatedRecord.encrypted_data !== currentRecord.encrypted_data;
-                
-                const updated = prev.map(r => {
-                  if (r.id !== updatedRecord.id) return r;
-                  return {
-                    ...r,
-                    emotion: updatedRecord.emotion || r.emotion,
-                    intensity: updatedRecord.intensity ?? r.intensity,
-                    is_public: updatedRecord.is_public ?? r.is_public,
-                    proof_status: updatedRecord.proof_status || r.proof_status,
-                    sui_ref: updatedRecord.sui_ref || r.sui_ref,
-                    encrypted_data: updatedRecord.encrypted_data !== undefined ? updatedRecord.encrypted_data : r.encrypted_data,
-                    tags: encryptedDataChanged ? undefined : r.tags, // 如果加密數據更新，清除 tags（需要重新解密）
-                  };
-                });
-                return sortRecordsByDate(updated);
-              });
-              
-              // 如果 encrypted_data 更新了，清除相關的解密狀態
-              if (encryptedDataChanged) {
-                setDecryptedDescriptions(prev => {
-                  const next = { ...prev };
-                  delete next[updatedRecord.id];
-                  return next;
-                });
-                setDecryptedAiResponses(prev => {
-                  const next = { ...prev };
-                  delete next[updatedRecord.id];
-                  return next;
-                });
-                setDecryptErrors(prev => {
-                  const next = { ...prev };
-                  delete next[updatedRecord.id];
-                  return next;
-                });
-                setDecryptErrorDetails(prev => {
-                  const next = { ...prev };
-                  delete next[updatedRecord.id];
-                  return next;
-                });
-                setFailedAutoDecrypts(prev => {
-                  const next = new Set(prev);
-                  next.delete(updatedRecord.id);
-                  return next;
-                });
-              }
-            } else if (payload.eventType === 'DELETE') {
-              // 刪除記錄：從列表中移除並清理所有相關狀態
-              const deletedId = payload.old.id;
-              setRecords(prev => prev.filter(r => r.id !== deletedId));
-              setDecryptedDescriptions(prev => {
-                const next = { ...prev };
-                delete next[deletedId];
-                return next;
-              });
-              setDecryptedAiResponses(prev => {
-                const next = { ...prev };
-                delete next[deletedId];
-                return next;
-              });
-              setDecryptErrors(prev => {
-                const next = { ...prev };
-                delete next[deletedId];
-                return next;
-              });
-              setDecryptErrorDetails(prev => {
-                const next = { ...prev };
-                delete next[deletedId];
-                return next;
-              });
-              setFailedAutoDecrypts(prev => {
-                const next = new Set(prev);
-                next.delete(deletedId);
-                return next;
-              });
-              setExpandedErrorDetails(prev => {
-                const next = new Set(prev);
-                next.delete(deletedId);
-                return next;
-              });
-            }
-          } catch (error) {
-            console.error('[AuthTimeline] Error processing realtime update:', error);
-            // 降級：如果處理失敗，重新載入所有記錄
-            loadRecords();
-          }
-        }
-      )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('[AuthTimeline] Realtime subscription active');
-          // 清除輪詢（如果存在）
-          if (pollingIntervalRef.current) {
-            clearInterval(pollingIntervalRef.current);
-            pollingIntervalRef.current = null;
-          }
-        } else if (status === 'CHANNEL_ERROR') {
-          console.warn('[AuthTimeline] Realtime subscription error, falling back to polling');
-          toast({
-            title: t("timeline.realtimeError") || "實時同步失敗",
-            description: t("timeline.realtimeErrorDesc") || "將使用定期刷新來同步數據",
-            variant: "default",
-          });
-          // 降級：如果訂閱失敗，定期重新載入（每30秒）
-          if (!pollingIntervalRef.current) {
-            pollingIntervalRef.current = setInterval(() => {
-              // 使用 ref 或直接检查，避免闭包问题
-              supabase.auth.getSession().then(({ data: { session } }) => {
-                if (session?.user?.id === currentUserId) {
-                  loadRecords();
-                }
-              });
-            }, 30000);
-          }
-        }
-      });
-
-    return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-      }
-      supabase.removeChannel(channel);
-    };
-  }, [user, loadRecords, sortRecordsByDate, toast, t]);
 
   // 生成 Sui Scan 链接
   const getSuiScanUrl = (objectId: string | null): string | null => {
@@ -538,33 +316,34 @@ const AuthTimeline = () => {
     throw new Error("Retry failed");
   }, []);
 
-  // 判斷記錄是否為數據庫儲存（非 Walrus）
+  // 判斷記錄是否為本地儲存
   const isLocalRecord = (record: EmotionRecord) => {
-    // 檢查 blob_id 和 walrus_url 來判斷是否為數據庫存儲
-    // 數據庫存儲的標識：
-    // 1. blob_id 以 "local_" 開頭
-    // 2. walrus_url 以 "local://" 開頭
-    // 3. 沒有 blob_id 但有 encrypted_data（數據庫 fallback）
+    // 檢查 blob_id 和 walrus_url 來判斷是否為本地記錄
+    // 如果 blob_id 以 "local_" 開頭，或 walrus_url 以 "local://" 開頭，則為本地記錄
     const blobId = record.blob_id || "";
     const walrusUrl = record.walrus_url || "";
     
     const isLocalBlob = blobId.startsWith("local_");
     const isLocalUrl = walrusUrl.startsWith("local://");
-    const isDatabaseFallback = !blobId && record.encrypted_data;
     
-    // 數據庫存儲：明確的本地格式或數據庫 fallback
-    const isDatabase = isLocalBlob || isLocalUrl || isDatabaseFallback;
+    // 只有當明確是本地格式時，才返回 true
+    // 其他情況（包括 walrus_url 是 https://aggregator.testnet.walrus.space 開頭，或 blob_id 是正常的 Walrus ID）都是 Walrus 記錄
+    const isLocal = isLocalBlob || isLocalUrl;
     
-    return isDatabase;
+    // 除錯日誌
+    if (!isLocal && (blobId || walrusUrl)) {
+      console.log(`[AuthTimeline] Walrus record detected:`, {
+        id: record.id,
+        blob_id: blobId,
+        walrus_url: walrusUrl,
+        isLocalBlob,
+        isLocalUrl,
+        isLocal
+      });
+    }
+    
+    return isLocal;
   };
-
-  // 獲取存儲類型標籤（用於顯示）
-  const getStorageLabel = useCallback((record: EmotionRecord) => {
-    const isDatabase = isLocalRecord(record);
-    return isDatabase 
-      ? (t("timeline.filter.database") || t("timeline.filter.local") || "數據庫")
-      : t("timeline.filter.walrus");
-  }, [t]);
 
   // 解密記錄描述
   const decryptDescription = useCallback(async (record: EmotionRecord) => {
@@ -598,7 +377,7 @@ const AuthTimeline = () => {
       // 優先使用資料庫中的 encrypted_data，否則從 Walrus 讀取（帶重試）
       let encryptedDataString: string;
       if (record.encrypted_data) {
-        console.log(`[AuthTimeline] Using encrypted_data from database for record ${record.id}`);
+        console.log(`[Timeline] Using encrypted_data from database for record ${record.id}`);
         encryptedDataString = record.encrypted_data;
       } else {
         // 從 Walrus 讀取加密資料（帶重試機制）
@@ -629,25 +408,26 @@ const AuthTimeline = () => {
       const possibleKeys: Array<{key: string, type: string}> = [];
       
       try {
-        // 在認證模式下，優先使用 Supabase 用戶密鑰
-        // 1. 優先嘗試 Supabase 使用者 ID（認證模式的主要密鑰）
-        if (user?.id) {
-          const supabaseKey = await generateUserKeyFromId(user.id);
-          possibleKeys.push({ key: supabaseKey, type: 'Supabase User' });
-        }
-        
-        // 2. 如果是公開記錄，嘗試公開金鑰
+        // 如果是公開記錄，優先嘗試公開金鑰
         if (record.is_public) {
           possibleKeys.push({ key: PUBLIC_SEAL_KEY, type: 'Public Seal' });
         }
         
-        // 3. 嘗試匿名金鑰（作為後備，處理從匿名模式遷移的記錄）
+        // 1. 優先嘗試 Supabase 使用者 ID（如果有登錄）
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+          const supabaseKey = await generateUserKeyFromId(session.user.id);
+          possibleKeys.push({ key: supabaseKey, type: 'Supabase User' });
+        }
+        
+        // 2. 嘗試匿名金鑰（如果存在）
         const anonymousKey = await getAnonymousUserKey();
         if (anonymousKey) {
           possibleKeys.push({ key: anonymousKey, type: 'Anonymous' });
         }
         
-        // 4. 如果不是公開記錄，也嘗試公開金鑰（以防記錄被錯誤標記）
+        
+        // 5. 如果不是公開記錄，也嘗試公開金鑰（以防記錄被錯誤標記）
         if (!record.is_public) {
           possibleKeys.push({ key: PUBLIC_SEAL_KEY, type: 'Public Seal (fallback)' });
         }
@@ -681,11 +461,11 @@ const AuthTimeline = () => {
       }
       
       if (!decryptedString) {
-        console.error(`[AuthTimeline] All ${possibleKeys.length} decryption attempts failed for record ${record.id}`);
+        console.error(`[Timeline] All ${possibleKeys.length} decryption attempts failed for record ${record.id}`);
         throw lastError || new Error(`Failed to decrypt with any available key (tried ${possibleKeys.length} keys)`);
       }
       
-      console.log(`[AuthTimeline] 🎉 Record ${record.id} decrypted successfully using ${successKeyType} key`);
+      console.log(`[Timeline] 🎉 Record ${record.id} decrypted successfully using ${successKeyType} key`);
       
       // 解析解密後的 JSON 獲取快照
       const snapshot = JSON.parse(decryptedString);
@@ -693,8 +473,8 @@ const AuthTimeline = () => {
         ? new Date(snapshot.timestamp).toISOString()
         : null;
       
-      // 更新記錄的 metadata（例如真實時間戳與情緒/強度、標籤）
-      if (snapshotTimestamp || snapshot.emotion || snapshot.intensity || snapshot.tags) {
+      // 更新記錄的 metadata（例如真實時間戳與情緒/強度）
+      if (snapshotTimestamp || snapshot.emotion || snapshot.intensity) {
         setRecords(prev =>
           sortRecordsByDate(prev.map(r => {
             if (r.id !== record.id) return r;
@@ -704,7 +484,6 @@ const AuthTimeline = () => {
               emotion: snapshot.emotion || r.emotion,
               intensity: typeof snapshot.intensity === "number" ? snapshot.intensity : r.intensity,
               wallet_address: snapshot.walletAddress || r.wallet_address,
-              tags: snapshot.tags || r.tags, // 從解密後的 snapshot 中提取 tags
             };
           }))
         );
@@ -753,7 +532,7 @@ const AuthTimeline = () => {
         description: t("timeline.decryptSuccessDesc"),
       });
     } catch (error: any) {
-      console.error(`[AuthTimeline] Failed to decrypt record ${record.id}:`, error);
+      console.error(`[Timeline] Failed to decrypt record ${record.id}:`, error);
       
       // 提取詳細錯誤資訊
       let errorType = "unknown";
@@ -882,7 +661,7 @@ const AuthTimeline = () => {
         suggestions,
       };
       
-      console.error(`[AuthTimeline] Detailed error for record ${record.id}:`, errorDetail);
+      console.error(`[Timeline] Detailed error for record ${record.id}:`, errorDetail);
       
       setDecryptErrorDetails(prev => ({
         ...prev,
@@ -926,15 +705,16 @@ const AuthTimeline = () => {
     let filtered = records;
     
     // 1. 儲存類型過濾
-    const isDatabaseStorage = (record: EmotionRecord) => {
-      // 使用統一的判斷邏輯
-      return isLocalRecord(record);
+    const isLocal = (record: EmotionRecord) => {
+      const blobId = record.blob_id || "";
+      const walrusUrl = record.walrus_url || "";
+      return blobId.startsWith("local_") || walrusUrl.startsWith("local://");
     };
     
-    if (filter === "database") {
-      filtered = filtered.filter(isDatabaseStorage);
+    if (filter === "local") {
+      filtered = filtered.filter(isLocal);
     } else if (filter === "walrus") {
-      filtered = filtered.filter(r => !isDatabaseStorage(r));
+      filtered = filtered.filter(r => !isLocal(r));
     }
     
     // 2. 日期範圍過濾
@@ -1070,7 +850,7 @@ const AuthTimeline = () => {
         // 添加小延遲避免過於頻繁的請求
         await new Promise(resolve => setTimeout(resolve, 100));
       } catch (error) {
-        console.error(`[AuthTimeline] Failed to decrypt record ${record.id} in batch:`, error);
+        console.error(`[Timeline] Failed to decrypt record ${record.id} in batch:`, error);
         failCount++;
         // 檢查是否為 Walrus 記錄
         const isWalrusRecord = record.blob_id && !record.blob_id.startsWith("local_");
@@ -1129,7 +909,7 @@ const AuthTimeline = () => {
     // 自動解密每個公開記錄
     publicWalrusRecords.forEach(record => {
       decryptDescription(record).catch(error => {
-        console.warn(`[AuthTimeline] Failed to auto-decrypt public record ${record.id}:`, error);
+        console.warn(`[Timeline] Failed to auto-decrypt public record ${record.id}:`, error);
         // 記錄失敗的嘗試，避免無限重試
         setFailedAutoDecrypts(prev => new Set(prev).add(record.id));
       });
@@ -1139,7 +919,7 @@ const AuthTimeline = () => {
   // 統計資料
   const stats = useMemo(() => {
     const total = records.length;
-    const database = records.filter(isLocalRecord).length;
+    const local = records.filter(isLocalRecord).length;
     const walrus = records.filter(r => !isLocalRecord(r)).length;
     
     const emotionCounts: Record<string, number> = {};
@@ -1159,7 +939,7 @@ const AuthTimeline = () => {
 
     return {
       total,
-      database,
+      local,
       walrus,
       emotionCounts,
       avgIntensity,
@@ -1185,8 +965,8 @@ const AuthTimeline = () => {
   const storageChartData = useMemo(() => {
     return [
       {
-        name: t("timeline.filter.database") || t("timeline.filter.local") || "數據庫",
-        value: stats.database,
+        name: t("timeline.filter.local"),
+        value: stats.local,
         color: "#8b5cf6",
       },
       {
@@ -1195,7 +975,7 @@ const AuthTimeline = () => {
         color: "#06b6d4",
       },
     ];
-  }, [stats.database, stats.walrus, t]);
+  }, [stats.local, stats.walrus, t]);
 
   // 時間趨勢資料（支持周/月/年視圖）
   const timelineChartData = useMemo(() => {
@@ -1477,7 +1257,7 @@ const AuthTimeline = () => {
           row.push(descriptions[record.id] || record.description || "");
         }
         if (customExportFields.storage) {
-          row.push(getStorageLabel(record));
+          row.push(isLocal ? t("timeline.filter.local") : t("timeline.filter.walrus"));
         }
         if (customExportFields.privacy) {
           row.push(record.is_public ? t("timeline.publicRecord") : t("timeline.privateRecord"));
@@ -2136,7 +1916,7 @@ const AuthTimeline = () => {
               <div className="flex items-center gap-3 flex-wrap">
                 <Filter className="w-4 h-4 text-muted-foreground" />
                 <div className="flex gap-2">
-                  {(["all", "database", "walrus"] as FilterType[]).map((filterType) => (
+                  {(["all", "local", "walrus"] as FilterType[]).map((filterType) => (
                     <Button
                       key={filterType}
                       variant={filter === filterType ? "default" : "outline"}
@@ -2380,8 +2160,8 @@ const AuthTimeline = () => {
               <div className="text-xs text-muted-foreground">{t("timeline.stats.total")}</div>
             </Card>
             <Card className="p-4 glass-card">
-              <div className="text-2xl font-bold">{stats.database}</div>
-              <div className="text-xs text-muted-foreground">{t("timeline.stats.database") || t("timeline.stats.local") || "數據庫"}</div>
+              <div className="text-2xl font-bold">{stats.local}</div>
+              <div className="text-xs text-muted-foreground">{t("timeline.stats.local")}</div>
             </Card>
             <Card className="p-4 glass-card">
               <div className="text-2xl font-bold">{stats.walrus}</div>
@@ -2764,7 +2544,7 @@ const AuthTimeline = () => {
                       </>
                     ) : (
                       <>
-                        <Button onClick={() => navigate("/auth-record")} className="gradient-emotion">
+                        <Button onClick={() => navigate("/record")} className="gradient-emotion">
                           <Sparkles className="mr-2 h-4 w-4" />
                           {t("timeline.recordFirst") || "記錄第一條情緒"}
                         </Button>
@@ -2857,7 +2637,7 @@ const AuthTimeline = () => {
                                   ? "bg-purple-500/10 text-purple-500" 
                                   : "bg-cyan-500/10 text-cyan-500"
                               }`}>
-                                {isLocal ? "💾 " + getStorageLabel(record) : "☁️ " + getStorageLabel(record)}
+                                {isLocal ? "💾 " + t("timeline.filter.local") : "☁️ " + t("timeline.filter.walrus")}
                               </span>
                             </div>
                             {/* Actions Menu */}
@@ -3546,7 +3326,7 @@ const AuthTimeline = () => {
                   <div>
                     <h4 className="text-xs font-semibold text-muted-foreground mb-1">{t("timeline.storage") || "儲存位置"}</h4>
                     <p className="text-sm">
-                      {isLocalRecord(selectedRecord) ? "💾 " + getStorageLabel(selectedRecord) : "☁️ " + getStorageLabel(selectedRecord)}
+                      {isLocalRecord(selectedRecord) ? "💾 " + t("timeline.filter.local") : "☁️ " + t("timeline.filter.walrus")}
                     </p>
                   </div>
                   <div>
