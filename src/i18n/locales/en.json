@@ -122,7 +122,18 @@
       "walrusHint": "Using Walrus storage means your emotion records will be stored on decentralized storage, and no third party can decrypt them.",
       "epoch": "Storage Duration (Epoch)",
       "epochDesc": "Select the number of epochs to store data on Walrus Testnet (1 epoch ≈ 1 day)",
-      "epochValue": "{{value}} epochs (approx. {{days}} days)"
+      "epochValue": "{{value}} epochs (approx. {{days}} days)",
+      "backup": {
+        "enabled": "Backup to Database",
+        "disabled": "No Database Backup",
+        "enabledDesc": "Backup encrypted data to Supabase, can be restored even if Walrus expires",
+        "disabledDesc": "No backup, data only exists on Walrus (testnet data may expire)",
+        "anonymousWarning": "⚠️ Anonymous mode requires logging in to Supabase to backup",
+        "failedTitle": "⚠️ Cannot Backup to Database",
+        "failedDesc": "Anonymous mode requires logging in to Supabase to backup. Data has been uploaded to Walrus.",
+        "backupFailedTitle": "⚠️ Backup Failed",
+        "backupFailedDesc": "Data has been uploaded to Walrus, but backup to database failed."
+      }
     },
     "status": {
       "encrypting": "Encrypting...",
