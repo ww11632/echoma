@@ -70,7 +70,14 @@ const App = () => (
               <ErrorBoundary>
                 <Suspense fallback={<LoadingFallback />}>
             <Routes>
-              <Route path="/" element={<Index />} />
+              <Route 
+                path="/" 
+                element={
+                  <React.Suspense fallback={<LoadingFallback />}>
+                    <Index />
+                  </React.Suspense>
+                } 
+              />
               {/* Anonymous/Wallet Mode */}
               <Route path="/record" element={<Record />} />
               <Route path="/timeline" element={<Timeline />} />
