@@ -92,33 +92,44 @@ export async function checkAnonymousRateLimit(
   // We'll use a special format for anonymous user_id: "anon:{anonymousId}"
   const anonUserId = `anon:${anonymousId}`;
   
-  const { count, error } = await supabase
-    .from('ai_audit_logs')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', anonUserId)
-    .gte('created_at', windowStart.toISOString());
+  try {
+    const { count, error } = await supabase
+      .from('ai_audit_logs')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', anonUserId)
+      .gte('created_at', windowStart.toISOString());
 
-  if (error) {
-    console.error('Anonymous rate limit check error:', error);
-    // On error, be more conservative: deny the request to prevent abuse
-    // This is safer for anonymous users who could abuse the system
+    if (error) {
+      console.error('Anonymous rate limit check error:', error);
+      // If table doesn't exist or RLS blocks us, allow request but log warning
+      // This prevents blocking legitimate users due to configuration issues
+      console.warn('Allowing anonymous request due to rate limit check failure');
+      return {
+        allowed: true,
+        remaining: RATE_LIMIT_CONFIG.maxRequestsAnonymous - 1,
+        resetAt: new Date(Date.now() + RATE_LIMIT_CONFIG.windowMs),
+      };
+    }
+
+    const requestCount = count || 0;
+    const remaining = Math.max(0, RATE_LIMIT_CONFIG.maxRequestsAnonymous - requestCount);
+    const allowed = requestCount < RATE_LIMIT_CONFIG.maxRequestsAnonymous;
+    const resetAt = new Date(Date.now() + RATE_LIMIT_CONFIG.windowMs);
+
     return {
-      allowed: false,
-      remaining: 0,
+      allowed,
+      remaining,
+      resetAt,
+    };
+  } catch (err) {
+    console.error('Anonymous rate limit check exception:', err);
+    // Allow request on exception to prevent blocking legitimate users
+    return {
+      allowed: true,
+      remaining: RATE_LIMIT_CONFIG.maxRequestsAnonymous - 1,
       resetAt: new Date(Date.now() + RATE_LIMIT_CONFIG.windowMs),
     };
   }
-
-  const requestCount = count || 0;
-  const remaining = Math.max(0, RATE_LIMIT_CONFIG.maxRequestsAnonymous - requestCount);
-  const allowed = requestCount < RATE_LIMIT_CONFIG.maxRequestsAnonymous;
-  const resetAt = new Date(Date.now() + RATE_LIMIT_CONFIG.windowMs);
-
-  return {
-    allowed,
-    remaining,
-    resetAt,
-  };
 }
 
 /**

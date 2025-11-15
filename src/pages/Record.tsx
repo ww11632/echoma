@@ -622,8 +622,8 @@ const Record = () => {
                 },
                 context: {
                   walletAddress: currentAccount?.address,
-                  journalId: journalId || "unknown",
-                  moodScore,
+                  recordId: "unknown",
+                  intensity,
                 },
               };
               const existingLogs = JSON.parse(localStorage.getItem("nft_mint_errors") || "[]");
