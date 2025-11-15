@@ -4,4 +4,4 @@ project_id = "xafoyjtagyqljqbpcepv"
 verify_jwt = true
 
 [functions.ai-emotion-response]
-verify_jwt = true
+verify_jwt = false
