@@ -29,7 +29,6 @@ Deno.serve(async (req) => {
     let supabase: ReturnType<typeof createClient>;
     let user: { id: string } | null = null;
     let isAnonymous = false;
-    let anonymousId: string | null = null;
     let serviceClient: ReturnType<typeof createClient> | null = null;
 
     if (authHeader) {
@@ -123,13 +122,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { emotion, intensity, description, language = 'zh-TW', anonymousId } = body as {
+    const { emotion, intensity, description, language = 'zh-TW', anonymousId: anonymousIdFromBody } = body as {
       emotion?: string;
       intensity?: number;
       description?: string;
       language?: string;
       anonymousId?: string;
     };
+    
+    const anonymousId = anonymousIdFromBody || null;
 
     // Normalize language code (support zh-CN, zh-HK, etc.)
     const normalizedLanguage = language.startsWith('zh') ? 'zh-TW' : 'en';
