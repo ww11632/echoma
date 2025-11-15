@@ -24,7 +24,10 @@ Echoma 是一個基於 Web3 的情感記錄應用，結合了客戶端加密、�
 - 📤 **數據導出** - 支持導出為 CSV、JSON、PDF、Markdown 格式，支持自定義字段和日期格式
 - 🔄 **實時同步**（認證模式）- 使用 Supabase Realtime 自動同步數據變化，支持多設備實時更新
 - 🌍 **多語言支持** - 支持繁體中文和英文切換
+- 🌓 **主題切換** - 支持淺色/深色/跟隨系統主題切換（默認淺色主題）
 - 👤 **多種模式** - 匿名模式、認證模式和 MVP 本地模式
+- 🛡️ **錯誤邊界** - 完整的錯誤捕獲和友好錯誤提示
+- 📱 **響應式設計** - 適配桌面和移動設備
 
 ## 📱 iOS App 支持
 
@@ -53,6 +56,11 @@ Echoma 現在支持打包成 iOS 原生應用！使用 **Capacitor** 框架，�
 
 ## 🚀 快速開始
 
+### 首次使用
+
+- **醫療免責聲明**：首次使用時會顯示醫療免責聲明，需要確認後才能繼續使用
+- **引導流程**：首次訪問首頁時會顯示引導流程，介紹主要功能（可跳過）
+
 ### 前置要求
 
 - Node.js 18+ 和 npm（推薦使用 [nvm](https://github.com/nvm-sh/nvm#installing-and-updating) 安裝）
@@ -74,6 +82,19 @@ npm run dev
 ```
 
 應用將在 `http://localhost:5173` 啟動。
+
+### 本地開發服務器（可選）
+
+如果需要使用本地開發服務器（用於某些 API 調用），可以單獨啟動：
+
+```sh
+# 在另一個終端窗口啟動本地服務器
+npm run server
+```
+
+服務器將在 `http://localhost:3001` 啟動。
+
+**注意**：本地開發服務器是可選的，主要用於開發環境。生產環境通常不需要。
 
 ### 構建生產版本
 
@@ -133,7 +154,16 @@ npm run cap:build:ios
 - **i18next** - 國際化支持
 - **Capacitor** - 跨平台原生應用框架
 - **date-fns** - 日期處理
+- **react-day-picker** - 日期選擇器（日期範圍過濾）
 - **jsPDF** - PDF 生成（數據導出）
+- **next-themes** - 主題切換管理（默認淺色主題，支持跟隨系統）
+- **sonner** - Toast 通知組件
+- **recharts** - 圖表庫（情感趨勢圖表）
+
+### 性能優化
+- **代碼分割** - 使用 React.lazy 和 Suspense 實現路由級代碼分割，減少初始加載時間
+- **懶加載** - 頁面組件按需加載，提升首屏性能
+- **虛擬滾動** - Timeline 頁面使用 @tanstack/react-virtual 優化大量數據渲染
 
 ## 📁 項目結構
 
@@ -145,10 +175,13 @@ echoma/
 │   │   ├── WalletConnect.tsx
 │   │   ├── LanguageSwitcher.tsx
 │   │   ├── ErrorBoundary.tsx  # 錯誤邊界組件
-│   │   ├── Onboarding.tsx     # 引導流程組件
+│   │   ├── Onboarding.tsx     # 引導流程組件（首次使用引導）
+│   │   ├── MedicalDisclaimer.tsx # 醫療免責聲明組件
 │   │   ├── TagInput.tsx       # 標籤輸入組件
-│   │   └── ThemeToggle.tsx    # 主題切換組件
+│   │   └── ThemeToggle.tsx    # 主題切換組件（淺色/深色/跟隨系統）
 │   ├── hooks/              # 自定義 React Hooks
+│   │   ├── use-mobile.tsx  # 移動設備檢測 Hook
+│   │   └── use-toast.ts    # Toast 通知 Hook
 │   ├── lib/                # 工具函數和核心邏輯
 │   │   ├── encryption.ts   # 客戶端加密功能
 │   │   ├── securityTests.ts # 安全測試套件
@@ -156,6 +189,11 @@ echoma/
 │   │   ├── walrus.ts       # Walrus 儲存集成
 │   │   ├── storageService.ts  # 存儲服務抽象層
 │   │   ├── localIndex.ts   # 本地索引服務
+│   │   ├── anonymousIdentity.ts # 匿名身份管理（匿名模式用戶ID生成）
+│   │   ├── api.ts          # API 調用（本地開發服務器通信）
+│   │   ├── validation.ts  # 數據驗證（使用 Zod 進行輸入驗證）
+│   │   ├── dataSchema.ts   # 數據模式定義
+│   │   ├── storage.ts      # 存儲相關功能
 │   │   └── utils.ts        # 通用工具函數
 │   ├── pages/              # 頁面組件
 │   │   ├── Index.tsx       # 首頁
@@ -322,13 +360,16 @@ Echoma 實現了完整的安全測試套件，確保加密機制的正確性和�
 
 ## 🌐 網路配置
 
-當前配置為 **Sui Testnet**：
+當前配置為 **Sui Testnet**（默認網絡）：
 
-- Sui RPC: `getFullnodeUrl("testnet")`
-- Walrus Upload Relay: `https://upload-relay.testnet.walrus.space`
-- Walrus Aggregator: `https://aggregator.testnet.walrus.space`
+- **默認網絡**：Testnet（可在 `src/App.tsx` 中修改 `defaultNetwork`）
+- **支持的網絡**：Testnet 和 Mainnet（已配置，可切換）
+- **Sui RPC**: `getFullnodeUrl("testnet")`
+- **Walrus Upload Relay**: `https://upload-relay.testnet.walrus.space`
+- **Walrus Aggregator**: `https://aggregator.testnet.walrus.space`
+- **錢包自動連接**：啟用 `autoConnect`，頁面載入時自動嘗試連接已授權的錢包
 
-可在 `src/App.tsx` 中修改網路配置。
+可在 `src/App.tsx` 中修改網路配置和默認網絡。
 
 ### ⚠️ Walrus Aggregator 已知問題
 
@@ -609,12 +650,20 @@ Echoma 提供三種不同的使用模式，滿足不同需求：
   - [x] 情緒趨勢預測（基於線性回歸）
   - [x] 情緒關聯分析
   - [x] 情緒日曆視圖
+- [x] **情感數據解密和查看功能** - 完整的解密和查看功能
+  - [x] 自動解密（本地記錄和公開 Walrus 記錄）
+  - [x] 一鍵批量解密（私密 Walrus 記錄）
+  - [x] 手動解密重試（針對解密失敗的記錄）
+  - [x] 記錄詳情查看（完整記錄信息對話框）
+  - [x] 解密狀態標識和錯誤提示
+  - [x] 隱藏已解密內容功能
 
 ### 🚧 進行中 / 計劃中
 - [ ] 完整集成 Argon2id 支持（當前回退到增強 PBKDF2）
 - [ ] 實現用戶密碼/短語輸入界面（提升密鑰安全性）
+  - 當前狀態：`generateUserKey` 函數已支持 `userPassword` 參數，但缺少用戶界面
+  - 需要實現：在記錄頁面添加密碼/短語輸入選項，用於生成更安全的加密密鑰
 - [ ] 實現 Sui Move 合約用於 NFT 鑄造
-- [ ] 添加情感數據解密和查看功能
 - [ ] 支持多鏈網路切換
 - [ ] 實時安全監控告警系統
 - [ ] 動態關鍵詞列表更新機制
