@@ -126,304 +126,67 @@ npm run cap:build:ios
 
 ## 🛠️ 技術棧
 
-### 前端框架
-- **React 18** - UI 框架
-- **TypeScript** - 類型安全
-- **Vite** - 構建工具和開發伺服器
-
-### UI 組件
-- **shadcn/ui** - 高質量 UI 組件庫
-- **Tailwind CSS** - 實用優先的 CSS 框架
-- **Radix UI** - 無樣式、可訪問的組件原語
-- **Lucide React** - 圖標庫
-
-### Web3 集成
-- **@mysten/dapp-kit** - Sui 區塊鏈集成
-- **@mysten/sui** - Sui SDK
-- **@mysten/walrus** - Walrus 儲存 SDK
-
-### 後端服務
-- **Supabase** - 用戶認證和雲端存儲
-- **Supabase Edge Functions** - AI 情感分析服務
-- **Express** - 本地開發伺服器
-
-### 其他工具
-- **React Router** - 路由管理
-- **TanStack Query** - 數據獲取和狀態管理
-- **TanStack Virtual** - 虛擬滾動優化（@tanstack/react-virtual）
-- **React Hook Form** - 表單處理
-- **Zod** - 數據驗證
-- **i18next** - 國際化支持
-- **Capacitor** - 跨平台原生應用框架
-- **date-fns** - 日期處理
-- **react-day-picker** - 日期選擇器（日期範圍過濾）
-- **jsPDF** - PDF 生成（數據導出）
-- **next-themes** - 主題切換管理（默認淺色主題，支持跟隨系統）
-- **sonner** - Toast 通知組件
-- **recharts** - 圖表庫（情感趨勢圖表）
-
-### 性能優化
-- **代碼分割** - 使用 React.lazy 和 Suspense 實現路由級代碼分割，減少初始加載時間
-- **懶加載** - 頁面組件按需加載，提升首屏性能
-- **虛擬滾動** - Timeline 頁面使用 @tanstack/react-virtual 優化大量數據渲染
+**前端框架：** React 18, TypeScript, Vite  
+**UI 組件：** shadcn/ui, Tailwind CSS, Radix UI  
+**Web3 集成：** @mysten/dapp-kit, @mysten/sui, @mysten/walrus  
+**後端服務：** Supabase（認證 + 存儲）, Supabase Edge Functions（AI API）  
+**核心庫：** TanStack Query/Virtual, React Router, React Hook Form, Zod, i18next, Capacitor  
+**性能優化：** 代碼分割、懶加載、虛擬滾動
 
 ## 📁 項目結構
 
 ```
 echoma/
 ├── src/
-│   ├── components/          # React 組件
-│   │   ├── ui/             # shadcn/ui 組件
-│   │   ├── WalletConnect.tsx
-│   │   ├── LanguageSwitcher.tsx
-│   │   ├── ErrorBoundary.tsx  # 錯誤邊界組件
-│   │   ├── Onboarding.tsx     # 引導流程組件（首次使用引導）
-│   │   ├── MedicalDisclaimer.tsx # 醫療免責聲明組件
-│   │   ├── TagInput.tsx       # 標籤輸入組件
-│   │   └── ThemeToggle.tsx    # 主題切換組件（淺色/深色/跟隨系統）
-│   ├── hooks/              # 自定義 React Hooks
-│   │   ├── use-mobile.tsx  # 移動設備檢測 Hook
-│   │   └── use-toast.ts    # Toast 通知 Hook
-│   ├── lib/                # 工具函數和核心邏輯
-│   │   ├── encryption.ts   # 客戶端加密功能
-│   │   ├── securityTests.ts # 安全測試套件
-│   │   ├── securityTests.worker.ts # Web Worker（CPU 密集型測試）
-│   │   ├── walrus.ts       # Walrus 儲存集成
-│   │   ├── storageService.ts  # 存儲服務抽象層
-│   │   ├── localIndex.ts   # 本地索引服務
-│   │   ├── anonymousIdentity.ts # 匿名身份管理（匿名模式用戶ID生成）
-│   │   ├── api.ts          # API 調用（本地開發服務器通信）
-│   │   ├── validation.ts  # 數據驗證（使用 Zod 進行輸入驗證）
-│   │   ├── dataSchema.ts   # 數據模式定義
-│   │   ├── storage.ts      # 存儲相關功能
-│   │   └── utils.ts        # 通用工具函數
-│   ├── pages/              # 頁面組件
-│   │   ├── Index.tsx       # 首頁
-│   │   ├── Record.tsx      # 匿名模式記錄頁面
-│   │   ├── Timeline.tsx    # 匿名模式時間線
-│   │   ├── Auth.tsx        # 認證頁面
-│   │   ├── AuthRecord.tsx  # 認證模式記錄頁面
-│   │   ├── AuthTimeline.tsx # 認證模式時間線
-│   │   ├── MvpRecord.tsx   # MVP 本地記錄頁面
-│   │   ├── MvpTimeline.tsx # MVP 本地時間線
-│   │   ├── SecurityTests.tsx # 安全測試頁面（開發環境）
-│   │   └── NotFound.tsx   # 404 頁面
-│   ├── i18n/               # 國際化配置
-│   │   ├── config.ts
-│   │   └── locales/        # 語言文件
-│   ├── integrations/       # 第三方集成
-│   │   └── supabase/       # Supabase 客戶端
-│   └── App.tsx             # 應用入口
-├── server/                 # 本地開發伺服器
-│   └── index.js
-├── supabase/               # Supabase 配置
-│   ├── functions/          # Edge Functions
-│   │   ├── ai-emotion-response/  # AI 情感分析
-│   │   ├── get-emotions/   # 獲取情感記錄
-│   │   └── upload-emotion/ # 上傳情感記錄
-│   └── migrations/         # 數據庫遷移
-├── benchmarks/             # 測試基準數據
-│   └── schema/            # JSON Schema
-│       └── security.v1.json # 安全測試輸出 Schema
-└── public/                 # 靜態資源
+│   ├── components/    # UI 組件（shadcn/ui、錢包、主題等）
+│   ├── pages/         # 路由頁面（Record、Timeline、Auth、MVP）
+│   ├── lib/           # 核心邏輯（加密、存儲、walrus、鑄造）
+│   ├── hooks/         # 自定義 React Hooks
+│   ├── i18n/          # 國際化（繁中/英文）
+│   └── integrations/  # Supabase 集成
+├── supabase/          # Edge functions 和數據庫遷移
+├── nft_mint_test/     # Sui Move 合約
+└── public/            # 靜態資源
 ```
+
+詳細文件結構請查看代碼庫。
 
 ## 🔐 安全特性
 
 Echoma 採用多層安全防護，保護用戶數據和隱私：
 
-### 客戶端加密
+- **客戶端加密** – AES-GCM 256 位加密，數據離開設備前已加密
+- **密鑰派生** – PBKDF2（Argon2id 計劃中），自動調整迭代次數
+- **Seal 權限模型** – 公開/私密記錄分離，智能解密
+- **AI 安全防護** – prompt injection 控制、危機檢測、審計日誌
+- **安全測試套件** – 端到端密碼學驗證（可重現/可量測/可審計）
+- **向後兼容** – 自動遷移舊格式數據
 
-所有情感數據在離開設備前使用 **AES-GCM 256 位加密**，採用業界最佳實踐：
+**數據流程：** 記錄 → 加密 → 儲存（Walrus）→ 驗證（Sui NFT）
 
-#### 加密算法
-- **AES-GCM 256 位**：提供加密和認證（防止篡改）
-- **版本化加密頭**：支持未來算法升級和向後兼容
-- **嚴格驗證**：Salt ≥16 bytes，IV = 12 bytes（AES-GCM 要求）
-
-#### 密鑰派生（KDF）
-- **PBKDF2**（當前默認）：
-  - 根據設備性能自動調整迭代次數（100k - 1M）
-  - 支持手動配置迭代次數
-  - 使用 SHA-256 哈希算法
-- **Argon2id**（預留接口）：
-  - 記憶體硬成本，抗 GPU/ASIC 攻擊
-  - 當前因構建限制暫時回退到增強 PBKDF2
-  - 未來將完整集成
-
-#### 密鑰生成安全
-- ⚠️ **安全警告**：不建議僅基於錢包地址生成密鑰（低熵）
-- ✅ **推薦做法**：使用用戶密碼/短語 + 確定性 salt
-- ✅ **Salt 管理**：
-  - **加密時**：每條記錄使用唯一的隨機 salt（≥16 bytes）
-  - **密鑰生成時**：使用確定性 salt（基於應用+用戶標識），確保相同輸入產生相同密鑰
-- ✅ **Domain Separation**：地址僅用於域分離，不作為主要熵源
-
-#### 錯誤處理
-- **明確的錯誤分類**：區分密鑰錯誤、數據損壞、版本不兼容等
-- **AES-GCM 認證標籤驗證**：嚴格檢查數據完整性
-- **用戶友好的錯誤提示**：提供具體的失敗原因和解決建議
-- **國際化錯誤消息**：所有錯誤提示支持多語言（繁體中文/英文）
-- **存儲配額管理**：當本地存儲空間不足時，提供清晰的提示和解決方案
-
-#### Seal 權限控制
-- **公開記錄**：使用共享公開 Seal 金鑰加密，任何人都可以查驗 proof 和解密內容
-- **私密記錄**：使用用戶專屬金鑰加密，只有持有授權金鑰的用戶可以解密存取
-- **智能解密**：解密時自動嘗試公開金鑰和用戶專屬金鑰，確保兼容性
-- **權限管理**：通過加密金鑰實現訪問控制，無需額外的權限管理系統
-- **數據分離存儲**：公開和私密記錄分開存儲在不同的 localStorage key 中，避免密鑰混用
-- **自動解密優化**：公開的 Walrus 記錄會自動解密，無需手動操作
-
-#### 本地存儲加密
-- **全模式加密**：所有本地存儲數據（包括匿名模式和 MVP 模式）均使用 AES-GCM 256 位加密
-- **智能密鑰管理**：
-  - 錢包模式：基於錢包地址派生密鑰
-  - 認證模式：基於 Supabase 用戶 ID 派生密鑰
-  - 匿名模式：基於匿名 UUID 派生密鑰
-- **數據完整性保護**：
-  - 防止數據丟失：保存前驗證可解密性，無法解密時阻止保存
-  - 智能數據遷移：支持賬戶切換時的數據自動遷移和合併
-  - 密鑰緩存優化：減少重複計算，提升性能
-  - 數據分離存儲：公開和私密記錄分開存儲，避免密鑰混用和數據覆蓋
-- **向後兼容**：自動遷移舊的未加密本地數據到加密存儲
-
-### 數據流程
-
-1. **記錄** - 用戶輸入情感和描述
-2. **加密** - 客戶端使用 AES-GCM 加密數據（帶版本化頭）
-3. **儲存** - 加密數據上傳到 Walrus 去中心化儲存
-4. **驗證** - 在 Sui 區塊鏈上鑄造 NFT 作為儲存證明
-
-### 向後兼容性
-
-- 支持自動遷移舊格式加密數據
-- 版本化加密頭確保未來算法升級時仍可解密舊數據
-- 舊數據可無縫解密，無需用戶操作
-
-### AI 安全防護
-
-針對 AI 情感分析功能，實現了完整的安全防護機制：
-
-#### Prompt Injection 防護
-- ✅ **輸入清理**：自動移除常見的 prompt injection 模式
-- ✅ **最小化上下文**：只傳遞必要的情緒信息，避免敏感字段暴露
-- ✅ **輸出分類**：自動分類 AI 響應（支持性文本、建議、危機提示）
-
-#### 危機檢測與安全卡控
-- ✅ **關鍵詞檢測**：檢測自伤/他伤相關關鍵詞（支持中英文）
-- ✅ **本地端安全卡控**：檢測到高風險內容時，不發送到模型或返回安全響應
-- ✅ **安全響應**：提供專業心理健康資源指引
-
-#### 審計日誌
-- ✅ **完整記錄**：記錄所有 AI API 調用（時間、用戶、token 花費、截斷長度）
-- ✅ **安全檢測結果**：記錄響應分類、風險等級、檢測到的關鍵詞
-- ✅ **隱私保護**：只存儲輸入摘要（情緒類型、強度），不存儲完整描述
-
-#### API Key 管理
-- ✅ **Key Rotation**：支持定期輪換 API keys（默認 90 天）
-- ✅ **安全存儲**：API keys 加密存儲在數據庫
-- ✅ **自動檢查**：自動檢查輪換時間並提醒
-
-詳細的安全功能說明請參閱 [SECURITY_FEATURES.md](./SECURITY_FEATURES.md)
-
-### 安全測試套件
-
-Echoma 實現了完整的安全測試套件，確保加密機制的正確性和安全性：
-
-#### 測試覆蓋範圍
-- ✅ **密碼學向量測試**：Tag 篡改、IV 重用、Header 竄改、AAD 驗證、定時側通道檢查等
-- ✅ **參數回放測試**：跨設備加密/解密兼容性驗證
-- ✅ **UTF-8 邊界測試**：Unicode 正規化、複雜字符處理
-- ✅ **Rate Limit 測試**：限流機制、429 header 驗證、Replay 防護
-- ✅ **JWT 刷新平滑度測試**：會話刷新期間的平滑過渡驗證
-
-#### 測試特性
-- 🔄 **可重現性**：支持 SEED 參數，確保測試結果可重現
-- 📊 **可量測性**：標準化 JSON 輸出，支持 CI 自動化驗收
-- 🔍 **可審計性**：完整的錯誤碼對照表、驗收標準、統計學指標
-- 🛡️ **生產級可信度**：覆蓋邊界情況、非預期成功告警、JSON Schema 驗證
-
-#### 訪問安全測試頁面
-- **開發環境**：自動啟用 `/security-tests` 路由
-- **生產環境**：需設置 `VITE_ENABLE_SECURITY_TESTS=true` 和 `VITE_FORCE_ENABLE_SECURITY_TESTS=true`（強制保護）
-
-詳細的安全測試說明請參閱 [Security_Test_Guide.md](./Security_Test_Guide.md)
-
-### 安全審計
-
-詳細的安全最佳實踐檢查報告請參閱 [SECURITY_BEST_PRACTICES.md](./SECURITY_BEST_PRACTICES.md)
-
-- ✅ **設計原則對齊 NIST/OWASP 建議，已覆蓋核心控制項**，細節見 SECURITY_BEST_PRACTICES.md
-- ✅ 核心加密機制遵循業界最佳實踐
-- ✅ 完善的錯誤處理和向後兼容性
-- ✅ AI 安全防護機制完整實現
-- ✅ **完整的安全測試套件**：可重現、可量測、可審計
-- ⚠️ Argon2id 集成進行中（當前使用增強 PBKDF2 作為補償）
+📖 **詳細文檔：**
+- [SECURITY_FEATURES.md](./SECURITY_FEATURES.md) – 完整安全功能說明
+- [SECURITY_BEST_PRACTICES.md](./SECURITY_BEST_PRACTICES.md) – 安全審計檢查清單
+- [Security_Test_Guide.md](./Security_Test_Guide.md) – 安全測試套件指南
 
 ## 🌐 網路配置
 
-默認網絡：**Sui Testnet**
+**默認網絡：Sui Mainnet**
 
-- **網路切換器** – 右上角的 UI 組件，可在 Testnet 和 Mainnet 之間切換
-- **持久化偏好** – 網路選擇會保存到 localStorage，跨會話持久化
-- **跨標籤頁同步** – 網路變更會自動同步到所有瀏覽器標籤頁
-- **自動清理快取** – 切換網路時會清理 React Query 快取，避免顯示過期數據
-- **支持的網路** – Testnet + Mainnet（已預配置）
-- **Sui RPC** – 根據選擇自動使用 `getFullnodeUrl("testnet")` 或 `getFullnodeUrl("mainnet")`
-- **Walrus 端點** – 自動在 testnet/mainnet Walrus 服務之間切換：
-  - Testnet: `https://upload-relay.testnet.walrus.space` / `https://aggregator.testnet.walrus.space`
-  - Mainnet: `https://upload-relay.mainnet.walrus.space` / `https://aggregator.mainnet.walrus.space`
-- **錢包自動連接** – 啟用後，已授權的錢包會在載入時自動重新連接
-- **網路感知數據處理**：
-  - 記錄會將網路信息嵌入到 `walrus_url` 中
-  - 解密時自動使用記錄的原始網路（從 `walrus_url` 提取）
-  - 去重邏輯考慮網路信息（使用 `blob_id + network` 作為唯一標識符）
-  - 所有上傳路徑（SDK、Supabase Function、Server API）都遵循選擇的網路
-  - 網路特定的錯誤訊息（測試網警告僅在測試網顯示）
-- **跨網路數據訪問**：
-  - 在一個網路上創建的記錄可以在切換到另一個網路時查看
-  - 解密會根據記錄的 `walrus_url` 自動使用正確的網路端點
-  - 時間線查詢僅從當前網路獲取鏈上數據（數據庫記錄顯示所有網路）
+- 通過 UI（右上角）在 Testnet 和 Mainnet 之間切換
+- 網路偏好持久化保存，跨標籤頁同步
+- 自動切換 Walrus 端點（testnet/mainnet）
+- 網路感知數據處理，支持跨網路記錄訪問
 
-網路切換器在 `GlobalControls` 組件中可用（所有頁面的右上角）。
+⚠️ **注意：** 測試網的 Walrus aggregator 可能偶爾無法提供下載服務（數據仍在鏈上，可在 SuiScan 查看）。
 
-### ⚠️ Walrus Aggregator 已知問題
-
-**重要提示**：雖然你的資料在鏈上（SuiScan 可以看到），但 Walrus aggregator 暫時無法提供下載服務。這是 testnet 的已知問題。
-
-- 資料已成功上傳到鏈上，可以在 SuiScan 查看
-- 由於 Walrus aggregator 的限制，暫時無法從 aggregator 下載資料
-- 在 Anonymous Mode 的時間線中，如果解密失敗，系統會自動顯示此提示
-
-### 📅 Walrus 儲存期限（Epochs）
-
-在 Anonymous Mode 記錄情緒時，你可以選擇資料在 Walrus Testnet 上的儲存期限：
-
-- **Epoch 說明**：1 epoch ≈ 1 天（testnet）
-- **可選範圍**：1-1000 epochs
-- **預設值**：200 epochs（約 200 天）
-- **快速選擇**：提供 5、200、365 epochs 快速按鈕
-- **自訂數值**：可使用滑塊選擇任意 1-1000 之間的數值
-
-**注意**：
-- Epochs 值越大，資料儲存時間越長，但可能需要更多代幣
-- 選擇的 epochs 值會直接影響 Walrus 上傳的成本
-- 建議根據實際需求選擇合適的儲存期限
+📖 詳見 [WALRUS_SETUP.md](./WALRUS_SETUP.md) 了解 Walrus 儲存期限（epochs）詳情。
 
 ## 💧 獲取測試代幣
 
-使用 Walrus 上傳需要 **SUI** 和 **WAL** 測試代幣：
+Walrus 上傳需要 **SUI** 和 **WAL** 測試代幣。
 
-### SUI 代幣
-- **官方水龍頭**：https://faucet.sui.io/ （推薦）
-- **社群水龍頭**：https://faucet.blockbolt.io/
-- **Sui Discord**：在 `#testnet-faucet` 頻道使用 `!faucet <地址>`
-
-### WAL 代幣
-- **Walrus CLI**：`walrus get-wal`（使用 SUI 以 1:1 比例兌換）
-- **Stakely 水龍頭**：https://stakely.io/faucet/walrus-testnet-wal
-
-詳細說明請查看 [Faucet_Test_Token_Guide.md](./Faucet_Test_Token_Guide.md)
+📖 詳見 [Faucet_Test_Token_Guide.md](./Faucet_Test_Token_Guide.md) 了解水龍頭連結和使用說明。
 
 ## 📝 使用說明
 
@@ -432,183 +195,44 @@ Echoma 實現了完整的安全測試套件，確保加密機制的正確性和�
 Echoma 提供三種不同的使用模式，滿足不同需求：
 
 #### 1. 匿名模式（Wallet Mode）
-- **路由**: `/record` 和 `/timeline`
-- **特點**: 使用 Sui 錢包連接，數據加密後上傳到 Walrus，支持 AI 情感回應
-- **適用**: 想要去中心化存儲，不需要登入的用戶
-- **步驟**:
-  1. 連接 Sui 錢包
-  2. 選擇情感類型和強度
-  3. 輸入描述文字
-  4. **（可選）添加標籤**：為記錄添加標籤以便分類和查找（如：工作、家庭、健康等）
-  5. **（可選）獲取 AI 情感回應**：點擊「Get AI Emotion Response」按鈕，獲取溫暖、同理心的 AI 回應
-     - 支持繁體中文和英文
-     - 匿名用戶有速率限制（每分鐘 3 次請求）
-     - 無需登入即可使用
-  6. 選擇 Walrus 儲存方式（而非本地儲存）
-  7. **選擇儲存期限（Epochs）**：可選擇 1-1000 epochs（1 epoch ≈ 1 天）
-     - 預設值：200 epochs（約 200 天）
-     - 快速選擇按鈕：5、200、365 epochs
-     - 或使用滑塊自訂數值
-  8. 啟用「鑄造為 NFT」開關（需要連接錢包）
-  9. 點擊「記錄並鑄造 NFT」
-- **NFT 功能：**
-  - 每日限鑄：**測試網** - 每個 Journal 每天只能鑄造一次；**主網** - 每天可鑄造多次（無限制）
-  - 首次鑄造時自動創建 Journal
-  - 可在 Sui Scan 查看鑄造交易
-  - NFT 記錄在 Timeline 中顯示，帶有特殊標記
-- **注意**: 如果解密失敗，系統會提示：雖然你的資料在鏈上（SuiScan 可以看到），但 Walrus aggregator 暫時無法提供下載服務。這是 testnet 的已知問題
+- **路由：** `/record`, `/timeline`
+- **適用：** 去中心化存儲，無需登入
+- **快速步驟：** 連接錢包 → 記錄情感 → 選擇 Walrus 儲存（設定 epochs）→ 啟用「鑄造為 NFT」→ 記錄並鑄造
+- **功能：**
+  - 可選 AI 情感分析（3 次/分鐘，無需登入）
+  - Walrus 儲存，可配置保留期限（1–1000 epochs，約 1 天/epoch）
+  - NFT 鑄造：**測試網** - 每個 Journal 每天 1 次；**主網** - 無限制
+  - 自動創建 Journal、交易追蹤、Timeline 標記
 
 #### 2. 認證模式（Secure Mode）
-- **路由**: `/auth-record` 和 `/auth-timeline`
-- **特點**: 需要 Supabase 帳號登入，支持雲端備份、AI 情感分析和實時同步
-- **適用**: 需要跨設備訪問和 AI 輔助分析的用戶
-- **步驟**:
-  1. 在首頁點擊「登入 / 註冊」
-  2. 創建或登入 Supabase 帳號
-  3. 記錄情感時可獲取 AI 回應
-  4. 數據會同步到雲端
-  5. **實時同步**：時間線會自動同步其他設備的更新（新增、修改、刪除）
+- **路由：** `/auth-record`, `/auth-timeline`
+- **適用：** 跨設備訪問和 AI 輔助分析
+- **功能：** Supabase 登入、雲端備份、AI 分析（10 次/分鐘）、跨設備實時同步
 
 #### 3. MVP 模式（Local Mode）
-- **路由**: `/mvp` 和 `/mvp-timeline`
-- **特點**: 完全本地存儲，無需錢包或登入，適合快速測試
-- **適用**: 想要快速體驗或離線使用的用戶
-- **步驟**:
-  1. 直接訪問 `/mvp` 頁面
-  2. 選擇情感和輸入描述
-  3. 數據加密後保存在瀏覽器本地存儲（AES-GCM 256 位加密）
-- **安全特性**:
-  - ✅ 所有本地數據均使用 AES-GCM 256 位加密
-  - ✅ 自動密鑰管理（基於錢包地址、Supabase 用戶 ID 或匿名 ID）
-  - ✅ 數據完整性保護（防止數據丟失和損壞）
-  - ✅ 智能密鑰恢復（支持賬戶切換時的數據遷移）
+- **路由：** `/mvp`, `/mvp-timeline`
+- **適用：** 快速體驗、離線使用，無需錢包或登入
+- **功能：** 完全本地存儲、AES-GCM 256 加密、自動密鑰管理
 
-### 查看時間線
+### 時間線體驗
 
-在時間線頁面可以查看所有已記錄的情感快照，包括：
-
-**記錄顯示信息：**
-- 情感類型和強度
-- 記錄時間
-- 描述文字（解密後顯示）
-- 標籤（以徽章形式顯示）
-- Walrus 儲存 ID（匿名模式，如有）
-- 區塊鏈驗證狀態（proof_status）
-- Sui 引用鏈接（如有，可打開 SuiScan 查看）
-- AI 回應（如有，匿名模式和認證模式均支持）
-- 儲存類型標識（本地/數據庫/Walrus）
-- 隱私設置標識（公開/私密）
-- 解密狀態（已解密/需要解密/解密失敗）
-
-**性能優化：**
-- **虛擬滾動** - 使用 @tanstack/react-virtual 優化性能，即使有 1000+ 條記錄也能流暢滾動
-
-#### 時間線功能
-
-**通用功能（匿名模式和認證模式均支持）：**
-
-- **搜索功能** - 支持搜索情緒、描述、日期和標籤，實時顯示搜索結果數量
-- **標籤過濾** - 選擇標籤進行精確過濾（支持多標籤 AND 邏輯），可快速清除標籤篩選
-- **日期範圍過濾** - 使用日曆組件選擇日期範圍查看特定時期的記錄，支持雙月曆視圖
-- **儲存類型過濾** - 按儲存方式過濾
-  - 匿名模式：全部/本地/Walrus
-  - 認證模式：全部/數據庫/Walrus
-- **排序功能** - 按日期、強度或情緒排序，支持升序/降序切換
-- **清除篩選** - 一鍵清除所有篩選條件（搜索、日期範圍、儲存類型）
-- **統計卡片** - 顯示關鍵統計信息
-  - 總記錄數
-  - 本地/數據庫記錄數（匿名模式顯示本地，認證模式顯示數據庫）
-  - Walrus 記錄數
-  - 平均強度百分比
-- **批量操作** - 完整的批量操作功能
-  - 批量選擇模式切換
-  - 全選/取消全選
-  - 批量導出選中的記錄
-  - 批量刪除選中的記錄
-  - 顯示已選擇記錄數量
-- **數據導出** - 支持導出為 CSV、JSON、PDF、Markdown 格式
-  - 自定義字段選擇（日期、情緒、強度、描述、儲存類型、隱私設置、狀態、Sui 引用）
-  - 自定義日期格式（本地格式、ISO 8601、自定義格式）
-  - 支持導出所有記錄或僅導出選中的記錄
-- **記錄詳情查看** - 點擊記錄可查看完整詳情對話框，包括：
-  - 情緒類型和強度（帶進度條顯示）
-  - 記錄時間
-  - 描述文字
-  - AI 回應（如有）
-  - 儲存位置和隱私設置
-  - Blob ID 和 Sui 引用鏈接（如有，可點擊打開 SuiScan）
-- **單個記錄操作** - 每個記錄支持的操作
-  - 查看詳情（完整記錄信息對話框）
-  - 手動解密（針對解密失敗的記錄，可重試）
-  - 刪除記錄（帶確認對話框）
-  - 查看 Sui 引用鏈接（如有，直接打開 SuiScan）
-  - 隱藏已解密內容（可重新隱藏私密記錄的描述）
-- **情感趨勢圖表** - 多種可視化圖表幫助分析情感數據
-  - **情緒分布餅圖** - 顯示不同情緒類型的分布比例，帶顏色標識
-  - **儲存方式分布餅圖** - 顯示數據儲存方式的分布（本地/數據庫/Walrus）
-  - **時間趨勢圖表** - 支持周/月/年視圖切換，展示情感記錄的時間趨勢和平均強度
-  - **情緒趨勢預測** - 基於線性回歸算法預測未來情緒趨勢，顯示前 3 種主要情緒
-  - **情緒關聯分析** - 分析不同情緒之間的關聯性，顯示最強關聯對
-  - **情緒日曆** - 日曆視圖展示每日情緒狀態
-- **虛擬滾動優化** - 使用 @tanstack/react-virtual 實現高性能虛擬滾動，即使有 1000+ 條記錄也能流暢滾動
-- **離線狀態提示** - 自動檢測網絡狀態，離線時顯示提示信息
-- **Testnet 警告** - 當有 Walrus 記錄時自動顯示 Testnet 限制提示
-
-**認證模式專屬功能：**
-
-- **實時同步** - 使用 Supabase Realtime 自動同步數據變化
-  - 新增記錄自動出現在時間線
-  - 更新記錄自動刷新
-  - 刪除記錄自動移除
-  - 同步失敗時自動降級到定期輪詢（每30秒）
-  - 用戶信息顯示（當前登錄用戶郵箱和 ID）
-  - 登出功能
-
-#### 解密功能
-
-- **自動解密**：
-  - 本地存儲的記錄會自動解密並顯示
-  - 公開的 Walrus 記錄會自動解密（因為任何人都可以解密）
-  - 防止無限重試：自動解密失敗的記錄會被標記，避免重複嘗試
-- **一鍵解密**：對於 Walrus 儲存的私密記錄，提供「一鍵解密」按鈕批量解密所有記錄
-  - 自動識別需要解密的記錄（私密且未解密的 Walrus 記錄）
-  - 顯示解密進度和結果統計
-  - 支持部分成功的情況（部分記錄解密成功，部分失敗）
-- **手動重試**：解密失敗的記錄可以通過手動解密按鈕重試，系統會清除失敗標記
-- **隱藏解密內容**：已解密的私密記錄可以重新隱藏，保護隱私
-- **智能提示**：
-  - 解密失敗時會顯示友好的錯誤提示和解決建議
-  - 公開和私密記錄的錯誤顯示保持一致，都包含詳細的錯誤信息和展開選項
-  - 錯誤詳情包含：錯誤類型、狀態碼、Blob ID、SuiScan 鏈接（如有）、時間戳、解決建議
-  - Walrus 狀態提示：如果 Walrus Testnet Aggregator 不穩定，會自動顯示提示信息（適用於所有用戶）
-  - 解密狀態標識：清楚顯示哪些記錄已解密、哪些需要解密、哪些解密失敗
+**功能：**
+- 搜索、過濾（標籤、日期、儲存類型）和排序
+- 批量操作（導出/刪除）
+- 數據導出（CSV/JSON/PDF/Markdown），支持自定義字段和日期格式
+- 情感分析（分布、趨勢、預測、關聯、日曆）
+- 虛擬滾動（1000+ 條記錄仍流暢）
+- 自動解密本地和公開 Walrus 記錄
+- 手動解密重試私密記錄
+- Supabase 實時同步（僅認證模式）
 
 ### AI 情感分析
 
-在**匿名模式**和**認證模式**下，輸入情感描述後都可以獲取 AI 回應：
+在匿名模式和認證模式下均可使用。
 
-#### 功能特點
-- 溫暖、同理心的情感支持
-- 根據情緒類型和強度提供個性化回應
-- 支持繁體中文和英文
-- 基於 Lovable API 實現
-
-#### 使用方式
-- **匿名模式**：在記錄頁面點擊「Get AI Emotion Response」按鈕
-  - 無需登入即可使用
-  - 速率限制：每分鐘 3 次請求
-  - 使用匿名 ID 追蹤（存儲在本地瀏覽器）
-- **認證模式**：在記錄頁面點擊「Get AI Emotion Response」按鈕
-  - 需要 Supabase 帳號登入
-  - 速率限制：每分鐘 10 次請求
-  - 支持雲端備份和跨設備訪問
-
-#### 安全特性
-- ✅ **輸入驗證**：自動清理 prompt injection 嘗試
-- ✅ **危機檢測**：檢測自傷/他傷關鍵詞（支持中英文）
-- ✅ **安全響應**：檢測到高風險內容時返回安全響應
-- ✅ **速率限制**：防止濫用和過度使用
-- ✅ **審計日誌**：記錄所有 AI API 調用（匿名用戶使用特殊標識）
+- 溫暖、同理心的回應，支持繁體中文和英文
+- 速率限制：3 次/分鐘（匿名），10 次/分鐘（認證）
+- 安全特性：prompt injection 控制、危機檢測、審計日誌
 
 ## 🚧 開發計劃
 
@@ -681,55 +305,30 @@ Echoma 提供三種不同的使用模式，滿足不同需求：
   - [x] 隱藏已解密內容功能
 
 ### ✅ 最近完成
-- **Sui 區塊鏈 NFT 鑄造** – 已完全實現並部署到測試網和主網
+- **Sui NFT 鑄造** – 已部署到測試網和主網
   - 每日限鑄：**測試網** - 每個 Journal 每天只能鑄造一次；**主網** - 每天可鑄造多次（無限制）
-  - 自動創建和管理 Journal
-  - 交易 digest 追蹤和 Sui Scan 鏈接
-  - NFT 記錄在 Timeline 中顯示，帶有特殊標記
   - **測試網 Package ID**: `0x55f1c575f979ad2b16c264191627ca6716c9b0b397ab041280da1ad6bce37e71`
   - **主網 Package ID**: `0x6ec7914c755708fd77ed3fe0dc8aed25ec5ccae2ff781267da3a5ca3549535b9`
-  - 自動遷移舊 Package ID 的 Journal（當合約重新部署時）
-  - 使用 dapp-kit SuiClient 修復 CORS 問題
+  - 自動遷移舊 Package ID、CORS 修復
   - 詳見 [nft_mint_test/README.md](./nft_mint_test/README.md) 了解合約詳情
 
+### ✅ 已實現核心功能
+- 客戶端 AES-GCM 256 加密、Walrus 儲存、Sui NFT 鑄造
+- Supabase 認證和雲端同步、AI 情感分析（匿名 + 認證）
+- 多語言 UI（繁中/英文）、iOS 支持、網路切換
+- 虛擬滾動時間線、情感分析、數據導出（CSV/JSON/PDF/Markdown）
+- 安全測試套件、完善的錯誤處理
+
 ### 🚧 進行中 / 計劃中
-- [ ] 完整集成 Argon2id 支持（當前回退到增強 PBKDF2）
-- [ ] 實現用戶密碼/短語輸入界面（提升密鑰安全性）
-  - 當前狀態：`generateUserKey` 函數已支持 `userPassword` 參數，但缺少用戶界面
-  - 需要實現：在記錄頁面添加密碼/短語輸入選項，用於生成更安全的加密密鑰
-- [ ] 支持多鏈網路切換
-- [ ] 實時安全監控告警系統
-- [ ] 動態關鍵詞列表更新機制
+- 完整 Argon2id 支持（當前使用增強 PBKDF2 作為補償）
+- 用戶密碼/短語輸入界面（提升密鑰安全性）
+- 實時安全監控告警系統
 
 ## 🧪 測試
 
-### 功能測試
+📖 詳見 [Functional_Test_Guide.md](./Functional_Test_Guide.md) 了解詳細測試步驟。
 
-項目包含完整的功能測試指南和快速測試腳本：
-
-- **功能測試指南** (`Functional_Test_Guide.md`) - 詳細的測試步驟和驗證方法
-- **快速測試腳本** (`Quick_Test_Script.js`) - 在瀏覽器 Console 中運行的自動化測試腳本
-
-#### 快速開始測試
-
-1. 啟動開發服務器：
-   ```bash
-   npm run dev
-   ```
-
-2. 打開應用並運行測試：
-   - 打開瀏覽器開發者工具（F12）
-   - 進入 Console 標籤
-   - 複製 `Quick_Test_Script.js` 的內容並執行
-
-3. 查看詳細測試步驟：
-   - 參考 `Functional_Test_Guide.md` 進行完整的功能測試
-
-#### 已修復的問題驗證
-
-以下高優先級邏輯問題已修復並通過驗證：
-
-- ✅ **時間戳格式一致性** - 統一使用 ISO 字符串格式
+**快速測試：** 運行 `npm run dev`，打開 DevTools Console，貼上 `Quick_Test_Script.js` 並執行。
 - ✅ **組件卸載安全** - 防止內存泄漏和 React 警告
 - ✅ **localStorage 並發保存** - 實現鎖機制防止數據丟失
 - ✅ **去重邏輯優化** - 優先使用 `id` 作為主鍵
@@ -759,50 +358,16 @@ Echoma 提供三種不同的使用模式，滿足不同需求：
 
 ## 🔧 環境變數配置
 
-如需使用認證模式和 AI 功能，需要配置以下環境變數：
+認證模式和 AI 功能所需環境變數：
 
 ```env
-# Supabase 配置
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_key
-
-# Supabase Edge Functions 需要配置
-LOVABLE_API_KEY=your_lovable_api_key  # 用於 AI 情感分析（向後兼容）
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key  # 用於 API key rotation 和審計日誌（可選）
+LOVABLE_API_KEY=your_lovable_api_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key  # 可選，用於 key rotation + 審計日誌
 ```
 
-**注意**：
-- `LOVABLE_API_KEY` 可直接從環境變數讀取（向後兼容）
-- 如需使用 API key rotation 功能，需要配置 `SUPABASE_SERVICE_ROLE_KEY`
-- 審計日誌功能需要運行數據庫遷移（見下方）
-- **安全測試頁面**：開發環境自動啟用，生產環境需設置 `VITE_ENABLE_SECURITY_TESTS=true` 和 `VITE_FORCE_ENABLE_SECURITY_TESTS=true`（強制保護）
-
-### CI 安全檢查
-
-項目包含自動化 CI 檢查，防止安全測試旗標洩漏到生產環境：
-
-- **檢查腳本**：`npm run ci:check-security-flags`
-- **檢查範圍**：
-  - `.env.example`：不應包含任何 `VITE_*SECURITY_TESTS*` 環境變數
-  - `Dockerfile` / `docker-compose.yml`：不應包含安全測試相關的環境變數
-  - 生產構建腳本：不應包含安全測試相關的環境變數
-- **GitHub Actions**：`.github/workflows/security-check.yml` 會在 PR 和 push 時自動運行檢查
-
-詳細說明請參閱 [Security_Test_Guide.md](./Security_Test_Guide.md) 中的「風險旗標掃描」章節。
-
-### 數據庫遷移
-
-啟用審計日誌和 API key rotation 功能需要運行以下遷移：
-
-```bash
-# 應用審計日誌表遷移
-supabase migration up 20250116000000_create_audit_logs
-
-# 應用 API keys 表遷移
-supabase migration up 20250116000001_create_api_keys_table
-```
-
-詳細配置說明請查看 [SECURITY_FEATURES.md](./SECURITY_FEATURES.md)
+📖 詳見 [SECURITY_FEATURES.md](./SECURITY_FEATURES.md) 了解詳細配置、CI 安全檢查和數據庫遷移。
 
 ---
 
