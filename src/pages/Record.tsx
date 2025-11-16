@@ -555,11 +555,13 @@ const Record = () => {
             }
             console.log("[Record] Journal ID:", journalId);
             
-            // 檢查今天是否已經鑄造過 NFT
-            const { checkTodayMinted } = await import("@/lib/mintContract");
-            const alreadyMintedToday = await checkTodayMinted(journalId, currentNetwork);
-            if (alreadyMintedToday) {
-              throw new Error("今天已經鑄造過 NFT，每天只能鑄造一次。請明天再試。");
+            // 檢查今天是否已經鑄造過 NFT（僅在測試網限制，主網允許每天多次鑄造）
+            if (currentNetwork === "testnet") {
+              const { checkTodayMinted } = await import("@/lib/mintContract");
+              const alreadyMintedToday = await checkTodayMinted(journalId, currentNetwork);
+              if (alreadyMintedToday) {
+                throw new Error("今天已經鑄造過 NFT，每天只能鑄造一次。請明天再試。");
+              }
             }
             
             // Calculate mood score (1-10) from intensity (0-100)
