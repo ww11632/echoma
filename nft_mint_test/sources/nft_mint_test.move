@@ -17,6 +17,7 @@ module nft_mint_test::diary {
     /// 只用來索引 EntryNFT 的 ID（不改變所有權）
     public struct EntryRef has store {
         id: object::ID,                      // ✅ 加上 object:: 命名空間
+        day_index: u64,                      // 記錄日期索引方便查詢
     }
 
     /// 使用者的情緒日誌（父物件）
@@ -103,23 +104,31 @@ module nft_mint_test::diary {
             audio_duration_ms,
         };
 
-        // 在 Journal 下掛一個 Dynamic Field：day_index → EntryRef{id}
-        // 這裡只是索引，不影響 NFT 所有權
+        // 在 Journal 下掛一個 Dynamic Field：使用 count 作為唯一 key
+        // 這樣每個 entry 都有唯一索引，允許同一天多筆記錄
         let entry_id = object::id(&nft);            // ✅ 取 NFT 的 ID
-        df::add<u64, EntryRef>(&mut journal.id, day_index, EntryRef { id: entry_id });
+        df::add<u64, EntryRef>(&mut journal.id, journal.count, EntryRef { 
+            id: entry_id,
+            day_index 
+        });
 
         event::emit(MintEvent { owner: sender, day_index, mood_score });
         transfer::transfer(nft, sender);
     }
 
-    /// 用 day_index 從 Journal 取得當天 NFT 的 ID（若不存在會 abort）
-    public fun get_entry_id(journal: &Journal, day_index: u64): object::ID {
-        let r = df::borrow<u64, EntryRef>(&journal.id, day_index);
+    /// 用 entry_index (count) 從 Journal 取得 NFT 的 ID（若不存在會 abort）
+    public fun get_entry_id(journal: &Journal, entry_index: u64): object::ID {
+        let r = df::borrow<u64, EntryRef>(&journal.id, entry_index);
         r.id
     }
 
-    /// 是否存在該日索引（不會 abort）
-    public fun has_entry(journal: &Journal, day_index: u64): bool {
-        df::exists_with_type<u64, EntryRef>(&journal.id, day_index) // ✅ 新版 API
+    /// 是否存在該 entry 索引（不會 abort）
+    public fun has_entry(journal: &Journal, entry_index: u64): bool {
+        df::exists_with_type<u64, EntryRef>(&journal.id, entry_index) // ✅ 新版 API
+    }
+    
+    /// 取得 Journal 的 entry 數量
+    public fun get_journal_count(journal: &Journal): u64 {
+        journal.count
     }
 }
