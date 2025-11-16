@@ -10,7 +10,7 @@ Deno.serve(async (req) => {
 
   try {
     const url = new URL(req.url);
-    const walletAddress = url.pathname.split('/').pop();
+    const walletAddress = url.searchParams.get('walletAddress');
 
     if (!walletAddress) {
       throw new Error('Wallet address is required');

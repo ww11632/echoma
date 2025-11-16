@@ -10,8 +10,7 @@ Deno.serve(async (req) => {
 
   try {
     const url = new URL(req.url);
-    const pathParts = url.pathname.split('/');
-    const blobId = pathParts[pathParts.length - 1];
+    const blobId = url.searchParams.get('blobId');
     const network = url.searchParams.get('network') || 'mainnet';
 
     if (!blobId) {
@@ -20,10 +19,18 @@ Deno.serve(async (req) => {
 
     console.log('Fetching encrypted data for blob:', blobId, 'network:', network);
     
+    // Get auth header if present for private records
+    const authHeader = req.headers.get('Authorization');
+    
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
+        global: authHeader ? {
+          headers: {
+            Authorization: authHeader,
+          },
+        } : {},
         auth: {
           persistSession: false,
         },
@@ -31,22 +38,47 @@ Deno.serve(async (req) => {
     );
 
     // Find the record with this blob_id
+    // Use maybeSingle() to handle missing records gracefully
     const { data: record, error: dbError } = await supabase
       .from('emotion_records')
-      .select('encrypted_data')
+      .select('encrypted_data, is_public, user_id')
       .eq('blob_id', blobId)
-      .single();
+      .maybeSingle();
 
-    if (dbError || !record) {
+    if (dbError) {
       console.error('Database error:', dbError);
-      throw new Error('Record not found');
+      throw new Error('Failed to fetch record');
+    }
+
+    if (!record) {
+      console.log('No record found for blob_id:', blobId);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Record not found or you do not have permission to access it',
+        }),
+        {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     if (!record.encrypted_data) {
-      throw new Error('No encrypted data available for this blob');
+      console.log('Record found but no encrypted data');
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'No encrypted data available for this blob',
+        }),
+        {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
-    console.log('Found encrypted data');
+    console.log('Found encrypted data for blob:', blobId);
 
     return new Response(
       JSON.stringify({
