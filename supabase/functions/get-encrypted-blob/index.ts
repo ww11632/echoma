@@ -50,35 +50,37 @@ Deno.serve(async (req) => {
       throw new Error('Failed to fetch record');
     }
 
+    // If no record found with this blob_id, it means the data is stored only on Walrus
+    // Return success with null to indicate the client should fetch directly from Walrus
     if (!record) {
-      console.log('No record found for blob_id:', blobId);
+      console.log('No database record found for blob_id:', blobId, '- data is on Walrus only');
       return new Response(
         JSON.stringify({
-          success: false,
-          error: 'Record not found or you do not have permission to access it',
+          success: true,
+          encryptedData: null,
+          message: 'Data is stored on Walrus, not in database backup',
         }),
         {
-          status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
     }
 
     if (!record.encrypted_data) {
-      console.log('Record found but no encrypted data');
+      console.log('Record found but no encrypted data - should fetch from Walrus');
       return new Response(
         JSON.stringify({
-          success: false,
-          error: 'No encrypted data available for this blob',
+          success: true,
+          encryptedData: null,
+          message: 'Data is stored on Walrus, not in database backup',
         }),
         {
-          status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
     }
 
-    console.log('Found encrypted data for blob:', blobId);
+    console.log('Found encrypted data in database for blob:', blobId);
 
     return new Response(
       JSON.stringify({
