@@ -629,12 +629,15 @@ Available in Anonymous *and* Authenticated modes.
 - **Network switching UI** – dynamic network switcher with persistent preferences, cross-tab sync, and automatic cache cleanup
 
 ### ✅ Recently Completed
-- **NFT Minting on Sui** – Fully implemented and deployed to testnet
+- **NFT Minting on Sui** – Fully implemented and deployed to testnet and mainnet
   - Daily mint limit (one NFT per day per journal)
   - Automatic Journal creation and management
   - Transaction digest tracking and Sui Scan links
   - NFT records visible in Timeline with special badges
-  - Contract Package ID: `0x55f1c575f979ad2b16c264191627ca6716c9b0b397ab041280da1ad6bce37e71`
+  - **Testnet Package ID**: `0x55f1c575f979ad2b16c264191627ca6716c9b0b397ab041280da1ad6bce37e71`
+  - **Mainnet Package ID**: `0x6ec7914c755708fd77ed3fe0dc8aed25ec5ccae2ff781267da3a5ca3549535b9`
+  - Auto-migration from old package IDs when contract is redeployed
+  - CORS fixes using dapp-kit SuiClient
   - See [nft_mint_test/README.md](./nft_mint_test/README.md) for contract details
 
 ### 🚧 In Progress / Planned
