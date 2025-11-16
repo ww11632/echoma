@@ -506,7 +506,7 @@ const Timeline = () => {
                   if (nft.imageUrl) {
                     // 嘗試從 URL 中提取 blob ID
                     // Walrus URL 格式: https://aggregator.testnet.walrus.space/v1/{blobId}
-                    const match = nft.imageUrl.match(/\/([^\/]+)$/);
+                    const match = nft.imageUrl.match(/\/([^/]+)$/);
                     if (match) {
                       blobIdFromNft = match[1];
                     } else {

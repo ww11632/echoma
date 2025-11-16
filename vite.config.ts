@@ -1,14 +1,16 @@
 import { defineConfig } from "vite";
+import type { IncomingMessage, ServerResponse } from "http";
+import type { Plugin, ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import wasm from "vite-plugin-wasm";
 
 // Plugin to handle WebAssembly files with correct MIME type
-const wasmPlugin = () => ({
+const wasmPlugin = (): Plugin => ({
   name: "wasm-mime-type",
-  configureServer(server: any) {
-    server.middlewares.use((req: any, res: any, next: any) => {
+  configureServer(server: ViteDevServer) {
+    server.middlewares.use((req: IncomingMessage, res: ServerResponse, next: () => void) => {
       if (req.url?.endsWith(".wasm")) {
         res.setHeader("Content-Type", "application/wasm");
       }

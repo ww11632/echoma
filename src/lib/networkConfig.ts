@@ -12,16 +12,23 @@ interface NetworkConfig {
   rpcUrl?: string;
   walrusUploadRelay: string;
   walrusAggregator: string;
+  nftLogoUrl?: string; // NFT image URL for this network
 }
 
 const NETWORK_CONFIGS: Record<SuiNetwork, NetworkConfig> = {
   testnet: {
     walrusUploadRelay: "https://upload-relay.testnet.walrus.space",
     walrusAggregator: "https://aggregator.testnet.walrus.space",
+    // Testnet: use Walrus URL as image (backward compatible)
+    nftLogoUrl: undefined,
   },
   mainnet: {
     walrusUploadRelay: "https://upload-relay.mainnet.walrus.space",
     walrusAggregator: "https://aggregator.mainnet.walrus.space",
+    // Mainnet: use Echoma logo (set via environment variable or upload to Walrus)
+    // Format: https://aggregator.mainnet.walrus.space/v1/{blobId}
+    // Or use a CDN URL if preferred
+    nftLogoUrl: import.meta.env.VITE_MAINNET_NFT_LOGO_URL || undefined,
   },
 };
 

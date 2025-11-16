@@ -24,6 +24,7 @@ import WalletConnect from "@/components/WalletConnect";
 import { getOrCreateAnonymousUserKey, getOrCreateAnonymousUserId } from "@/lib/anonymousIdentity";
 import { TagInput } from "@/components/TagInput";
 import { useSelectedNetwork } from "@/hooks/useSelectedNetwork";
+import { getNetworkConfig } from "@/lib/networkConfig";
 
 const isBackendUnavailable = (error: unknown) => {
   if (!(error instanceof Error)) return false;
@@ -567,9 +568,20 @@ const Record = () => {
             // Prepare tags CSV
             const tagsCsv = tags.length > 0 ? tags.join(",") : "";
             
-            // Use Walrus URL as image URL (or empty if not available)
-            const imageUrl = sdkResult.walrusUrl || "";
-            const imageMime = "text/plain"; // Since we're storing encrypted data
+            // Use Echoma logo for mainnet NFTs, Walrus URL for testnet (backward compatible)
+            let imageUrl: string;
+            let imageMime: string;
+            
+            if (currentNetwork === "mainnet") {
+              // Mainnet: use Echoma logo if configured
+              const config = getNetworkConfig("mainnet");
+              imageUrl = config.nftLogoUrl || sdkResult.walrusUrl || "";
+              imageMime = config.nftLogoUrl ? "image/png" : "text/plain"; // Logo is PNG, fallback to text/plain
+            } else {
+              // Testnet: use Walrus URL (backward compatible)
+              imageUrl = sdkResult.walrusUrl || "";
+              imageMime = "text/plain"; // Since we're storing encrypted data
+            }
             
             // Mint the NFT
             console.log("[Record] Minting Entry NFT with params:", {
