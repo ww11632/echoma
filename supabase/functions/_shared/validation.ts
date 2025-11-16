@@ -130,6 +130,12 @@ export const uploadEmotionRequestSchema = z.object({
     .min(1, "Epochs must be between 1 and 1000")
     .max(1000, "Epochs must be between 1 and 1000")
     .optional(),
+  network: z
+    .enum(["testnet", "mainnet"], {
+      errorMap: () => ({ message: "Network must be either 'testnet' or 'mainnet'" }),
+    })
+    .optional()
+    .default("testnet"), // Default to testnet for backward compatibility
 });
 
 /**

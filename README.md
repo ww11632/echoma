@@ -365,6 +365,16 @@ Default network: **Sui Testnet**
   - Testnet: `https://upload-relay.testnet.walrus.space` / `https://aggregator.testnet.walrus.space`
   - Mainnet: `https://upload-relay.mainnet.walrus.space` / `https://aggregator.mainnet.walrus.space`
 - **Wallet auto-connect** – enabled so approved wallets reconnect on load
+- **Network-aware data handling**:
+  - Records are stored with network information embedded in `walrus_url`
+  - Decryption automatically uses the record's original network (extracted from `walrus_url`)
+  - Deduplication logic considers network information (`blob_id + network` as unique identifier)
+  - All upload paths (SDK, Supabase Function, Server API) respect the selected network
+  - Network-specific error messages (testnet warnings only shown on testnet)
+- **Cross-network data access**:
+  - Records created on one network can be viewed when switched to another network
+  - Decryption automatically uses the correct network endpoint based on the record's `walrus_url`
+  - Timeline queries only fetch on-chain data from the current network (database records show all networks)
 
 The network switcher is available in the `GlobalControls` component (top-right corner) on all pages.
 

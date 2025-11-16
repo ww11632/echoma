@@ -15,6 +15,7 @@ import { encryptData, generateUserKeyFromId, PUBLIC_SEAL_KEY } from "@/lib/encry
 import { prepareEmotionSnapshot } from "@/lib/walrus";
 import { emotionSnapshotSchema } from "@/lib/validation";
 import GlobalControls from "@/components/GlobalControls";
+import { useSelectedNetwork } from "@/hooks/useSelectedNetwork";
 import type { User, Session } from "@supabase/supabase-js";
 
 const emotionValues = [
@@ -30,6 +31,7 @@ const AuthRecord = () => {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const { toast } = useToast();
+  const network = useSelectedNetwork(); // 获取当前选择的网络
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [selectedEmotion, setSelectedEmotion] = useState<string>("");
@@ -251,6 +253,7 @@ const AuthRecord = () => {
             description: sanitizedDescription,
             encryptedData: encryptedData,
             isPublic: isPublic,
+            network: network, // 传递当前选择的网络
           }),
         }
       );

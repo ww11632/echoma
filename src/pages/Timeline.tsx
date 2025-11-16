@@ -34,6 +34,7 @@ import { zhTW, enUS } from "date-fns/locale";
 import jsPDF from "jspdf";
 import { useSelectedNetwork } from "@/hooks/useSelectedNetwork";
 import { useNetworkChangeListener } from "@/hooks/useNetworkChangeListener";
+import { extractNetworkFromWalrusUrl } from "@/lib/networkConfig";
 
 interface EmotionRecord {
   id: string;
@@ -398,10 +399,24 @@ const Timeline = () => {
                 let addedCount = 0;
                 let updatedCount = 0;
                 for (const blob of onChainBlobs) {
-                  // 檢查是否已經存在（透過 blob_id 或 sui_ref）
-                  const existing = allRecords.find(
-                    r => r.blob_id === blob.blobId || r.sui_ref === blob.objectId
-                  );
+                  // 檢查是否已經存在（透過 blob_id + network 或 sui_ref）
+                  // 注意：相同 blob_id 在不同網絡上應該視為不同記錄
+                  const blobNetwork = extractNetworkFromWalrusUrl(getWalrusUrl(blob.blobId, currentNetworkSnapshot));
+                  const existing = allRecords.find(r => {
+                    // 通過 sui_ref 匹配（同一對象）
+                    if (r.sui_ref === blob.objectId) return true;
+                    // 通過 blob_id + network 匹配（相同 blob 但需要確認網絡）
+                    if (r.blob_id === blob.blobId) {
+                      const recordNetwork = extractNetworkFromWalrusUrl(r.walrus_url);
+                      // 如果網絡信息都明確且相同，或者是同一個網絡，則視為同一記錄
+                      if (blobNetwork && recordNetwork) {
+                        return blobNetwork === recordNetwork;
+                      }
+                      // 如果網絡信息不明確，但當前查詢的網絡與記錄的網絡匹配，視為同一記錄
+                      return blobNetwork === currentNetworkSnapshot || recordNetwork === currentNetworkSnapshot;
+                    }
+                    return false;
+                  });
 
                   if (!existing) {
                     // 創建新的鏈上記錄
@@ -500,16 +515,28 @@ const Timeline = () => {
                     }
                   }
                   
-                  // 檢查是否已經存在（優先通過 sui_ref 或 id 匹配 NFT ID，然後通過 blob_id 匹配）
+                  // 檢查是否已經存在（優先通過 sui_ref 或 id 匹配 NFT ID，然後通過 blob_id + network 匹配）
                   // 情況1：數據庫記錄的 sui_ref 指向這個 NFT（r.sui_ref === nft.nftId）
                   // 情況2：數據庫記錄的 id 就是這個 NFT ID（r.id === nft.nftId，雖然不太可能）
-                  // 情況3：通過 blob_id 或 walrus_url 匹配
-                  const existing = allRecords.find(
-                    r => r.id === nft.nftId ||  // 數據庫記錄的 id 就是 NFT ID（雖然不太可能）
-                         r.sui_ref === nft.nftId ||  // 數據庫記錄的 sui_ref 指向這個 NFT
-                         (blobIdFromNft && r.blob_id === blobIdFromNft) ||
-                         (nft.imageUrl && r.walrus_url === nft.imageUrl)
-                  );
+                  // 情況3：通過 blob_id + network 或 walrus_url 匹配（考慮網絡信息）
+                  const nftNetwork = extractNetworkFromWalrusUrl(nft.imageUrl) || currentNetworkSnapshot;
+                  const existing = allRecords.find(r => {
+                    // 通過 sui_ref 或 id 匹配（同一對象，不需要考慮網絡）
+                    if (r.id === nft.nftId || r.sui_ref === nft.nftId) return true;
+                    // 通過 walrus_url 完全匹配
+                    if (nft.imageUrl && r.walrus_url === nft.imageUrl) return true;
+                    // 通過 blob_id + network 匹配（相同 blob 但需要確認網絡）
+                    if (blobIdFromNft && r.blob_id === blobIdFromNft) {
+                      const recordNetwork = extractNetworkFromWalrusUrl(r.walrus_url);
+                      // 如果網絡信息都明確且相同，或者是同一個網絡，則視為同一記錄
+                      if (nftNetwork && recordNetwork) {
+                        return nftNetwork === recordNetwork;
+                      }
+                      // 如果網絡信息不明確，但當前查詢的網絡與記錄的網絡匹配，視為同一記錄
+                      return nftNetwork === currentNetworkSnapshot || recordNetwork === currentNetworkSnapshot;
+                    }
+                    return false;
+                  });
                   
                   if (!existing) {
                     // 將 moodScore (1-10) 轉換為 intensity (0-100)
@@ -719,24 +746,31 @@ const Timeline = () => {
           }
           
           // 檢查 blob_id 衝突（不同 id 但相同 blob_id）
+          // 注意：相同 blob_id 在不同網絡上應該視為不同記錄
           if (record.blob_id && record.blob_id !== record.id) {
-            const existingByBlobId = blobIdToRecordMap.get(record.blob_id);
+            const recordNetwork = extractNetworkFromWalrusUrl(record.walrus_url);
+            // 使用 blob_id + network 作為鍵，確保不同網絡的相同 blob_id 不會衝突
+            const blobIdKey = recordNetwork 
+              ? `${record.blob_id}:${recordNetwork}` 
+              : `${record.blob_id}:unknown`;
+            
+            const existingByBlobId = blobIdToRecordMap.get(blobIdKey);
             if (existingByBlobId && existingByBlobId.id !== record.id) {
-              // 發現 blob_id 衝突：兩個不同的記錄有相同的 blob_id
+              // 發現 blob_id 衝突：兩個不同的記錄有相同的 blob_id 和網絡
               // 保留 id 在 deduplicationMap 中的記錄（主映射優先）
               const recordInMainMap = deduplicationMap.get(record.id);
               const existingInMainMap = deduplicationMap.get(existingByBlobId.id);
               
               if (recordInMainMap && !existingInMainMap) {
                 // 當前記錄在主映射中，但衝突記錄不在，更新輔助映射
-                blobIdToRecordMap.set(record.blob_id, record);
+                blobIdToRecordMap.set(blobIdKey, record);
               } else if (!recordInMainMap && existingInMainMap) {
                 // 衝突記錄在主映射中，當前記錄不在，不更新輔助映射
-                console.log(`[Timeline] Dedup: blob_id conflict - keeping ${existingByBlobId.id}, skipping ${record.id} (same blob_id)`);
+                console.log(`[Timeline] Dedup: blob_id conflict - keeping ${existingByBlobId.id}, skipping ${record.id} (same blob_id and network)`);
               }
             } else if (!existingByBlobId) {
-              // 沒有衝突，添加輔助映射
-              blobIdToRecordMap.set(record.blob_id, record);
+              // 沒有衝突，添加輔助映射（使用 blob_id + network 作為鍵）
+              blobIdToRecordMap.set(blobIdKey, record);
             }
           }
         }
@@ -959,9 +993,11 @@ const Timeline = () => {
         encryptedDataString = record.encrypted_data;
       } else {
         // 從 Walrus 讀取加密資料（帶重試機制）
+        // 優先使用記錄創建時的網絡（從 walrus_url 提取），否則使用當前網絡
+        const recordNetwork = extractNetworkFromWalrusUrl(record.walrus_url) || network;
         try {
           encryptedDataString = await retryWithBackoff(
-            () => readFromWalrus(record.blob_id, network),
+            () => readFromWalrus(record.blob_id, recordNetwork),
             3,
             1000
           );
@@ -969,7 +1005,7 @@ const Timeline = () => {
           console.warn(`[Timeline] Walrus fetch failed for ${record.blob_id}, falling back to server backup`, walrusError);
           try {
             encryptedDataString = await retryWithBackoff(
-              () => getEncryptedEmotionByBlob(record.blob_id),
+              () => getEncryptedEmotionByBlob(record.blob_id, recordNetwork),
               2,
               500
             );
@@ -1187,7 +1223,7 @@ const Timeline = () => {
           errorMessage = "找不到資料，可能已過期或已被刪除";
           statusCode = 404;
           suggestions = [
-            "⚠️ Walrus Testnet 資料會在 epochs 到期後被刪除",
+            ...(isTestnet ? ["⚠️ Walrus Testnet 資料會在 epochs 到期後被刪除"] : []),
             "💡 建議：記錄新情緒時啟用「備份到資料庫」選項",
             "📱 已備份的資料可在任何設備查看",
           ];
@@ -1230,11 +1266,11 @@ const Timeline = () => {
         statusCode = error.response.status;
       }
       
-      // 如果是 Walrus 記錄，添加 Walrus aggregator 提示（所有用戶都可能遇到）
+      // 如果是 Walrus 記錄，且當前在測試網，添加 Walrus aggregator 提示
       const isWalrusRecord = record.blob_id && !record.blob_id.startsWith("local_");
       
-      if (isWalrusRecord) {
-        // 在錯誤訊息中添加 Walrus aggregator 提示
+      if (isWalrusRecord && isTestnet) {
+        // 在錯誤訊息中添加 Walrus aggregator 提示（僅在測試網顯示）
         const aggregatorNotice = t("timeline.walrusAggregatorNotice");
         // 將提示添加到建議列表的最前面，讓用戶更容易看到
         suggestions = [aggregatorNotice, ...suggestions];
@@ -1276,7 +1312,7 @@ const Timeline = () => {
         return next;
       });
     }
-  }, [decryptedDescriptions, decryptingRecords, currentAccount, toast, t, isLocalRecord, retryWithBackoff]);
+  }, [decryptedDescriptions, decryptingRecords, currentAccount, toast, t, isLocalRecord, retryWithBackoff, isTestnet]);
 
   // 獲取所有可用的標籤
   // 緩存是否有非本地記錄（用於顯示 Testnet 警告）

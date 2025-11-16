@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
       throw new Error(`Validation failed: ${errors}`);
     }
 
-    const { emotion, intensity, description, encryptedData, isPublic, epochs } = validationResult.data;
+    const { emotion, intensity, description, encryptedData, isPublic, epochs, network } = validationResult.data;
 
     console.log('Request data validated:', { 
       emotion, 
@@ -123,11 +123,24 @@ Deno.serve(async (req) => {
     
     // Validate and set epochs (default to 200 if not provided)
     const validEpochs = epochs && epochs >= 1 && epochs <= 1000 ? epochs : 200;
-    console.log(`Using ${validEpochs} epochs for Walrus upload`);
+    // Validate network (default to testnet for backward compatibility)
+    const targetNetwork = network === "mainnet" ? "mainnet" : "testnet";
+    
+    // Get Walrus endpoints based on network
+    const walrusPublisherUrl = targetNetwork === "mainnet"
+      ? "https://upload-relay.mainnet.walrus.space"
+      : "https://upload-relay.testnet.walrus.space";
+    const walrusAggregatorUrl = targetNetwork === "mainnet"
+      ? "https://aggregator.mainnet.walrus.space"
+      : "https://aggregator.testnet.walrus.space";
+    
+    console.log(`Using ${validEpochs} epochs for Walrus upload on ${targetNetwork}`);
+    console.log(`Walrus publisher: ${walrusPublisherUrl}`);
+    console.log(`Walrus aggregator: ${walrusAggregatorUrl}`);
     
     try {
       const walrusResponse = await fetch(
-        `https://publisher.testnet.walrus.space/v1/store?epochs=${validEpochs}`,
+        `${walrusPublisherUrl}/v1/store?epochs=${validEpochs}`,
         {
           method: 'PUT',
           body: binaryData,
@@ -180,7 +193,7 @@ Deno.serve(async (req) => {
           throw new Error('Unexpected storage response format');
         }
 
-        walrusUrl = `https://aggregator.testnet.walrus.space/v1/${blobId}`;
+        walrusUrl = `${walrusAggregatorUrl}/v1/${blobId}`;
         suiRef = walrusResult.newlyCreated?.blobObject?.id || null;
       }
     } catch (error) {

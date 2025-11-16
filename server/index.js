@@ -306,9 +306,15 @@ async function writeAll(list) {
   await fs.writeFile(DATA_FILE, JSON.stringify(list, null, 2), "utf-8");
 }
 
-async function uploadToWalrus(encryptedData, epochs = DEFAULT_EPOCHS) {
-  const url = `${DEFAULT_WALRUS_PUBLISHER_URL}/v1/store?epochs=${epochs}`;
-  console.log(`[Walrus] Uploading to ${url}, data size: ${encryptedData.length} bytes, epochs: ${epochs}`);
+async function uploadToWalrus(encryptedData, epochs = DEFAULT_EPOCHS, networkParam = null) {
+  // 根据网络参数选择正确的 Walrus 端点
+  const network = resolveWalrusNetwork(networkParam);
+  const walrusConfig = getWalrusConfig(network);
+  const publisherUrl = walrusConfig.publisher;
+  const aggregatorUrl = walrusConfig.aggregator;
+  
+  const url = `${publisherUrl}/v1/store?epochs=${epochs}`;
+  console.log(`[Walrus] Uploading to ${url} on ${network}, data size: ${encryptedData.length} bytes, epochs: ${epochs}`);
   
   try {
     const res = await fetch(url, {
@@ -329,7 +335,7 @@ async function uploadToWalrus(encryptedData, epochs = DEFAULT_EPOCHS) {
       
       // Provide more specific error messages based on status code
       if (res.status === 404) {
-        throw new Error(`Walrus service endpoint not found. Please check if the service is available at ${DEFAULT_WALRUS_PUBLISHER_URL}`);
+        throw new Error(`Walrus service endpoint not found. Please check if the service is available at ${publisherUrl}`);
       } else if (res.status === 413) {
         throw new Error(`Data too large (${encryptedData.length} bytes). Maximum size exceeded.`);
       } else if (res.status >= 500) {
@@ -356,7 +362,7 @@ async function uploadToWalrus(encryptedData, epochs = DEFAULT_EPOCHS) {
     
     return {
       blobId,
-      walrusUrl: `${DEFAULT_WALRUS_AGGREGATOR_URL}/v1/${blobId}`,
+      walrusUrl: `${aggregatorUrl}/v1/${blobId}`,
       suiRef: result.newlyCreated?.blobObject?.id || null,
       raw: result,
     };
@@ -374,7 +380,7 @@ async function uploadToWalrus(encryptedData, epochs = DEFAULT_EPOCHS) {
 app.post("/api/emotion", requireAuth, rateLimitMiddleware, async (req, res) => {
   try {
     console.log(`[API] POST /api/emotion - Authenticated request from user: ${req.user.id}`);
-    const { emotion, intensity, description, encryptedData, isPublic = false, walletAddress = null, epochs } = req.body || {};
+    const { emotion, intensity, description, encryptedData, isPublic = false, walletAddress = null, epochs, network } = req.body || {};
     
     // Validate inputs
     if (!emotion || typeof emotion !== "string") {
@@ -436,8 +442,8 @@ app.post("/api/emotion", requireAuth, rateLimitMiddleware, async (req, res) => {
     
     if (WALRUS_ENABLED) {
       try {
-        console.log(`[API] Starting Walrus upload with ${validEpochs} epochs...`);
-        uploaded = await uploadToWalrus(encryptedData, validEpochs);
+        console.log(`[API] Starting Walrus upload with ${validEpochs} epochs on network: ${network || 'default'}...`);
+        uploaded = await uploadToWalrus(encryptedData, validEpochs, network);
         console.log(`[API] Walrus upload completed - blobId: ${uploaded.blobId}`);
       } catch (walrusError) {
         console.warn(`[API] Walrus upload failed, falling back to local storage:`, walrusError.message);

@@ -67,3 +67,28 @@ export function persistNetworkPreference(network: SuiNetwork): void {
 export function getNetworkConfig(network: SuiNetwork): NetworkConfig {
   return NETWORK_CONFIGS[network];
 }
+
+/**
+ * Extract network from Walrus URL
+ * Returns the network if the URL contains testnet/mainnet, otherwise returns null
+ */
+export function extractNetworkFromWalrusUrl(walrusUrl: string | null | undefined): SuiNetwork | null {
+  if (!walrusUrl || typeof walrusUrl !== "string") {
+    return null;
+  }
+  
+  // Check if URL contains testnet or mainnet
+  if (walrusUrl.includes("testnet.walrus.space")) {
+    return "testnet";
+  }
+  if (walrusUrl.includes("mainnet.walrus.space")) {
+    return "mainnet";
+  }
+  
+  // If it's a local URL, return null (no network info)
+  if (walrusUrl.startsWith("local://")) {
+    return null;
+  }
+  
+  return null;
+}

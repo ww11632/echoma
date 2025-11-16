@@ -352,6 +352,7 @@ const Record = () => {
             isPublic,
             walletAddress: null,
             epochs: selectedEpochs,
+            network: currentNetwork, // 传递当前选择的网络
           });
           
           // Backup encrypted_data to Supabase (if user chose to backup)
@@ -701,6 +702,7 @@ const Record = () => {
             isPublic,
             walletAddress: currentAccount.address,
             epochs: selectedEpochs,
+            network: currentNetwork, // 传递当前选择的网络
           });
           
           // Backup encrypted_data to Supabase (if user chose to backup)
@@ -719,7 +721,7 @@ const Record = () => {
                 emotion: selectedEmotion as any,
                 intensity: intensityValue,
                 blob_id: sdkResult.blobId,
-                walrus_url: `https://aggregator.testnet.walrus.space/v1/${sdkResult.blobId}`,
+                walrus_url: sdkResult.walrusUrl, // 使用 SDK 返回的 walrusUrl，它已经包含正确的网络信息
                 payload_hash: '',
                 encrypted_data: encryptedString,
                 is_public: isPublic,
@@ -899,6 +901,7 @@ const Record = () => {
           description: sanitizedDescription,
           encryptedData: encryptedString,
           isPublic,
+          network: currentNetwork, // 传递当前选择的网络
         },
       });
 

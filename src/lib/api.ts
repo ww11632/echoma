@@ -8,6 +8,7 @@ export async function postEmotion(payload: {
   isPublic: boolean;
   walletAddress?: string | null;
   epochs?: number;
+  network?: "testnet" | "mainnet";
 }) {
   try {
     const res = await fetch(`${API_BASE}/api/emotion`, {
@@ -92,8 +93,9 @@ export async function getEmotionsByWallet(walletAddress: string) {
 }
 
 // Fetch encrypted snapshot from server as Walrus fallback
-export async function getEncryptedEmotionByBlob(blobId: string): Promise<string> {
-  const res = await fetch(`${API_BASE}/api/emotions/blob/${encodeURIComponent(blobId)}`);
+export async function getEncryptedEmotionByBlob(blobId: string, network?: "testnet" | "mainnet"): Promise<string> {
+  const networkQuery = network ? `?network=${network}` : "";
+  const res = await fetch(`${API_BASE}/api/emotions/blob/${encodeURIComponent(blobId)}${networkQuery}`);
   const data = await res.json();
   if (!res.ok || !data.success || !data.encryptedData) {
     throw new Error(data.error || "Failed to fetch encrypted data from server.");

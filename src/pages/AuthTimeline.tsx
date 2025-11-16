@@ -32,6 +32,7 @@ import { zhTW, enUS } from "date-fns/locale";
 import jsPDF from "jspdf";
 import { useSelectedNetwork } from "@/hooks/useSelectedNetwork";
 import { useNetworkChangeListener } from "@/hooks/useNetworkChangeListener";
+import { extractNetworkFromWalrusUrl } from "@/lib/networkConfig";
 
 interface EmotionRecord {
   id: string;
@@ -648,9 +649,11 @@ const AuthTimeline = () => {
         encryptedDataString = record.encrypted_data;
       } else {
         // 從 Walrus 讀取加密資料（帶重試機制）
+        // 優先使用記錄創建時的網絡（從 walrus_url 提取），否則使用當前網絡
+        const recordNetwork = extractNetworkFromWalrusUrl(record.walrus_url) || network;
         try {
           encryptedDataString = await retryWithBackoff(
-            () => readFromWalrus(record.blob_id, network),
+            () => readFromWalrus(record.blob_id, recordNetwork),
             3,
             1000
           );
@@ -658,7 +661,7 @@ const AuthTimeline = () => {
           console.warn(`[Timeline] Walrus fetch failed for ${record.blob_id}, falling back to server backup`, walrusError);
           try {
             encryptedDataString = await retryWithBackoff(
-              () => getEncryptedEmotionByBlob(record.blob_id),
+              () => getEncryptedEmotionByBlob(record.blob_id, recordNetwork),
               2,
               500
             );
@@ -865,7 +868,7 @@ const AuthTimeline = () => {
           errorMessage = "找不到資料，可能已過期或已被刪除";
           statusCode = 404;
           suggestions = [
-            "⚠️ Walrus Testnet 資料會在 epochs 到期後被刪除",
+            ...(isTestnet ? ["⚠️ Walrus Testnet 資料會在 epochs 到期後被刪除"] : []),
             "💡 建議：記錄新情緒時啟用「備份到資料庫」選項",
             "📱 已備份的資料可在任何設備查看",
           ];
@@ -908,11 +911,11 @@ const AuthTimeline = () => {
         statusCode = error.response.status;
       }
       
-      // 如果是 Walrus 記錄，添加 Walrus aggregator 提示（所有用戶都可能遇到）
+      // 如果是 Walrus 記錄，且當前在測試網，添加 Walrus aggregator 提示
       const isWalrusRecord = record.blob_id && !record.blob_id.startsWith("local_");
       
-      if (isWalrusRecord) {
-        // 在錯誤訊息中添加 Walrus aggregator 提示
+      if (isWalrusRecord && isTestnet) {
+        // 在錯誤訊息中添加 Walrus aggregator 提示（僅在測試網顯示）
         const aggregatorNotice = t("timeline.walrusAggregatorNotice");
         // 將提示添加到建議列表的最前面，讓用戶更容易看到
         suggestions = [aggregatorNotice, ...suggestions];
@@ -954,7 +957,7 @@ const AuthTimeline = () => {
         return next;
       });
     }
-  }, [decryptedDescriptions, decryptingRecords, user, toast, t, isLocalRecord, retryWithBackoff]);
+  }, [decryptedDescriptions, decryptingRecords, user, toast, t, isLocalRecord, retryWithBackoff, isTestnet]);
 
   // 獲取所有可用的標籤
   const availableTags = useMemo(() => {
