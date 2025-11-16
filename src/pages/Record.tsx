@@ -19,7 +19,7 @@ import { addEmotionRecord, initializeEncryptedStorage } from "@/lib/localIndex";
 import type { EmotionRecord } from "@/lib/dataSchema";
 import { postEmotion } from "@/lib/api";
 import { getOrCreateJournal, mintEntry } from "@/lib/mintContract";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
+import GlobalControls from "@/components/GlobalControls";
 import WalletConnect from "@/components/WalletConnect";
 import { getOrCreateAnonymousUserKey, getOrCreateAnonymousUserId } from "@/lib/anonymousIdentity";
 import { TagInput } from "@/components/TagInput";
@@ -1030,7 +1030,7 @@ const Record = () => {
           <ArrowLeft className="mr-2 h-4 w-4" />
             {t("common.back")}
         </Button>
-          <LanguageSwitcher />
+          <GlobalControls />
         </div>
 
         <div className="glass-card rounded-2xl p-8 space-y-8">
