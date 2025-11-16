@@ -995,22 +995,36 @@ const Timeline = () => {
         // 從 Walrus 讀取加密資料（帶重試機制）
         // 優先使用記錄創建時的網絡（從 walrus_url 提取），否則使用當前網絡
         const recordNetwork = extractNetworkFromWalrusUrl(record.walrus_url) || network;
+        
+        console.log(`[Timeline] Fetching encrypted data for blob_id: ${record.blob_id}, network: ${recordNetwork}`);
+        
         try {
+          // Try database backup first (faster and more reliable)
           encryptedDataString = await retryWithBackoff(
-            () => readFromWalrus(record.blob_id, recordNetwork),
-            3,
-            1000
+            () => getEncryptedEmotionByBlob(record.blob_id, recordNetwork),
+            2,
+            500
           );
-        } catch (walrusError) {
-          console.warn(`[Timeline] Walrus fetch failed for ${record.blob_id}, falling back to server backup`, walrusError);
-          try {
-            encryptedDataString = await retryWithBackoff(
-              () => getEncryptedEmotionByBlob(record.blob_id, recordNetwork),
-              2,
-              500
-            );
-          } catch (backupError) {
-            throw new Error(`無法從 Walrus 或備份伺服器讀取資料：${(backupError as Error).message}`);
+          console.log(`[Timeline] Successfully fetched from database backup`);
+        } catch (backupError) {
+          const errorMsg = (backupError as Error).message;
+          // If the error indicates data is on Walrus only, try fetching from Walrus
+          if (errorMsg.includes("Data not available in database backup")) {
+            console.log(`[Timeline] No database backup found, fetching from Walrus...`);
+            try {
+              encryptedDataString = await retryWithBackoff(
+                () => readFromWalrus(record.blob_id, recordNetwork),
+                3,
+                1000
+              );
+              console.log(`[Timeline] Successfully fetched from Walrus`);
+            } catch (walrusError) {
+              console.error(`[Timeline] Walrus fetch failed:`, walrusError);
+              throw new Error(`This record is stored on Walrus decentralized storage, but it's currently unavailable. This may be due to: network connectivity issues, Walrus service downtime, or the data may have expired. Please try again later.`);
+            }
+          } else {
+            // Other database errors
+            throw new Error(`Failed to fetch encrypted data: ${errorMsg}`);
           }
         }
       }
