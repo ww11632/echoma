@@ -5,11 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Sparkles, Lock, Shield, Database, Unlock } from "lucide-react";
 import WalletConnect from "@/components/WalletConnect";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
+import GlobalControls from "@/components/GlobalControls";
+import { useSelectedNetwork } from "@/hooks/useSelectedNetwork";
 
 const Index = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const network = useSelectedNetwork();
+  const isTestnet = network === "testnet";
 
   const features = [
     {
@@ -34,9 +37,9 @@ const Index = () => {
 
   return (
     <div className="min-h-screen">
-      {/* Language Switcher */}
+      {/* Quick settings */}
       <div className="absolute top-4 right-4 z-20">
-        <LanguageSwitcher />
+        <GlobalControls />
       </div>
       
       {/* Hero Section */}
@@ -62,10 +65,18 @@ const Index = () => {
                 <span className="text-secondary">{t("index.subtitleHighlight1")}</span> {t("index.subtitleConnector")}{" "}
                 <span className="text-primary">{t("index.subtitleHighlight2")}</span>
               </p>
-              {/* Testnet Notice */}
-              <Card className="inline-block mx-auto px-4 py-2 bg-yellow-500/10 border-yellow-500/20">
-                <p className="text-sm text-yellow-600 dark:text-yellow-400 font-medium">
-                  {t("common.testnetNotice")}
+              {/* Network Notice */}
+              <Card
+                className={`inline-block mx-auto px-4 py-2 ${
+                  isTestnet ? "bg-yellow-500/10 border-yellow-500/20" : "bg-emerald-500/10 border-emerald-500/20"
+                }`}
+              >
+                <p
+                  className={`text-sm font-medium ${
+                    isTestnet ? "text-yellow-600 dark:text-yellow-400" : "text-emerald-600 dark:text-emerald-300"
+                  }`}
+                >
+                  {isTestnet ? t("common.testnetNotice") : t("common.mainnetNotice")}
                 </p>
               </Card>
             </div>

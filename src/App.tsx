@@ -13,6 +13,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Onboarding } from "@/components/Onboarding";
 import { useTranslation } from "react-i18next";
 import "@mysten/dapp-kit/dist/index.css";
+import { getCurrentNetwork } from "@/lib/networkConfig";
 
 // 程式碼分割：懶載入頁面組件
 const Index = lazy(() => import("./pages/Index"));
@@ -42,6 +43,7 @@ const { networkConfig } = createNetworkConfig({
   testnet: { url: getFullnodeUrl("testnet") },
   mainnet: { url: getFullnodeUrl("mainnet") },
 });
+const initialNetwork = getCurrentNetwork();
 
 const LoadingFallback = () => {
   const { t } = useTranslation();
@@ -58,7 +60,7 @@ const LoadingFallback = () => {
 const App = () => (
   <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
   <QueryClientProvider client={queryClient}>
-    <SuiClientProvider networks={networkConfig} defaultNetwork="testnet">
+    <SuiClientProvider networks={networkConfig} defaultNetwork={initialNetwork}>
       <WalletProvider autoConnect>
         <TooltipProvider>
           <Toaster />

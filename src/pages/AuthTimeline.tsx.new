@@ -12,7 +12,7 @@ import { queryWalrusBlobsByOwner, getWalrusUrl, readFromWalrus } from "@/lib/wal
 import { decryptData, decryptDataWithMigration, generateUserKey, generateUserKeyFromId, DecryptionError, DecryptionErrorType, PUBLIC_SEAL_KEY } from "@/lib/encryption";
 import type { EncryptedData } from "@/lib/encryption";
 import { getAnonymousUserKey, getOrCreateAnonymousUserKey } from "@/lib/anonymousIdentity";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
+import GlobalControls from "@/components/GlobalControls";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Legend, CartesianGrid } from "recharts";
 import { useToast } from "@/hooks/use-toast";
@@ -1797,7 +1797,7 @@ const AuthTimeline = () => {
             {t("common.back")}
           </Button>
           <div className="flex items-center gap-2">
-            <LanguageSwitcher />
+            <GlobalControls />
             <Button variant="ghost" onClick={() => navigate("/")} className="text-muted-foreground">
               <Home className="h-4 w-4" />
             </Button>

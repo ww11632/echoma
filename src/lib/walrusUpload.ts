@@ -1,22 +1,24 @@
-// 超簡版：專門上傳圖片 / 音檔檔案到 Walrus
-const WALRUS_PUBLISHER_URL = "https://upload-relay.testnet.walrus.space";
-const WALRUS_AGGREGATOR_URL = "https://aggregator.testnet.walrus.space";
+import { getCurrentNetwork, getNetworkConfig, type SuiNetwork } from "./networkConfig";
+
 const DEFAULT_EPOCHS = 5;
 
 export async function uploadMediaFileToWalrus(
   file: File,
-  epochs: number = DEFAULT_EPOCHS
+  epochs: number = DEFAULT_EPOCHS,
+  network?: SuiNetwork
 ): Promise<{
   blobId: string;
   walrusUrl: string;
   mime: string;
   size: number;
 }> {
+  const targetNetwork = network || getCurrentNetwork();
+  const config = getNetworkConfig(targetNetwork);
   const arrayBuffer = await file.arrayBuffer();
   const bytes = new Uint8Array(arrayBuffer);
 
   const res = await fetch(
-    `${WALRUS_PUBLISHER_URL}/v1/store?epochs=${epochs}`,
+    `${config.walrusUploadRelay}/v1/store?epochs=${epochs}`,
     {
       method: "PUT",
       headers: { "Content-Type": "application/octet-stream" },
@@ -43,7 +45,7 @@ export async function uploadMediaFileToWalrus(
 
   return {
     blobId,
-    walrusUrl: `${WALRUS_AGGREGATOR_URL}/v1/${blobId}`,
+    walrusUrl: `${config.walrusAggregator}/v1/${blobId}`,
     mime: file.type || "application/octet-stream",
     size: file.size,
   };

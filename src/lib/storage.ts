@@ -16,12 +16,20 @@ export async function setEncryptedItem(
   value: string,
   encryptionKey: string
 ): Promise<void> {
+  if (typeof window === "undefined") {
+    throw new Error("localStorage is not available");
+  }
+  
   try {
     const encrypted = await encryptData(value, encryptionKey);
     const storageKey = `${STORAGE_KEY_PREFIX}${key}`;
     localStorage.setItem(storageKey, JSON.stringify(encrypted));
-  } catch (error) {
+  } catch (error: any) {
     console.error("Failed to encrypt and store data:", error);
+    // 如果是配额超出错误，提供更友好的错误信息
+    if (error.name === 'QuotaExceededError' || error.code === 22) {
+      throw new Error("STORAGE_QUOTA_EXCEEDED");
+    }
     throw new Error("Failed to save data securely");
   }
 }
@@ -33,6 +41,10 @@ export async function getEncryptedItem(
   key: string,
   encryptionKey: string
 ): Promise<string | null> {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  
   try {
     const storageKey = `${STORAGE_KEY_PREFIX}${key}`;
     const encryptedDataStr = localStorage.getItem(storageKey);
@@ -122,11 +134,21 @@ export async function getEmotionRecordsMetadata(
  * Clear all encrypted storage
  */
 export function clearEncryptedStorage(): void {
-  const keys = Object.keys(localStorage);
-  keys.forEach((key) => {
-    if (key.startsWith(STORAGE_KEY_PREFIX)) {
-      localStorage.removeItem(key);
-    }
-  });
+  if (typeof window === "undefined") return;
+  
+  try {
+    const keys = Object.keys(localStorage);
+    keys.forEach((key) => {
+      if (key.startsWith(STORAGE_KEY_PREFIX)) {
+        try {
+          localStorage.removeItem(key);
+        } catch (error) {
+          console.warn(`[storage] Failed to remove key ${key} from localStorage:`, error);
+        }
+      }
+    });
+  } catch (error) {
+    console.warn("[storage] Failed to clear encrypted storage:", error);
+  }
 }
 

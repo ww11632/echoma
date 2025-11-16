@@ -11,11 +11,8 @@ module nft_mint_test::diary {
     use 0x2::tx_context;
     use std::string::String;
     use 0x2::clock;
-    use 0x2::table;
     use 0x2::event;
     use 0x2::dynamic_field as df;
-
-    const E_DUP_DAY: u64 = 1;
 
     /// 只用來索引 EntryNFT 的 ID（不改變所有權）
     public struct EntryRef has store {
@@ -27,8 +24,6 @@ module nft_mint_test::diary {
         id: object::UID,                     // ✅ 加上 object:: 命名空間
         owner: address,
         count: u64,
-        /// 檢查是否已鑄（每日限鑄）
-        minted_days: table::Table<u64, bool>,
         /// Dynamic Field：parent = journal.id, key = day_index (u64), value = EntryRef
     }
 
@@ -61,7 +56,6 @@ module nft_mint_test::diary {
             id: object::new(ctx),
             owner,
             count: 0,
-            minted_days: table::new<u64, bool>(ctx),
         };
         transfer::transfer(j, owner);
     }
@@ -88,11 +82,7 @@ module nft_mint_test::diary {
         let now = clock::timestamp_ms(clk);        // ✅ 新版 API
         let day_index = now / 86400000;
 
-        // 每日限鑄檢查（Table）
-        if (table::contains(&journal.minted_days, day_index)) {
-            abort E_DUP_DAY
-        };
-        table::add(&mut journal.minted_days, day_index, true);
+        // 更新計數器
         journal.count = journal.count + 1;
 
         // 鑄造 NFT（所有權給使用者）

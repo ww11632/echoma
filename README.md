@@ -355,14 +355,18 @@ See [SECURITY_BEST_PRACTICES.md](./SECURITY_BEST_PRACTICES.md) for the full chec
 
 Default network: **Sui Testnet**
 
-- **Default network** – Testnet (change `defaultNetwork` inside `src/App.tsx`)
-- **Supported** – Testnet + Mainnet (pre-configured)
-- **Sui RPC** – `getFullnodeUrl("testnet")`
-- **Walrus Upload Relay** – `https://upload-relay.testnet.walrus.space`
-- **Walrus Aggregator** – `https://aggregator.testnet.walrus.space`
+- **Network switcher** – UI component in the top-right corner allows switching between Testnet and Mainnet
+- **Persistent preference** – network selection is saved to localStorage and persists across sessions
+- **Cross-tab sync** – network changes automatically sync across all browser tabs
+- **Auto cache cleanup** – React Query cache is cleared when switching networks to prevent stale data
+- **Supported networks** – Testnet + Mainnet (pre-configured)
+- **Sui RPC** – automatically uses `getFullnodeUrl("testnet")` or `getFullnodeUrl("mainnet")` based on selection
+- **Walrus endpoints** – automatically switches between testnet/mainnet Walrus services:
+  - Testnet: `https://upload-relay.testnet.walrus.space` / `https://aggregator.testnet.walrus.space`
+  - Mainnet: `https://upload-relay.mainnet.walrus.space` / `https://aggregator.mainnet.walrus.space`
 - **Wallet auto-connect** – enabled so approved wallets reconnect on load
 
-Update `src/App.tsx` if you need different endpoints.
+The network switcher is available in the `GlobalControls` component (top-right corner) on all pages.
 
 ### ⚠️ Walrus Aggregator Heads-up
 
@@ -608,6 +612,7 @@ Available in Anonymous *and* Authenticated modes.
 - Supabase Realtime sync with fallback
 - Emotion analytics (distribution, storage split, time-series, forecast, correlation, calendar)
 - Complete decrypt + viewing UX (auto decrypt, batch decrypt, manual retry, detail dialog, hide content)
+- **Network switching UI** – dynamic network switcher with persistent preferences, cross-tab sync, and automatic cache cleanup
 
 ### ✅ Recently Completed
 - **NFT Minting on Sui** – Fully implemented and deployed to testnet
@@ -622,7 +627,6 @@ Available in Anonymous *and* Authenticated modes.
 - Full Argon2id support (currently falls back to enhanced PBKDF2)
 - User password/phrase input UI for stronger keys
   - `generateUserKey` already accepts `userPassword`; needs front-end controls
-- Multi-chain network switching
 - Realtime security monitoring alerts
 - Dynamic keyword updates for crisis detection
 
