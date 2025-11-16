@@ -549,7 +549,7 @@ const Record = () => {
             };
             
             console.log("[Record] Getting or creating Journal on", currentNetwork, "...");
-            journalId = await getOrCreateJournal(signAndExecute, currentAccount.address, currentNetwork);
+            journalId = await getOrCreateJournal(signAndExecute, currentAccount.address, currentNetwork, suiClient);
             if (!journalId) {
               throw new Error("無法獲取或創建 Journal，請檢查錢包連接和餘額");
             }
@@ -615,7 +615,8 @@ const Record = () => {
               undefined, // audioSha256 - optional
               undefined, // audioDurationMs - optional
               currentAccount.address, // sender
-              currentNetwork // network - 确保使用正确的网络
+              currentNetwork, // network - 确保使用正确的网络
+              suiClient // suiClient - 使用 dapp-kit 提供的客户端避免 CORS
             );
             
             if (!mintResult || !mintResult.nftId) {

@@ -1,5 +1,6 @@
 // src/lib/mintContract.ts
 import { Transaction } from "@mysten/sui/transactions";
+import { SuiClient } from "@mysten/sui/client";
 import { getClientForNetwork } from "./suiClient";
 import { getCurrentNetwork, type SuiNetwork } from "./networkConfig";
 
@@ -202,12 +203,14 @@ export function clearJournalId(walletAddress: string): void {
  */
 export async function queryJournalByOwner(
   ownerAddress: string,
-  network?: SuiNetwork
+  network?: SuiNetwork,
+  suiClient?: SuiClient
 ): Promise<string | null> {
   try {
     const targetNetwork = network || getCurrentNetwork();
+    const client = suiClient || getClientForNetwork(targetNetwork);
     const packageId = getPackageId(targetNetwork);
-    const objects = await getClientForNetwork(targetNetwork).getOwnedObjects({
+    const objects = await client.getOwnedObjects({
       owner: ownerAddress,
       filter: {
         StructType: `${packageId}::${MODULE}::Journal`,
@@ -370,9 +373,11 @@ export async function checkTodayMinted(journalId: string, network?: SuiNetwork):
 export async function getOrCreateJournal(
   signAndExecute: any,
   walletAddress: string,
-  network?: SuiNetwork
+  network?: SuiNetwork,
+  suiClient?: SuiClient
 ): Promise<string | null> {
   const targetNetwork = network || getCurrentNetwork();
+  const client = suiClient || getClientForNetwork(targetNetwork);
   console.log(`[mintContract] getOrCreateJournal for ${walletAddress} on ${targetNetwork}`);
   
   // 1. 檢查本地存儲（使用網絡特定的鍵）
@@ -381,7 +386,7 @@ export async function getOrCreateJournal(
       // 驗證 Journal 是否仍然存在於正確的網絡上，且類型匹配當前 Package ID
       try {
         const packageId = getPackageId(targetNetwork);
-        const journal = await getClientForNetwork(targetNetwork).getObject({ 
+        const journal = await client.getObject({ 
           id: journalId,
           options: {
             showContent: true,
@@ -419,7 +424,7 @@ export async function getOrCreateJournal(
   }
 
   // 2. 查詢鏈上（在正確的網絡上）
-  journalId = await queryJournalByOwner(walletAddress, targetNetwork);
+  journalId = await queryJournalByOwner(walletAddress, targetNetwork, suiClient);
   if (journalId) {
     console.log(`[mintContract] Found Journal ${journalId} on-chain for ${targetNetwork}`);
     saveJournalId(walletAddress, journalId, targetNetwork);
@@ -429,7 +434,7 @@ export async function getOrCreateJournal(
   // 3. 創建新的 Journal（在正確的網絡上）
   try {
     console.log(`[mintContract] Creating new Journal on ${targetNetwork}...`);
-    journalId = await createJournal(signAndExecute, walletAddress, targetNetwork);
+    journalId = await createJournal(signAndExecute, walletAddress, targetNetwork, suiClient);
     if (journalId) {
       console.log(`[mintContract] Created Journal ${journalId} on ${targetNetwork}`);
       saveJournalId(walletAddress, journalId, targetNetwork);
@@ -454,8 +459,9 @@ export async function getOrCreateJournal(
 /**
  * 建立 Journal
  */
-export async function createJournal(signAndExecute: any, sender?: string, network?: SuiNetwork): Promise<string | null> {
+export async function createJournal(signAndExecute: any, sender?: string, network?: SuiNetwork, suiClient?: SuiClient): Promise<string | null> {
   const targetNetwork = network || getCurrentNetwork();
+  const client = suiClient || getClientForNetwork(targetNetwork);
   const tx = new Transaction();
   
   // Set sender if provided (required for transaction building)
@@ -480,7 +486,7 @@ export async function createJournal(signAndExecute: any, sender?: string, networ
     let retries = 3;
     while (retries > 0) {
       try {
-        full = await getClientForNetwork(targetNetwork).getTransactionBlock({
+        full = await client.getTransactionBlock({
           digest: result.digest!,
           options: { showObjectChanges: true },
         });
@@ -527,7 +533,8 @@ export async function mintEntry(
   audioSha256?: Uint8Array,
   audioDurationMs?: number,
   sender?: string,
-  network?: SuiNetwork
+  network?: SuiNetwork,
+  suiClient?: SuiClient
 ): Promise<{ nftId: string; transactionDigest: string } | null> {
   // Validate journalId format
   if (!journalId || typeof journalId !== "string") {
@@ -555,10 +562,11 @@ export async function mintEntry(
   const audioDurationValue = audioDurationMs || 0;
 
   const packageId = getPackageId(currentNetwork);
+  const client = suiClient || getClientForNetwork(currentNetwork);
   
   // Verify Journal object exists and has correct type before building transaction
   try {
-    const journal = await getClientForNetwork(currentNetwork).getObject({
+    const journal = await client.getObject({
       id: journalId,
       options: {
         showType: true,
@@ -629,7 +637,7 @@ export async function mintEntry(
     let retries = 3;
     while (retries > 0) {
       try {
-        full = await getClientForNetwork(currentNetwork).getTransactionBlock({
+        full = await client.getTransactionBlock({
           digest: result.digest!,
           options: { showObjectChanges: true },
         });
