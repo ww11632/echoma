@@ -7,8 +7,6 @@ module nft_mint_test::nft_mint_test;
 // https://docs.sui.io/concepts/sui-move-concepts/conventions
 #[allow(lint(public_entry))]
 module nft_mint_test::diary {
-    use 0x2::transfer;
-    use 0x2::tx_context;
     use std::string::String;
     use 0x2::clock;
     use 0x2::event;
@@ -21,11 +19,11 @@ module nft_mint_test::diary {
     }
 
     /// 使用者的情緒日誌（父物件）
+    /// Dynamic Field：parent = journal.id, key = day_index (u64), value = EntryRef
     public struct Journal has key {
         id: object::UID,                     // ✅ 加上 object:: 命名空間
         owner: address,
         count: u64,
-        /// Dynamic Field：parent = journal.id, key = day_index (u64), value = EntryRef
     }
 
     public struct EntryNFT has key, store {
@@ -52,7 +50,7 @@ module nft_mint_test::diary {
     }
 
     public entry fun create_journal(ctx: &mut TxContext) {
-        let owner = tx_context::sender(ctx); // ✅ 可用
+        let owner = tx_context::sender(ctx);
         let j = Journal {
             id: object::new(ctx),
             owner,
@@ -77,7 +75,7 @@ module nft_mint_test::diary {
         ctx: &mut TxContext
     ) {
         // 只允許 journal 擁有者鑄造
-        let sender = tx_context::sender(ctx);      // ✅
+        let sender = tx_context::sender(ctx);
         assert!(sender == journal.owner, 0);
 
         let now = clock::timestamp_ms(clk);        // ✅ 新版 API
