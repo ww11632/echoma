@@ -3,7 +3,7 @@
 # 檢查 Sui Mainnet 合約部署狀態腳本
 
 # Mainnet Package ID
-PACKAGE_ID="${MAINNET_PACKAGE_ID:-0x962039ad659c57c87206546c0dd9f801e7c679d9cced3edea2b6f411ed603c3c}"
+PACKAGE_ID="${MAINNET_PACKAGE_ID:-0x6ec7914c755708fd77ed3fe0dc8aed25ec5ccae2ff781267da3a5ca3549535b9}"
 NETWORK="mainnet"
 
 echo "🔍 檢查 Sui Mainnet 合約部署狀態..."
