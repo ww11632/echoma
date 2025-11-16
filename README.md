@@ -441,7 +441,7 @@ Echoma offers three flows tailored to different needs.
   8. Enable **"Mint as NFT"** toggle (requires wallet connection)
   9. Click **Record & Mint NFT**
 - **NFT Features:**
-  - Daily mint limit: one NFT per day per journal
+  - Daily mint limit: **Testnet** - one NFT per day per journal; **Mainnet** - unlimited mints per day
   - Automatic Journal creation on first mint
   - View minting transaction on Sui Scan
   - NFT records appear in Timeline with special badges
@@ -631,7 +631,7 @@ Available in Anonymous *and* Authenticated modes.
 
 ### ✅ Recently Completed
 - **NFT Minting on Sui** – Fully implemented and deployed to testnet and mainnet
-  - Daily mint limit (one NFT per day per journal)
+  - Daily mint limit: **Testnet** - one NFT per day per journal; **Mainnet** - unlimited mints per day
   - Automatic Journal creation and management
   - Transaction digest tracking and Sui Scan links
   - NFT records visible in Timeline with special badges
