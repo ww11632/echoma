@@ -577,6 +577,14 @@ const Record = () => {
               const config = getNetworkConfig("mainnet");
               imageUrl = config.nftLogoUrl || sdkResult.walrusUrl || "";
               imageMime = config.nftLogoUrl ? "image/png" : "text/plain"; // Logo is PNG, fallback to text/plain
+              
+              console.log("[Record] Mainnet NFT image configuration:", {
+                network: currentNetwork,
+                nftLogoUrl: config.nftLogoUrl,
+                walrusUrl: sdkResult.walrusUrl,
+                finalImageUrl: imageUrl,
+                imageMime,
+              });
             } else {
               // Testnet: use Walrus URL (backward compatible)
               imageUrl = sdkResult.walrusUrl || "";
@@ -589,7 +597,8 @@ const Record = () => {
               moodScore,
               descriptionLength: sanitizedDescription.length,
               tagsCsv,
-              imageUrl: imageUrl ? `${imageUrl.substring(0, 50)}...` : "empty",
+              imageUrl: imageUrl ? `${imageUrl.substring(0, 80)}...` : "empty",
+              imageMime,
             });
             
             const mintResult = await mintEntry(

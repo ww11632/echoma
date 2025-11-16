@@ -28,7 +28,8 @@ const NETWORK_CONFIGS: Record<SuiNetwork, NetworkConfig> = {
     // Mainnet: use Echoma logo (set via environment variable or upload to Walrus)
     // Format: https://aggregator.mainnet.walrus.space/v1/{blobId}
     // Or use a CDN URL if preferred
-    nftLogoUrl: import.meta.env.VITE_MAINNET_NFT_LOGO_URL || undefined,
+    // Fallback to GitHub URL if env var not set (for development)
+    nftLogoUrl: import.meta.env.VITE_MAINNET_NFT_LOGO_URL || "https://raw.githubusercontent.com/ww11632/echoma/main/public/echoma-logo.png",
   },
 };
 
