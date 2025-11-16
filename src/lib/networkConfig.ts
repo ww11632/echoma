@@ -6,7 +6,7 @@
 export type SuiNetwork = "testnet" | "mainnet";
 
 export const STORAGE_KEY = "sui-network-preference";
-const DEFAULT_NETWORK: SuiNetwork = "testnet";
+const DEFAULT_NETWORK: SuiNetwork = "mainnet";
 
 interface NetworkConfig {
   rpcUrl?: string;
