@@ -9,8 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Sparkles, ArrowLeft, Loader2, Lock, Unlock, Database } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useCurrentAccount, useCurrentWallet } from "@mysten/dapp-kit";
-import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
+import { useCurrentAccount, useCurrentWallet, useSuiClient } from "@mysten/dapp-kit";
 import { toBase64 } from "@mysten/sui/utils";
 import { encryptData, generateUserKey, generateUserKeyFromId, PUBLIC_SEAL_KEY } from "@/lib/encryption";
 import { prepareEmotionSnapshot, uploadToWalrusWithSDK, createSignerFromWallet } from "@/lib/walrus";
@@ -24,6 +23,7 @@ import LanguageSwitcher from "@/components/LanguageSwitcher";
 import WalletConnect from "@/components/WalletConnect";
 import { getOrCreateAnonymousUserKey, getOrCreateAnonymousUserId } from "@/lib/anonymousIdentity";
 import { TagInput } from "@/components/TagInput";
+import { useSelectedNetwork } from "@/hooks/useSelectedNetwork";
 
 const isBackendUnavailable = (error: unknown) => {
   if (!(error instanceof Error)) return false;
@@ -43,6 +43,8 @@ const Record = () => {
   const { t, i18n } = useTranslation();
   const currentAccount = useCurrentAccount();
   const { currentWallet } = useCurrentWallet();
+  const suiClient = useSuiClient(); // 使用 dapp-kit 提供的 SuiClient，避免 CORS 问题
+  const currentNetwork = useSelectedNetwork(); // 获取当前选择的网络
   
   // Track if component is mounted to prevent navigation after unmount
   const isMountedRef = useRef(true);
@@ -488,14 +490,12 @@ const Record = () => {
         
         console.log("[Record] Attempting SDK upload with wallet - THIS WILL TRIGGER TRANSACTION POPUP");
         console.log("[Record] Wallet:", currentWallet?.name, "Account:", currentAccount.address);
+        console.log("[Record] Current network:", currentNetwork);
         
-        const suiClient = new SuiClient({
-          url: getFullnodeUrl("testnet"),
-        });
-        
-        const signer = createSignerFromWallet(currentWallet, currentAccount.address, suiClient);
+        // 使用 dapp-kit 提供的 SuiClient，它会自动处理 CORS 和网络配置
+        const signer = createSignerFromWallet(currentWallet, currentAccount.address, suiClient, currentNetwork);
         const selectedEpochs = epochs[0];
-        const sdkResult = await uploadToWalrusWithSDK(encryptedString, signer, selectedEpochs);
+        const sdkResult = await uploadToWalrusWithSDK(encryptedString, signer, selectedEpochs, currentNetwork);
         
         // Check wallet connection again after SDK upload
         checkWalletConnection();
@@ -512,6 +512,9 @@ const Record = () => {
         let nftTransactionDigest: string | null = null;
         if (mintAsNFT) {
           console.log("[Record] 🎨 NFT minting is ENABLED, starting process...");
+          // Declare variables outside try block so they're accessible in catch
+          let journalId: string | null = null;
+          let moodScore: number = 0;
           try {
             console.log("[Record] 🎨 Starting NFT minting process...");
             setUploadStatus("uploading"); // Keep uploading status for NFT minting
@@ -520,10 +523,10 @@ const Record = () => {
             const { checkContractDeployed } = await import("@/lib/mintContract");
             
             // Check if contract is deployed
-            console.log("[Record] Checking if contract is deployed...");
-            const isDeployed = await checkContractDeployed();
+            console.log("[Record] Checking if contract is deployed on", currentNetwork, "...");
+            const isDeployed = await checkContractDeployed(currentNetwork);
             if (!isDeployed) {
-              throw new Error("合約尚未部署到 testnet。請先部署合約或聯繫開發者。");
+              throw new Error(`合約尚未部署到 ${currentNetwork}。請先部署合約或聯繫開發者。`);
             }
             
             // Get or create Journal
@@ -543,8 +546,8 @@ const Record = () => {
               }
             };
             
-            console.log("[Record] Getting or creating Journal...");
-            const journalId = await getOrCreateJournal(signAndExecute, currentAccount.address);
+            console.log("[Record] Getting or creating Journal on", currentNetwork, "...");
+            journalId = await getOrCreateJournal(signAndExecute, currentAccount.address, currentNetwork);
             if (!journalId) {
               throw new Error("無法獲取或創建 Journal，請檢查錢包連接和餘額");
             }
@@ -552,13 +555,13 @@ const Record = () => {
             
             // 檢查今天是否已經鑄造過 NFT
             const { checkTodayMinted } = await import("@/lib/mintContract");
-            const alreadyMintedToday = await checkTodayMinted(journalId);
+            const alreadyMintedToday = await checkTodayMinted(journalId, currentNetwork);
             if (alreadyMintedToday) {
               throw new Error("今天已經鑄造過 NFT，每天只能鑄造一次。請明天再試。");
             }
             
             // Calculate mood score (1-10) from intensity (0-100)
-            const moodScore = Math.max(1, Math.min(10, Math.round(intensityValue / 10)));
+            moodScore = Math.max(1, Math.min(10, Math.round(intensityValue / 10)));
             
             // Prepare tags CSV
             const tagsCsv = tags.length > 0 ? tags.join(",") : "";
@@ -589,7 +592,8 @@ const Record = () => {
               undefined, // audioMime - optional
               undefined, // audioSha256 - optional
               undefined, // audioDurationMs - optional
-              currentAccount.address // sender
+              currentAccount.address, // sender
+              currentNetwork // network - 确保使用正确的网络
             );
             
             if (!mintResult || !mintResult.nftId) {

@@ -10,7 +10,7 @@ import { ArrowLeft, Lock, Mail, Loader2, CheckCircle2, XCircle, AlertCircle } fr
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { User } from "@supabase/supabase-js";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
+import GlobalControls from "@/components/GlobalControls";
 
 // 密码强度计算函数
 const calculatePasswordStrength = (password: string): { strength: 'weak' | 'medium' | 'strong' | 'very-strong', score: number, feedback: string[] } => {
@@ -209,7 +209,7 @@ const Auth = () => {
     <div className="min-h-screen relative overflow-hidden">
       {/* Language Switcher */}
       <div className="absolute top-4 right-4 z-20">
-        <LanguageSwitcher />
+        <GlobalControls />
       </div>
       
       {/* Background effects */}

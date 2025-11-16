@@ -12,7 +12,7 @@ import { decryptDataWithMigration, generateUserKeyFromId, DecryptionError, Decry
 import type { EncryptedData } from "@/lib/encryption";
 import { getAnonymousUserKey } from "@/lib/anonymousIdentity";
 import { getEncryptedEmotionByBlob } from "@/lib/api";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
+import GlobalControls from "@/components/GlobalControls";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Legend, CartesianGrid } from "recharts";
 import { useToast } from "@/hooks/use-toast";
@@ -30,6 +30,8 @@ import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { zhTW, enUS } from "date-fns/locale";
 import jsPDF from "jspdf";
+import { useSelectedNetwork } from "@/hooks/useSelectedNetwork";
+import { useNetworkChangeListener } from "@/hooks/useNetworkChangeListener";
 
 interface EmotionRecord {
   id: string;
@@ -57,6 +59,8 @@ const AuthTimeline = () => {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const { toast } = useToast();
+  const network = useSelectedNetwork();
+  const isTestnet = network === "testnet";
   const [filter, setFilter] = useState<FilterType>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -222,6 +226,7 @@ const AuthTimeline = () => {
   const loadRecords = useCallback(async () => {
     setIsLoading(true);
     const currentUserId = user?.id; // 捕获当前的 user.id，避免竞态条件
+    const currentNetworkSnapshot = network; // 捕获当前的网络值，避免网络切换时的竞态条件
     try {
       if (!currentUserId) {
         setRecords([]);
@@ -298,14 +303,53 @@ const AuthTimeline = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [user, toast, t, sortRecordsByDate]);
+  }, [user, network, toast, t, sortRecordsByDate]); // 添加 network 到依赖项
 
-  // Load records when user is available
+  // Load records when user or network changes
   useEffect(() => {
+    // 使用一个标志来跟踪这个 effect 是否仍然有效
+    let isCancelled = false;
+    const currentUserIdSnapshot = user?.id;
+    const currentNetworkSnapshot = network;
+
     if (user) {
-      loadRecords();
+      const loadRecordsWithCancellation = async () => {
+        try {
+          if (!currentUserIdSnapshot || isCancelled) {
+            if (isCancelled) {
+              console.log("[AuthTimeline] Load cancelled due to user/network change");
+            }
+            return;
+          }
+
+          // 调用 loadRecords，但检查是否已被取消
+          await loadRecords();
+          
+          // 最后检查是否已被取消
+          if (isCancelled) {
+            console.log("[AuthTimeline] Skipping state update - load was cancelled");
+          }
+        } catch (error) {
+          if (!isCancelled) {
+            console.error("[AuthTimeline] Error in loadRecordsWithCancellation:", error);
+          }
+        }
+      };
+
+      loadRecordsWithCancellation();
+      
+      // 清理函数：当 effect 重新运行或组件卸载时，标记为已取消
+      return () => {
+        isCancelled = true;
+      };
     }
-  }, [user, loadRecords]);
+  }, [user, network, loadRecords]); // 添加 network 到依赖项，网络切换时自动重新加载
+
+  // 监听网络切换
+  useNetworkChangeListener((newNetwork, oldNetwork) => {
+    console.log(`[AuthTimeline] Network changed from ${oldNetwork} to ${newNetwork}, will reload records...`);
+    // 网络切换时，React Query 缓存已被清理，useEffect 会重新运行
+  });
 
   // 實時同步數據變化（使用 Supabase Realtime）
   useEffect(() => {
@@ -517,8 +561,9 @@ const AuthTimeline = () => {
   // 生成 Sui Scan 链接
   const getSuiScanUrl = (objectId: string | null): string | null => {
     if (!objectId) return null;
-    // Sui Scan testnet URL format: https://suiscan.xyz/testnet/object/{objectId}
-    return `https://suiscan.xyz/testnet/object/${objectId}`;
+    // Sui Scan URL format: https://suiscan.xyz/{network}/object/{objectId}
+    const networkPath = network === "mainnet" ? "mainnet" : "testnet";
+    return `https://suiscan.xyz/${networkPath}/object/${objectId}`;
   };
 
   // 指數退避重試函數
@@ -605,7 +650,7 @@ const AuthTimeline = () => {
         // 從 Walrus 讀取加密資料（帶重試機制）
         try {
           encryptedDataString = await retryWithBackoff(
-            () => readFromWalrus(record.blob_id),
+            () => readFromWalrus(record.blob_id, network),
             3,
             1000
           );
@@ -2018,7 +2063,7 @@ const AuthTimeline = () => {
             {t("common.back")}
           </Button>
           <div className="flex items-center gap-2">
-            <LanguageSwitcher />
+            <GlobalControls />
             <Button variant="ghost" onClick={() => navigate("/")} className="text-muted-foreground">
               <Home className="h-4 w-4" />
             </Button>
@@ -2043,7 +2088,7 @@ const AuthTimeline = () => {
         )}
 
         {/* Testnet Warning Banner */}
-        {records.some(r => !isLocalRecord(r)) && (
+        {isTestnet && records.some(r => !isLocalRecord(r)) && (
           <Card className="p-4 mb-4 bg-yellow-500/10 border-yellow-500/30">
             <div className="text-sm">
               <div className="font-semibold text-yellow-600 dark:text-yellow-400 mb-1">

@@ -1,23 +1,46 @@
 // src/lib/mintContract.ts
 import { Transaction } from "@mysten/sui/transactions";
-import { client } from "./suiClient";
+import { getClientForNetwork } from "./suiClient";
+import { getCurrentNetwork, type SuiNetwork } from "./networkConfig";
 
 // 合約常數
-const PACKAGE_ID =
+// Testnet Package ID
+const TESTNET_PACKAGE_ID =
   "0x55f1c575f979ad2b16c264191627ca6716c9b0b397ab041280da1ad6bce37e71";
+// Mainnet Package ID
+// 可以通過環境變數 MAINNET_PACKAGE_ID 覆蓋
+const MAINNET_PACKAGE_ID =
+  typeof window !== "undefined" && (window as any).MAINNET_PACKAGE_ID
+    ? (window as any).MAINNET_PACKAGE_ID
+    : "0x962039ad659c57c87206546c0dd9f801e7c679d9cced3edea2b6f411ed603c3c";
+
 const MODULE = "diary";
 const CLOCK_ID = "0x6"; // Sui Clock object ID
 
 /**
- * 檢查合約是否已部署到 testnet
+ * 獲取指定網絡的 Package ID
+ */
+export function getPackageId(network?: SuiNetwork): string {
+  const targetNetwork = network || getCurrentNetwork();
+  return targetNetwork === "mainnet" ? MAINNET_PACKAGE_ID : TESTNET_PACKAGE_ID;
+}
+
+/**
+ * 檢查合約是否已部署到指定網絡
  * 使用 tryMoveCall 來驗證合約是否可訪問
  */
-export async function checkContractDeployed(): Promise<boolean> {
+export async function checkContractDeployed(network?: SuiNetwork): Promise<boolean> {
+  const targetNetwork = network || getCurrentNetwork();
+  const packageId = getPackageId(targetNetwork);
+  
   try {
+    console.log(`[mintContract] Checking contract deployment on ${targetNetwork}...`);
+    console.log(`[mintContract] Package ID: ${packageId}`);
+    
     // 方法1: 嘗試獲取 Package 對象
     try {
-      const packageObject = await client.getObject({
-        id: PACKAGE_ID,
+      const packageObject = await getClientForNetwork(targetNetwork).getObject({
+        id: packageId,
         options: {
           showContent: true,
           showType: true,
@@ -25,11 +48,11 @@ export async function checkContractDeployed(): Promise<boolean> {
       });
       
       if (packageObject.data) {
-        console.log("[mintContract] ✅ Contract is deployed (verified via getObject):", PACKAGE_ID);
+        console.log(`[mintContract] ✅ Contract is deployed on ${targetNetwork} (verified via getObject):`, packageId);
         return true;
       }
     } catch (getObjectError: any) {
-      console.warn("[mintContract] getObject failed, trying alternative method:", getObjectError.message);
+      console.warn(`[mintContract] getObject failed on ${targetNetwork}, trying alternative method:`, getObjectError.message);
     }
     
     // 方法2: 嘗試 dry run 一個簡單的調用來驗證合約
@@ -38,29 +61,69 @@ export async function checkContractDeployed(): Promise<boolean> {
       const tx = new Transaction();
       tx.setSender("0x0000000000000000000000000000000000000000000000000000000000000000"); // 使用零地址作為檢查
       tx.moveCall({
-        target: `${PACKAGE_ID}::${MODULE}::create_journal`,
+        target: `${packageId}::${MODULE}::create_journal`,
         arguments: [],
       });
       
       // 嘗試構建交易（這會驗證合約是否存在）
-      await tx.build({ client });
-      console.log("[mintContract] ✅ Contract is deployed (verified via transaction build):", PACKAGE_ID);
+      await tx.build({ client: getClientForNetwork(targetNetwork) });
+      console.log(`[mintContract] ✅ Contract is deployed on ${targetNetwork} (verified via transaction build):`, packageId);
       return true;
     } catch (buildError: any) {
       // 如果錯誤是關於合約不存在的，返回 false
       if (buildError.message?.includes("Could not find the package") || 
           buildError.message?.includes("Package not found")) {
-        console.error("[mintContract] ❌ Contract not found:", PACKAGE_ID);
+        console.error(`[mintContract] ❌ Contract not found on ${targetNetwork}:`, packageId);
         return false;
       }
       // 其他錯誤（如參數錯誤）說明合約存在
-      console.log("[mintContract] ✅ Contract is deployed (verified via transaction build error type):", PACKAGE_ID);
+      console.log(`[mintContract] ✅ Contract is deployed on ${targetNetwork} (verified via transaction build error type):`, packageId);
       return true;
     }
   } catch (error: any) {
-    console.error("[mintContract] ❌ Error checking contract deployment:", error.message);
+    console.error(`[mintContract] ❌ Error checking contract deployment on ${targetNetwork}:`, error.message);
     return false;
   }
+}
+
+/**
+ * 專門檢查 Mainnet 合約是否已部署
+ */
+export async function checkMainnetContract(): Promise<{
+  deployed: boolean;
+  packageId: string;
+  details?: any;
+}> {
+  const packageId = getPackageId("mainnet");
+  const deployed = await checkContractDeployed("mainnet");
+  
+  let details: any = null;
+  if (deployed) {
+    try {
+      const packageObject = await getClientForNetwork("mainnet").getObject({
+        id: packageId,
+        options: {
+          showContent: true,
+          showType: true,
+          showOwner: true,
+        },
+      });
+      details = {
+        objectId: packageObject.data?.objectId,
+        version: (packageObject.data?.content as any)?.fields?.version,
+        publisher: (packageObject.data?.content as any)?.fields?.publisher,
+        explorerUrl: `https://suiexplorer.com/?network=mainnet&object=${packageId}`,
+      };
+    } catch (error) {
+      console.warn("[mintContract] Failed to get contract details:", error);
+    }
+  }
+  
+  return {
+    deployed,
+    packageId,
+    details,
+  };
 }
 
 // Journal ID 存儲鍵（基於錢包地址）
@@ -69,39 +132,85 @@ const getJournalStorageKey = (walletAddress: string) =>
 
 /**
  * 獲取用戶的 Journal ID（從本地存儲）
+ * 支持按網絡存儲，避免 testnet 和 mainnet 的 Journal ID 混淆
  */
-export function getJournalId(walletAddress: string): string | null {
+export function getJournalId(walletAddress: string, network?: SuiNetwork): string | null {
   if (!walletAddress) return null;
-  return localStorage.getItem(getJournalStorageKey(walletAddress));
+  if (typeof window === "undefined") return null;
+  
+  try {
+    const targetNetwork = network || getCurrentNetwork();
+    // 使用網絡特定的存儲鍵，避免 testnet 和 mainnet 混淆
+    const key = `${getJournalStorageKey(walletAddress)}_${targetNetwork}`;
+    return localStorage.getItem(key);
+  } catch (error) {
+    console.warn("[mintContract] Failed to read Journal ID from localStorage:", error);
+    return null;
+  }
 }
 
 /**
  * 保存 Journal ID 到本地存儲
+ * 支持按網絡存儲
  */
-export function saveJournalId(walletAddress: string, journalId: string): void {
+export function saveJournalId(walletAddress: string, journalId: string, network?: SuiNetwork): void {
   if (!walletAddress || !journalId) return;
-  localStorage.setItem(getJournalStorageKey(walletAddress), journalId);
+  if (typeof window === "undefined") return;
+  
+  try {
+    const targetNetwork = network || getCurrentNetwork();
+    // 使用網絡特定的存儲鍵
+    const key = `${getJournalStorageKey(walletAddress)}_${targetNetwork}`;
+    localStorage.setItem(key, journalId);
+  } catch (error: any) {
+    console.warn("[mintContract] Failed to save Journal ID to localStorage:", error);
+    // 如果是配额超出错误，尝试清理旧数据
+    if (error.name === 'QuotaExceededError' || error.code === 22) {
+      console.warn("[mintContract] Storage quota exceeded, attempting to clear old Journal IDs");
+      try {
+        clearJournalId(walletAddress);
+        // 重试保存
+        const targetNetwork = network || getCurrentNetwork();
+        const key = `${getJournalStorageKey(walletAddress)}_${targetNetwork}`;
+        localStorage.setItem(key, journalId);
+      } catch (retryError) {
+        console.error("[mintContract] Failed to save Journal ID after cleanup:", retryError);
+      }
+    }
+  }
 }
 
 /**
  * 清除 Journal ID（當用戶切換錢包時）
+ * 清除所有網絡的 Journal ID
  */
 export function clearJournalId(walletAddress: string): void {
   if (!walletAddress) return;
-  localStorage.removeItem(getJournalStorageKey(walletAddress));
+  if (typeof window === "undefined") return;
+  
+  try {
+    // 清除所有網絡的 Journal ID
+    localStorage.removeItem(`${getJournalStorageKey(walletAddress)}_testnet`);
+    localStorage.removeItem(`${getJournalStorageKey(walletAddress)}_mainnet`);
+  } catch (error) {
+    console.warn("[mintContract] Failed to clear Journal ID from localStorage:", error);
+  }
 }
 
 /**
  * 查詢用戶的 Journal 對象（從鏈上）
  */
 export async function queryJournalByOwner(
-  ownerAddress: string
+  ownerAddress: string,
+  network?: SuiNetwork
 ): Promise<string | null> {
   try {
-    const objects = await client.getOwnedObjects({
+    const targetNetwork = network || getCurrentNetwork();
+    const packageId = getPackageId(targetNetwork);
+    const objects = await getClientForNetwork(targetNetwork).getOwnedObjects({
       owner: ownerAddress,
       filter: {
-        StructType: `${PACKAGE_ID}::${MODULE}::Journal`,
+        StructType: `${packageId}::${MODULE}::Journal`,
       },
       options: {
         showContent: true,
@@ -123,7 +232,8 @@ export async function queryJournalByOwner(
  * 查詢用戶的所有 EntryNFT（從鏈上）
  */
 export async function queryEntryNFTsByOwner(
-  ownerAddress: string
+  ownerAddress: string,
+  network?: SuiNetwork
 ): Promise<Array<{
   nftId: string;
   journalId: string;
@@ -136,13 +246,15 @@ export async function queryEntryNFTsByOwner(
   transactionDigest?: string | null; // 從 previousTransaction 獲取
 }>> {
   try {
-    console.log(`[mintContract] Querying EntryNFTs for owner: ${ownerAddress}`);
+    const targetNetwork = network || getCurrentNetwork();
+    const packageId = getPackageId(targetNetwork);
+    console.log(`[mintContract] Querying EntryNFTs for owner: ${ownerAddress} on ${targetNetwork}`);
     
-    const objects = await client.getOwnedObjects({
-      owner: ownerAddress,
-      filter: {
-        StructType: `${PACKAGE_ID}::${MODULE}::EntryNFT`,
-      },
+      const objects = await getClientForNetwork(targetNetwork).getOwnedObjects({
+        owner: ownerAddress,
+        filter: {
+          StructType: `${packageId}::${MODULE}::EntryNFT`,
+        },
       options: {
         showContent: true,
         showType: true,
@@ -195,9 +307,10 @@ export async function queryEntryNFTsByOwner(
 /**
  * 檢查今天是否已經鑄造過 NFT
  */
-export async function checkTodayMinted(journalId: string): Promise<boolean> {
+export async function checkTodayMinted(journalId: string, network?: SuiNetwork): Promise<boolean> {
   try {
-    const journal = await client.getObject({
+    const targetNetwork = network || getCurrentNetwork();
+    const journal = await getClientForNetwork(targetNetwork).getObject({
       id: journalId,
       options: {
         showContent: true,
@@ -221,7 +334,8 @@ export async function checkTodayMinted(journalId: string): Promise<boolean> {
     // 為了提高效率，我們只查詢最近的 NFT（最多 10 個）來檢查今天是否已鑄造
     // 因為每天只能鑄造一次，所以最近的 NFT 中如果有今天的，就說明今天已經鑄造過
     const recentNFTs = await queryEntryNFTsByOwner(
-      fields.owner || ""
+      fields.owner || "",
+      targetNetwork
     );
     
     // 只檢查最近的 NFT（最多檢查 10 個，因為每天只能鑄造一次）
@@ -251,36 +365,56 @@ export async function checkTodayMinted(journalId: string): Promise<boolean> {
 /**
  * 獲取或創建 Journal
  * 優先從本地存儲獲取，如果不存在則查詢鏈上，最後才創建新的
+ * 重要：必須傳遞網絡參數，確保在正確的網絡上查找/創建 Journal
  */
 export async function getOrCreateJournal(
   signAndExecute: any,
-  walletAddress: string
+  walletAddress: string,
+  network?: SuiNetwork
 ): Promise<string | null> {
-  // 1. 檢查本地存儲
-  let journalId = getJournalId(walletAddress);
+  const targetNetwork = network || getCurrentNetwork();
+  console.log(`[mintContract] getOrCreateJournal for ${walletAddress} on ${targetNetwork}`);
+  
+  // 1. 檢查本地存儲（使用網絡特定的鍵）
+  let journalId = getJournalId(walletAddress, targetNetwork);
   if (journalId) {
-    // 驗證 Journal 是否仍然存在
-    try {
-      await client.getObject({ id: journalId });
-      return journalId;
-    } catch {
-      // Journal 不存在，清除本地存儲
-      clearJournalId(walletAddress);
-    }
+      // 驗證 Journal 是否仍然存在於正確的網絡上
+      try {
+        const journal = await getClientForNetwork(targetNetwork).getObject({ 
+          id: journalId,
+          options: {
+            showContent: true,
+            showType: true,
+          },
+        });
+        // 驗證對象確實存在且類型正確
+        if (journal.data) {
+          console.log(`[mintContract] Found existing Journal ${journalId} on ${targetNetwork}`);
+          return journalId;
+        }
+      } catch (error: any) {
+        console.warn(`[mintContract] Journal ${journalId} not found on ${targetNetwork}, clearing cache:`, error.message);
+        // Journal 不存在，清除本地存儲
+        clearJournalId(walletAddress);
+        journalId = null;
+      }
   }
 
-  // 2. 查詢鏈上
-  journalId = await queryJournalByOwner(walletAddress);
+  // 2. 查詢鏈上（在正確的網絡上）
+  journalId = await queryJournalByOwner(walletAddress, targetNetwork);
   if (journalId) {
-    saveJournalId(walletAddress, journalId);
+    console.log(`[mintContract] Found Journal ${journalId} on-chain for ${targetNetwork}`);
+    saveJournalId(walletAddress, journalId, targetNetwork);
     return journalId;
   }
 
-  // 3. 創建新的 Journal
+  // 3. 創建新的 Journal（在正確的網絡上）
   try {
-    journalId = await createJournal(signAndExecute, walletAddress);
+    console.log(`[mintContract] Creating new Journal on ${targetNetwork}...`);
+    journalId = await createJournal(signAndExecute, walletAddress, targetNetwork);
     if (journalId) {
-      saveJournalId(walletAddress, journalId);
+      console.log(`[mintContract] Created Journal ${journalId} on ${targetNetwork}`);
+      saveJournalId(walletAddress, journalId, targetNetwork);
     } else {
       throw new Error("Journal 創建失敗：未返回 Journal ID");
     }
@@ -302,7 +436,8 @@ export async function getOrCreateJournal(
 /**
  * 建立 Journal
  */
-export async function createJournal(signAndExecute: any, sender?: string): Promise<string | null> {
+export async function createJournal(signAndExecute: any, sender?: string, network?: SuiNetwork): Promise<string | null> {
+  const targetNetwork = network || getCurrentNetwork();
   const tx = new Transaction();
   
   // Set sender if provided (required for transaction building)
@@ -310,20 +445,24 @@ export async function createJournal(signAndExecute: any, sender?: string): Promi
     tx.setSender(sender);
   }
   
+  const packageId = getPackageId(targetNetwork);
+  console.log(`[mintContract] Creating Journal on ${targetNetwork} with package ${packageId}`);
   tx.moveCall({
-    target: `${PACKAGE_ID}::${MODULE}::create_journal`,
+    target: `${packageId}::${MODULE}::create_journal`,
     arguments: [],
   });
 
+  const chain = `sui:${targetNetwork}`;
+  
   try {
-    const result = await signAndExecute({ transaction: tx, chain: "sui:testnet" });
+    const result = await signAndExecute({ transaction: tx, chain });
     
     // 等待交易被索引（有時需要一點時間）
     let full;
     let retries = 3;
     while (retries > 0) {
       try {
-        full = await client.getTransactionBlock({
+        full = await getClientForNetwork(targetNetwork).getTransactionBlock({
           digest: result.digest!,
           options: { showObjectChanges: true },
         });
@@ -369,8 +508,20 @@ export async function mintEntry(
   audioMime?: string,
   audioSha256?: Uint8Array,
   audioDurationMs?: number,
-  sender?: string
+  sender?: string,
+  network?: SuiNetwork
 ): Promise<{ nftId: string; transactionDigest: string } | null> {
+  // Validate journalId format
+  if (!journalId || typeof journalId !== "string") {
+    throw new Error("Invalid journalId: must be a non-empty string");
+  }
+  if (!journalId.startsWith("0x") || journalId.length < 10) {
+    throw new Error(`Invalid journalId format: ${journalId}. Expected a valid Sui object ID starting with 0x`);
+  }
+
+  const currentNetwork = network || getCurrentNetwork();
+  const chain = `sui:${currentNetwork}`;
+  
   const tx = new Transaction();
   
   // Set sender if provided (required for transaction building)
@@ -385,8 +536,19 @@ export async function mintEntry(
   const audioMimeValue = audioMime || "";
   const audioDurationValue = audioDurationMs || 0;
 
+  const packageId = getPackageId(currentNetwork);
+  console.log("[mintContract] Building transaction with params:", {
+    journalId,
+    moodScore,
+    moodTextLength: moodText.length,
+    tagsCsv,
+    imageUrl: imageUrl ? `${imageUrl.substring(0, 50)}...` : "empty",
+    chain,
+    packageId,
+  });
+
   tx.moveCall({
-    target: `${PACKAGE_ID}::${MODULE}::mint_entry`,
+    target: `${packageId}::${MODULE}::mint_entry`,
     arguments: [
       tx.object(journalId),
       tx.pure.u8(moodScore),
@@ -404,14 +566,14 @@ export async function mintEntry(
   });
 
   try {
-    const result = await signAndExecute({ transaction: tx, chain: "sui:testnet" });
+    const result = await signAndExecute({ transaction: tx, chain });
     
     // 等待交易被索引（有時需要一點時間）
     let full;
     let retries = 3;
     while (retries > 0) {
       try {
-        full = await client.getTransactionBlock({
+        full = await getClientForNetwork(currentNetwork).getTransactionBlock({
           digest: result.digest!,
           options: { showObjectChanges: true },
         });

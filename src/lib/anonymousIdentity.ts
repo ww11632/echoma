@@ -12,11 +12,16 @@ function readStoredId(): string | null {
   if (!isBrowser()) {
     return null;
   }
-  const value = window.localStorage.getItem(ANON_USER_ID_STORAGE_KEY);
-  if (!value || !UUID_REGEX.test(value)) {
+  try {
+    const value = window.localStorage.getItem(ANON_USER_ID_STORAGE_KEY);
+    if (!value || !UUID_REGEX.test(value)) {
+      return null;
+    }
+    return value;
+  } catch (error) {
+    console.warn("[anonymousIdentity] Failed to read anonymous user ID from localStorage:", error);
     return null;
   }
-  return value;
 }
 
 export function getOrCreateAnonymousUserId(): string {
@@ -30,7 +35,21 @@ export function getOrCreateAnonymousUserId(): string {
   }
 
   const newId = crypto.randomUUID();
-  window.localStorage.setItem(ANON_USER_ID_STORAGE_KEY, newId);
+  try {
+    window.localStorage.setItem(ANON_USER_ID_STORAGE_KEY, newId);
+  } catch (error: any) {
+    console.warn("[anonymousIdentity] Failed to save anonymous user ID to localStorage:", error);
+    // 如果是配额超出错误，尝试清理旧数据后重试
+    if (error.name === 'QuotaExceededError' || error.code === 22) {
+      try {
+        window.localStorage.removeItem(ANON_USER_ID_STORAGE_KEY);
+        window.localStorage.setItem(ANON_USER_ID_STORAGE_KEY, newId);
+      } catch (retryError) {
+        console.error("[anonymousIdentity] Failed to save anonymous user ID after cleanup:", retryError);
+        // 即使保存失败，也返回生成的 ID（在内存中使用）
+      }
+    }
+  }
   return newId;
 }
 
@@ -55,5 +74,9 @@ export function clearAnonymousIdentity(): void {
   if (!isBrowser()) {
     return;
   }
-  window.localStorage.removeItem(ANON_USER_ID_STORAGE_KEY);
+  try {
+    window.localStorage.removeItem(ANON_USER_ID_STORAGE_KEY);
+  } catch (error) {
+    console.warn("[anonymousIdentity] Failed to clear anonymous user ID from localStorage:", error);
+  }
 }

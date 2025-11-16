@@ -14,7 +14,7 @@ import { queryEntryNFTsByOwner } from "@/lib/mintContract";
 import { decryptData, decryptDataWithMigration, generateUserKey, generateUserKeyFromId, DecryptionError, DecryptionErrorType, PUBLIC_SEAL_KEY } from "@/lib/encryption";
 import type { EncryptedData } from "@/lib/encryption";
 import { getAnonymousUserKey, getOrCreateAnonymousUserKey } from "@/lib/anonymousIdentity";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
+import GlobalControls from "@/components/GlobalControls";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Legend, CartesianGrid } from "recharts";
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +32,8 @@ import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { zhTW, enUS } from "date-fns/locale";
 import jsPDF from "jspdf";
+import { useSelectedNetwork } from "@/hooks/useSelectedNetwork";
+import { useNetworkChangeListener } from "@/hooks/useNetworkChangeListener";
 
 interface EmotionRecord {
   id: string;
@@ -61,6 +63,8 @@ const Timeline = () => {
   const currentAccount = useCurrentAccount();
   const { t, i18n } = useTranslation();
   const { toast } = useToast();
+  const network = useSelectedNetwork();
+  const isTestnet = network === "testnet";
   const [filter, setFilter] = useState<FilterType>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -204,16 +208,29 @@ const Timeline = () => {
   }, [navigate]);
 
   useEffect(() => {
+    // 使用一个标志来跟踪这个 effect 是否仍然有效
+    let isCancelled = false;
+    const currentNetworkSnapshot = network; // 捕获当前的网络值
+    const currentAccountSnapshot = currentAccount; // 捕获当前的账户值
+
     const loadRecords = async () => {
       setIsLoading(true);
       const allRecords: EmotionRecord[] = [];
 
       try {
+        // 检查是否已被取消（网络或账户已切换）
+        if (isCancelled) {
+          console.log("[Timeline] Load cancelled due to network/account change");
+          return;
+        }
         // 1. 嘗試從本地儲存載入記錄
         try {
+          // 再次检查是否已被取消
+          if (isCancelled) return;
+          
           // Try to load records with all possible keys (handles account switching)
           // This function will automatically try Supabase session, anonymous ID, and wallet address
-          const localRecords = await listEmotionRecordsWithAllKeys(currentAccount?.address);
+          const localRecords = await listEmotionRecordsWithAllKeys(currentAccountSnapshot?.address);
           
           // Check if there's a decryption warning
           if ((localRecords as any).__decryptionWarning) {
@@ -339,15 +356,19 @@ const Timeline = () => {
           }
           
           // 如果有錢包連接，嘗試查詢鏈上的 Walrus blob 物件
-          if (currentAccount?.address) {
-            console.log("[Timeline] Wallet connected, querying on-chain blobs for:", currentAccount.address);
+          if (currentAccountSnapshot?.address) {
+            // 再次检查是否已被取消
+            if (isCancelled) return;
+            
+            console.log("[Timeline] Wallet connected, querying on-chain blobs for:", currentAccountSnapshot.address);
             try {
               setIsQueryingOnChain(true);
-              console.log("[Timeline] Querying on-chain Walrus blobs for address:", currentAccount.address);
+              console.log("[Timeline] Querying on-chain Walrus blobs for address:", currentAccountSnapshot.address);
               console.log("[Timeline] Environment check:", {
                 hasSession: !!session,
-                hasWallet: !!currentAccount,
-                walletAddress: currentAccount.address,
+                hasWallet: !!currentAccountSnapshot,
+                walletAddress: currentAccountSnapshot.address,
+                network: currentNetworkSnapshot,
                 apiBase: import.meta.env.VITE_API_BASE || "http://localhost:3001"
               });
               
@@ -357,7 +378,7 @@ const Timeline = () => {
                 description: t("timeline.queryingOnChainDesc"),
               });
                 
-                const onChainBlobs = await queryWalrusBlobsByOwner(currentAccount.address);
+                const onChainBlobs = await queryWalrusBlobsByOwner(currentAccountSnapshot.address, currentNetworkSnapshot);
                 console.log(`[Timeline] Found ${onChainBlobs.length} on-chain Walrus blobs`);
                 console.log(`[Timeline] On-chain blob IDs:`, onChainBlobs.map(b => b.blobId));
                 
@@ -393,20 +414,20 @@ const Timeline = () => {
                       intensity: 50, // 預設值
                       description: "", // 加密內容，需要解密才能顯示
                       blob_id: blob.blobId,
-                      walrus_url: getWalrusUrl(blob.blobId),
+                      walrus_url: getWalrusUrl(blob.blobId, currentNetworkSnapshot),
                       payload_hash: "",
                       is_public: false,
                       proof_status: "confirmed", // 鏈上記錄肯定是已確認的
                       sui_ref: blob.objectId,
                       created_at: blob.createdAt || new Date().toISOString(),
-                      wallet_address: currentAccount?.address || null,
+                      wallet_address: currentAccountSnapshot?.address || null,
                     };
                     allRecords.push(onChainRecord);
                     addedCount++;
                     console.log(`[Timeline] ✅ Added on-chain record:`, {
                       blobId: blob.blobId,
                       objectId: blob.objectId,
-                      walrusUrl: getWalrusUrl(blob.blobId)
+                      walrusUrl: getWalrusUrl(blob.blobId, currentNetworkSnapshot)
                     });
                   } else {
                     let updated = false;
@@ -422,8 +443,8 @@ const Timeline = () => {
                         updated = true;
                       }
                     }
-                    if (currentAccount?.address && !existing.wallet_address) {
-                      existing.wallet_address = currentAccount.address;
+                    if (currentAccountSnapshot?.address && !existing.wallet_address) {
+                      existing.wallet_address = currentAccountSnapshot.address;
                       updated = true;
                     }
                     if (updated) {
@@ -454,8 +475,11 @@ const Timeline = () => {
               
               // 4. 查詢 EntryNFT（如果錢包已連接）
               try {
-                console.log("[Timeline] Querying EntryNFTs for address:", currentAccount.address);
-                const entryNFTs = await queryEntryNFTsByOwner(currentAccount.address);
+                // 再次检查是否已被取消
+                if (isCancelled) return;
+                
+                console.log("[Timeline] Querying EntryNFTs for address:", currentAccountSnapshot.address, "on network:", currentNetworkSnapshot);
+                const entryNFTs = await queryEntryNFTsByOwner(currentAccountSnapshot.address, currentNetworkSnapshot);
                 console.log(`[Timeline] Found ${entryNFTs.length} EntryNFTs`);
                 
                 let nftAddedCount = 0;
@@ -510,7 +534,7 @@ const Timeline = () => {
                       proof_status: "confirmed", // NFT 肯定是已確認的
                       sui_ref: nft.nftId,
                       created_at: nft.timestamp,
-                      wallet_address: currentAccount?.address || null,
+                      wallet_address: currentAccountSnapshot?.address || null,
                       tags: tags.length > 0 ? tags : undefined,
                       transaction_digest: nft.transactionDigest || null, // 從鏈上 NFT 對象的 previousTransaction 獲取
                     };
@@ -791,29 +815,53 @@ const Timeline = () => {
           sui_ref: r.sui_ref
         })));
 
-        setRecords(uniqueRecords);
+        // 最后检查是否已被取消，只有在未被取消时才更新状态
+        if (!isCancelled) {
+          setRecords(uniqueRecords);
+        } else {
+          console.log("[Timeline] Skipping state update - load was cancelled");
+        }
       } catch (error) {
-        console.error("Error loading records:", error);
+        if (!isCancelled) {
+          console.error("Error loading records:", error);
+        }
       } finally {
-        setIsLoading(false);
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
       }
     };
 
     loadRecords();
-  }, [currentAccount]);
+    
+    // 清理函数：当 effect 重新运行或组件卸载时，标记为已取消
+    return () => {
+      isCancelled = true;
+    };
+  }, [currentAccount, network]); // 添加 network 到依赖项，网络切换时自动重新加载
+
+  // 监听网络切换，重新加载记录
+  // 通过添加 network 到依赖项，当网络切换时会自动重新加载
+  useNetworkChangeListener((newNetwork, oldNetwork) => {
+    console.log(`[Timeline] Network changed from ${oldNetwork} to ${newNetwork}, will reload records...`);
+    // 网络切换时，React Query 缓存已被清理，useEffect 会重新运行
+    // 这里只需要记录日志，实际的重新加载由 useEffect 的依赖项触发
+  });
 
   // 生成 Sui Scan 链接（对象）
   const getSuiScanUrl = (objectId: string | null): string | null => {
     if (!objectId) return null;
-    // Sui Scan testnet URL format: https://suiscan.xyz/testnet/object/{objectId}
-    return `https://suiscan.xyz/testnet/object/${objectId}`;
+    // Sui Scan URL format: https://suiscan.xyz/{network}/object/{objectId}
+    const networkPath = network === "mainnet" ? "mainnet" : "testnet";
+    return `https://suiscan.xyz/${networkPath}/object/${objectId}`;
   };
 
   // 生成 Sui Scan 交易链接
   const getSuiScanTransactionUrl = (transactionDigest: string | null | undefined): string | null => {
     if (!transactionDigest) return null;
-    // Sui Scan testnet transaction URL format: https://suiscan.xyz/testnet/tx/{transactionDigest}
-    return `https://suiscan.xyz/testnet/tx/${transactionDigest}`;
+    // Sui Scan transaction URL format: https://suiscan.xyz/{network}/tx/{transactionDigest}
+    const networkPath = network === "mainnet" ? "mainnet" : "testnet";
+    return `https://suiscan.xyz/${networkPath}/tx/${transactionDigest}`;
   };
 
   // 指數退避重試函數
@@ -913,7 +961,7 @@ const Timeline = () => {
         // 從 Walrus 讀取加密資料（帶重試機制）
         try {
           encryptedDataString = await retryWithBackoff(
-            () => readFromWalrus(record.blob_id),
+            () => readFromWalrus(record.blob_id, network),
             3,
             1000
           );
@@ -2387,7 +2435,7 @@ const Timeline = () => {
             {t("common.back")}
           </Button>
           <div className="flex items-center gap-2">
-            <LanguageSwitcher />
+            <GlobalControls />
             <Button variant="ghost" onClick={() => navigate("/")} className="text-muted-foreground">
               <Home className="h-4 w-4" />
             </Button>
@@ -2412,7 +2460,7 @@ const Timeline = () => {
         )}
 
         {/* Testnet Warning Banner - 只顯示一次 */}
-        {showWarningBanner && (
+        {showWarningBanner && isTestnet && (
           <Card 
             key="testnet-warning-banner" 
             className="p-4 mb-4 bg-yellow-500/10 border-yellow-500/30"

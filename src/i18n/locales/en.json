@@ -45,7 +45,10 @@
     "connected": "Connected",
     "disconnected": "Disconnected",
     "testnet": "Testnet",
-    "testnetNotice": "⚠️ This app is currently running on Sui Testnet for testing purposes only"
+    "mainnet": "Mainnet",
+    "network": "Network",
+    "testnetNotice": "⚠️ This app is currently running on Sui Testnet for testing purposes only",
+    "mainnetNotice": "✅ Connected to Sui Mainnet. Transactions are live."
   },
   "disclaimer": {
     "title": "Important Notice",

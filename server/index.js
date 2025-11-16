@@ -163,8 +163,38 @@ async function requireAuth(req, res, next) {
 
 const DATA_DIR = path.join(process.cwd(), "server", "data");
 const DATA_FILE = path.join(DATA_DIR, "emotions.json");
-const WALRUS_PUBLISHER_URL = process.env.WALRUS_PUBLISHER_URL || "https://upload-relay.testnet.walrus.space";
-const WALRUS_AGGREGATOR_URL = process.env.WALRUS_AGGREGATOR_URL || "https://aggregator.testnet.walrus.space";
+const DEFAULT_WALRUS_NETWORK = process.env.WALRUS_NETWORK === "mainnet" ? "mainnet" : "testnet";
+const WALRUS_NETWORK_CONFIGS = {
+  testnet: {
+    publisher: process.env.WALRUS_PUBLISHER_TESTNET_URL || "https://upload-relay.testnet.walrus.space",
+    aggregator: process.env.WALRUS_AGGREGATOR_TESTNET_URL || "https://aggregator.testnet.walrus.space",
+  },
+  mainnet: {
+    publisher: process.env.WALRUS_PUBLISHER_MAINNET_URL || "https://upload-relay.mainnet.walrus.space",
+    aggregator: process.env.WALRUS_AGGREGATOR_MAINNET_URL || "https://aggregator.mainnet.walrus.space",
+  },
+};
+
+// Legacy single-network env vars for backward compatibility
+if (process.env.WALRUS_PUBLISHER_URL) {
+  WALRUS_NETWORK_CONFIGS[DEFAULT_WALRUS_NETWORK].publisher = process.env.WALRUS_PUBLISHER_URL;
+}
+if (process.env.WALRUS_AGGREGATOR_URL) {
+  WALRUS_NETWORK_CONFIGS[DEFAULT_WALRUS_NETWORK].aggregator = process.env.WALRUS_AGGREGATOR_URL;
+}
+
+function resolveWalrusNetwork(networkParam) {
+  return networkParam === "mainnet" ? "mainnet" : "testnet";
+}
+
+function getWalrusConfig(networkParam) {
+  const network = resolveWalrusNetwork(networkParam);
+  return { ...WALRUS_NETWORK_CONFIGS[network], network };
+}
+
+const DEFAULT_WALRUS_CONFIG = getWalrusConfig(DEFAULT_WALRUS_NETWORK);
+const DEFAULT_WALRUS_PUBLISHER_URL = DEFAULT_WALRUS_CONFIG.publisher;
+const DEFAULT_WALRUS_AGGREGATOR_URL = DEFAULT_WALRUS_CONFIG.aggregator;
 const DEFAULT_EPOCHS = Number(process.env.WALRUS_EPOCHS || 200); // 200 epochs (~200 days on testnet)
 const WALRUS_ENABLED = process.env.WALRUS_ENABLED !== "false"; // Default to true, can be disabled via env var
 const BLOB_ID_PATTERN = /^[A-Za-z0-9_-]{32,128}$/;
@@ -277,7 +307,7 @@ async function writeAll(list) {
 }
 
 async function uploadToWalrus(encryptedData, epochs = DEFAULT_EPOCHS) {
-  const url = `${WALRUS_PUBLISHER_URL}/v1/store?epochs=${epochs}`;
+  const url = `${DEFAULT_WALRUS_PUBLISHER_URL}/v1/store?epochs=${epochs}`;
   console.log(`[Walrus] Uploading to ${url}, data size: ${encryptedData.length} bytes, epochs: ${epochs}`);
   
   try {
@@ -299,7 +329,7 @@ async function uploadToWalrus(encryptedData, epochs = DEFAULT_EPOCHS) {
       
       // Provide more specific error messages based on status code
       if (res.status === 404) {
-        throw new Error(`Walrus service endpoint not found. Please check if the service is available at ${WALRUS_PUBLISHER_URL}`);
+        throw new Error(`Walrus service endpoint not found. Please check if the service is available at ${DEFAULT_WALRUS_PUBLISHER_URL}`);
       } else if (res.status === 413) {
         throw new Error(`Data too large (${encryptedData.length} bytes). Maximum size exceeded.`);
       } else if (res.status >= 500) {
@@ -326,7 +356,7 @@ async function uploadToWalrus(encryptedData, epochs = DEFAULT_EPOCHS) {
     
     return {
       blobId,
-      walrusUrl: `${WALRUS_AGGREGATOR_URL}/v1/${blobId}`,
+      walrusUrl: `${DEFAULT_WALRUS_AGGREGATOR_URL}/v1/${blobId}`,
       suiRef: result.newlyCreated?.blobObject?.id || null,
       raw: result,
     };
@@ -495,14 +525,18 @@ app.get("/api/walrus/:blobId", async (req, res) => {
       });
     }
     
+    const network = resolveWalrusNetwork(req.query.network);
+    const { aggregator } = getWalrusConfig(network);
+    
     const sanitizedBlobId = encodeURIComponent(blobId);
-    const walrusResponse = await fetch(`${WALRUS_AGGREGATOR_URL}/v1/${sanitizedBlobId}`);
+    const walrusResponse = await fetch(`${aggregator}/v1/${sanitizedBlobId}`);
     
     if (!walrusResponse.ok) {
       const errorText = await walrusResponse.text();
       console.error("[Walrus Proxy] Aggregator error:", {
         status: walrusResponse.status,
         blobId: `${blobId.slice(0, 8)}...`,
+        network,
         error: errorText,
       });
       
@@ -519,6 +553,7 @@ app.get("/api/walrus/:blobId", async (req, res) => {
         success: false,
         error: message,
         status: walrusResponse.status,
+        network,
       });
     }
     
@@ -526,6 +561,7 @@ app.get("/api/walrus/:blobId", async (req, res) => {
     res.setHeader("Content-Type", walrusResponse.headers.get("Content-Type") || "application/json");
     res.setHeader("Cache-Control", "no-store");
     res.setHeader("X-Walrus-Proxy", "true");
+    res.setHeader("X-Walrus-Network", network);
     return res.status(200).send(payload);
   } catch (error) {
     console.error("[Walrus Proxy] Unexpected error:", error);
@@ -579,12 +615,15 @@ app.get("/api/emotions/blob/:blobId", async (req, res) => {
 
     if (!record.encrypted_data) {
       try {
-        const walrusResponse = await fetch(`${WALRUS_AGGREGATOR_URL}/v1/${encodeURIComponent(blobId)}`);
+        const network = resolveWalrusNetwork(req.query.network);
+        const { aggregator } = getWalrusConfig(network);
+        const walrusResponse = await fetch(`${aggregator}/v1/${encodeURIComponent(blobId)}`);
         if (!walrusResponse.ok) {
           const errorText = await walrusResponse.text();
           return res.status(walrusResponse.status).json({
             success: false,
             error: errorText || `Failed to fetch encrypted data from Walrus (${walrusResponse.status}).`,
+            network,
           });
         }
         const payload = await walrusResponse.text();
@@ -593,6 +632,7 @@ app.get("/api/emotions/blob/:blobId", async (req, res) => {
         return res.json({
           success: true,
           encryptedData: payload,
+          network,
         });
       } catch (walrusError) {
         console.error("[API] Failed to fetch Walrus backup:", walrusError);

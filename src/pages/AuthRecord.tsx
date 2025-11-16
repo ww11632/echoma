@@ -14,7 +14,7 @@ import { validateAndSanitizeDescription } from "@/lib/validation";
 import { encryptData, generateUserKeyFromId, PUBLIC_SEAL_KEY } from "@/lib/encryption";
 import { prepareEmotionSnapshot } from "@/lib/walrus";
 import { emotionSnapshotSchema } from "@/lib/validation";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
+import GlobalControls from "@/components/GlobalControls";
 import type { User, Session } from "@supabase/supabase-js";
 
 const emotionValues = [
@@ -341,7 +341,7 @@ const AuthRecord = () => {
     <div className="min-h-screen relative overflow-hidden">
       {/* Language Switcher */}
       <div className="absolute top-4 right-4 z-20">
-        <LanguageSwitcher />
+        <GlobalControls />
       </div>
       
       <div className="absolute top-20 left-10 w-64 h-64 bg-primary/20 rounded-full blur-3xl animate-pulse-glow" />

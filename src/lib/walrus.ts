@@ -11,12 +11,26 @@ import { Transaction } from "@mysten/sui/transactions";
 import { toBase64 } from "@mysten/sui/utils";
 import { Ed25519PublicKey } from "@mysten/sui/keypairs/ed25519";
 import type { WalrusClient } from "@mysten/walrus";
+import { getCurrentNetwork, getNetworkConfig, type SuiNetwork } from "./networkConfig";
 
-// Walrus testnet configuration (new upload relay + aggregator hosts)
-const WALRUS_PUBLISHER_URL = "https://upload-relay.testnet.walrus.space";
-const WALRUS_AGGREGATOR_URL = "https://aggregator.testnet.walrus.space";
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:3001";
-const DEFAULT_EPOCHS = 200; // Store for 200 epochs (testnet epochs are ~1 day each, so ~200 days)
+const DEFAULT_EPOCHS = 200; // Default storage duration (epochs)
+
+interface WalrusEndpoints {
+  publisherUrl: string;
+  aggregatorUrl: string;
+  network: SuiNetwork;
+}
+
+function getWalrusEndpoints(network?: SuiNetwork): WalrusEndpoints {
+  const activeNetwork = network || getCurrentNetwork();
+  const config = getNetworkConfig(activeNetwork);
+  return {
+    publisherUrl: config.walrusUploadRelay,
+    aggregatorUrl: config.walrusAggregator,
+    network: activeNetwork,
+  };
+}
 
 export interface WalrusUploadResult {
   blobId: string;
@@ -81,15 +95,18 @@ interface WalrusChangedObject {
  */
 export async function uploadToWalrus(
   encryptedData: string,
-  epochs: number = DEFAULT_EPOCHS
+  epochs: number = DEFAULT_EPOCHS,
+  network?: SuiNetwork
 ): Promise<WalrusUploadResult> {
   // Validate epochs parameter
   if (epochs < 1 || epochs > 100) {
     throw new Error("Invalid storage duration");
   }
 
+  const { publisherUrl } = getWalrusEndpoints(network);
+
   try {
-    const response = await fetch(`${WALRUS_PUBLISHER_URL}/v1/store?epochs=${epochs}`, {
+    const response = await fetch(`${publisherUrl}/v1/store?epochs=${epochs}`, {
       method: "PUT",
       body: encryptedData,
       headers: {
@@ -176,15 +193,17 @@ export function isValidBlobId(blobId: string): boolean {
 /**
  * Read data from Walrus storage
  */
-export async function readFromWalrus(blobId: string): Promise<string> {
+export async function readFromWalrus(blobId: string, network?: SuiNetwork): Promise<string> {
   if (!isValidBlobId(blobId)) {
     const error: any = new Error("Invalid blob ID format");
     error.status = 400;
     throw error;
   }
 
+  const { aggregatorUrl, network: activeNetwork } = getWalrusEndpoints(network);
+
   try {
-    return await fetchWalrusDirect(blobId);
+    return await fetchWalrusDirect(blobId, aggregatorUrl);
   } catch (error) {
     if (!shouldFallbackToProxy(error)) {
       throw error;
@@ -194,15 +213,15 @@ export async function readFromWalrus(blobId: string): Promise<string> {
       message: (error as Error).message,
     });
     
-    return await fetchWalrusViaProxy(blobId);
+    return await fetchWalrusViaProxy(blobId, activeNetwork);
   }
 }
 
-async function fetchWalrusDirect(blobId: string): Promise<string> {
+async function fetchWalrusDirect(blobId: string, aggregatorUrl: string): Promise<string> {
   const sanitizedBlobId = encodeURIComponent(blobId);
   
   try {
-    const response = await fetch(`${WALRUS_AGGREGATOR_URL}/v1/${sanitizedBlobId}`);
+    const response = await fetch(`${aggregatorUrl}/v1/${sanitizedBlobId}`);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -233,11 +252,12 @@ async function fetchWalrusDirect(blobId: string): Promise<string> {
   }
 }
 
-async function fetchWalrusViaProxy(blobId: string): Promise<string> {
+async function fetchWalrusViaProxy(blobId: string, network?: SuiNetwork): Promise<string> {
   const sanitizedBlobId = encodeURIComponent(blobId);
+  const networkQuery = network ? `?network=${network}` : "";
   
   try {
-    const response = await fetch(`${API_BASE}/api/walrus/${sanitizedBlobId}`, {
+    const response = await fetch(`${API_BASE}/api/walrus/${sanitizedBlobId}${networkQuery}`, {
       headers: {
         "Accept": "application/json",
       },
@@ -309,8 +329,9 @@ function normalizeWalrusError(error: unknown): Error {
 /**
  * Generate Walrus URL for a blob
  */
-export function getWalrusUrl(blobId: string): string {
-  return `${WALRUS_AGGREGATOR_URL}/v1/${blobId}`;
+export function getWalrusUrl(blobId: string, network?: SuiNetwork): string {
+  const { aggregatorUrl } = getWalrusEndpoints(network);
+  return `${aggregatorUrl}/v1/${blobId}`;
 }
 
 /**
@@ -318,15 +339,17 @@ export function getWalrusUrl(blobId: string): string {
  * Returns blob IDs and object IDs for records stored on-chain
  */
 export async function queryWalrusBlobsByOwner(
-  ownerAddress: string
+  ownerAddress: string,
+  network?: SuiNetwork
 ): Promise<Array<{ blobId: string; objectId: string; createdAt?: string }>> {
   try {
+    const targetNetwork = network || getCurrentNetwork();
     const client = new SuiClient({
-      url: getFullnodeUrl("testnet"),
-      network: "testnet",
+      url: getFullnodeUrl(targetNetwork),
+      network: targetNetwork,
     });
 
-    console.log(`[Walrus Query] Querying Walrus blobs for owner: ${ownerAddress}`);
+    console.log(`[Walrus Query] Querying Walrus blobs for owner: ${ownerAddress} on ${targetNetwork}`);
 
     // Cache transaction timestamps and object details to avoid duplicate RPC calls
     const txTimestampCache = new Map<string, string | undefined>();
@@ -527,14 +550,15 @@ export async function queryWalrusBlobsByOwner(
  * Create Walrus client for SDK usage
  * The walrus SDK extends a SuiClient, so we need to create a SuiClient first
  */
-function createWalrusClient(): WalrusClient {
+function createWalrusClient(network?: SuiNetwork): WalrusClient {
+  const targetNetwork = network || getCurrentNetwork();
   const suiClient = new SuiClient({
-    url: getFullnodeUrl("testnet"),
-    network: "testnet", // Required for walrus to work correctly
+    url: getFullnodeUrl(targetNetwork),
+    network: targetNetwork,
   });
   
   // Extend the SuiClient with walrus functionality
-  return suiClient.$extend(walrus()) as unknown as WalrusClient;
+  return suiClient.$extend(walrus({ network: targetNetwork })) as unknown as WalrusClient;
 }
 
 /**
@@ -544,14 +568,17 @@ function createWalrusClient(): WalrusClient {
 export function createSignerFromWallet(
   wallet: any,
   accountAddress: string,
-  suiClient?: SuiClient
+  suiClient?: SuiClient,
+  network?: SuiNetwork
 ): Signer {
   if (!wallet) {
     throw new Error("Wallet is not connected");
   }
 
+  const targetNetwork = network || getCurrentNetwork();
   const clientToUse = suiClient || new SuiClient({
-    url: getFullnodeUrl("testnet"),
+    url: getFullnodeUrl(targetNetwork),
+    network: targetNetwork,
   });
 
   // Helper to sign bytes using wallet
@@ -568,7 +595,7 @@ export function createSignerFromWallet(
         const result = await signFeature.signTransactionBlock({
           transactionBlock: tx,
           account: { address: accountAddress },
-          chain: 'sui:testnet', // Required: Sui chain identifier
+          chain: `sui:${targetNetwork}`, // Required: Sui chain identifier
         });
         
         // Convert signature to Uint8Array
@@ -592,7 +619,7 @@ export function createSignerFromWallet(
         const result = await wallet.features.sui.signTransactionBlock({
           transactionBlock: tx,
           account: { address: accountAddress },
-          chain: 'sui:testnet', // Required: Sui chain identifier
+          chain: `sui:${targetNetwork}`, // Required: Sui chain identifier
         });
         
         const signature = typeof result.signature === 'string'
@@ -1036,7 +1063,8 @@ function buildChangedObjects(response: any): WalrusChangedObject[] {
 export async function uploadToWalrusWithSDK(
   encryptedData: string,
   signer: Signer,
-  epochs: number = DEFAULT_EPOCHS
+  epochs: number = DEFAULT_EPOCHS,
+  network?: SuiNetwork
 ): Promise<{
   blobId: string;
   walrusUrl: string;
@@ -1048,7 +1076,7 @@ export async function uploadToWalrusWithSDK(
 
   try {
     console.log("[Walrus SDK] Creating client...");
-    const client = createWalrusClient();
+    const client = createWalrusClient(network);
     
     const blob = new TextEncoder().encode(encryptedData);
     console.log("[Walrus SDK] Data size:", blob.length, "bytes");
@@ -1265,7 +1293,7 @@ export async function uploadToWalrusWithSDK(
 
     return {
       blobId,
-      walrusUrl: getWalrusUrl(blobId),
+      walrusUrl: getWalrusUrl(blobId, network),
       suiRef,
     };
   } catch (error: any) {
@@ -1346,7 +1374,8 @@ export function prepareEmotionSnapshot(
  */
 export async function storeEmotionSnapshot(
   snapshot: EmotionSnapshot,
-  encryptedData: string
+  encryptedData: string,
+  network?: SuiNetwork
 ): Promise<{
   blobId: string;
   walrusUrl: string;
@@ -1357,11 +1386,11 @@ export async function storeEmotionSnapshot(
   const payloadHash = await hashData(encryptedData);
   
   // Upload to Walrus
-  const uploadResult = await uploadToWalrus(encryptedData);
+  const uploadResult = await uploadToWalrus(encryptedData, DEFAULT_EPOCHS, network);
   
   return {
     blobId: uploadResult.blobId,
-    walrusUrl: getWalrusUrl(uploadResult.blobId),
+    walrusUrl: getWalrusUrl(uploadResult.blobId, network),
     payloadHash,
     suiRef: uploadResult.suiRef,
   };
