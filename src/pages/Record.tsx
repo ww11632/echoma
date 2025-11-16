@@ -1173,6 +1173,11 @@ const Record = () => {
                   {t("record.characters", { count: description.length })} / 5000
                 </p>
               </div>
+              {mintAsNFT && (
+                <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
+                  {t("record.onChainWarning")}
+                </p>
+              )}
 
               {/* AI Response Button */}
               <Button

@@ -104,6 +104,7 @@
     "addDescriptionFirst": "Please describe what happened first",
     "descriptionPlaceholder": "Describe the event that triggered this emotion... (will be encrypted)",
     "descriptionHint": "🔒 Your description will be encrypted on the client side before storage",
+    "onChainWarning": "⚠️ This caption will be stored on-chain. Please avoid personal identifiers or full sensitive content.",
     "characters": "{{count}}/5000 characters",
     "tags": "Tags/Categories",
     "tagsDesc": "Add tags to categorize and find records (optional)",

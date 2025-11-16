@@ -104,6 +104,7 @@
     "addDescriptionFirst": "請先描述發生了什麼事",
     "descriptionPlaceholder": "描述觸發這個情緒的事件...（將被加密）",
     "descriptionHint": "🔒 您的描述在儲存前會在客戶端加密",
+    "onChainWarning": "⚠️ 此描述將存儲在鏈上。請避免包含個人識別資訊或完整敏感內容。",
     "characters": "{{count}}/5000 字元",
     "tags": "標籤/分類",
     "tagsDesc": "為記錄添加標籤以便分類和查找（可選）",
