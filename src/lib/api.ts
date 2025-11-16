@@ -127,8 +127,10 @@ export async function getEncryptedEmotionByBlob(
       throw new Error(data.error || "Failed to fetch encrypted data");
     }
     
+    // If encryptedData is null, it means data is on Walrus only (not in DB backup)
+    // The caller should fetch directly from Walrus instead
     if (!data.encryptedData) {
-      throw new Error("Failed to fetch encrypted data from server.");
+      throw new Error("Data not available in database backup - fetch from Walrus instead");
     }
     
     return data.encryptedData as string;
