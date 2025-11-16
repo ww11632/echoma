@@ -72,18 +72,20 @@ export async function getEmotions(accessToken?: string) {
 // Get emotions by wallet address (for anonymous users)
 export async function getEmotionsByWallet(walletAddress: string) {
   try {
-    const { data, error } = await supabase.functions.invoke(
-      `get-emotions-by-wallet/${encodeURIComponent(walletAddress)}`,
-      { method: 'GET' }
-    );
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const functionUrl = `${supabaseUrl}/functions/v1/get-emotions-by-wallet?walletAddress=${encodeURIComponent(walletAddress)}`;
     
-    if (error) {
-      console.error("[API] Failed to fetch emotions by wallet:", error);
-      throw new Error(error.message || "Failed to fetch");
-    }
+    const res = await fetch(functionUrl, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
     
-    if (!data || !data.success) {
-      throw new Error(data?.error || "Failed to fetch");
+    const data = await res.json();
+    
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || "Failed to fetch");
     }
     
     return data.records as any[];
@@ -94,21 +96,39 @@ export async function getEmotionsByWallet(walletAddress: string) {
 }
 
 // Fetch encrypted snapshot from server as Walrus fallback
-export async function getEncryptedEmotionByBlob(blobId: string, network?: "testnet" | "mainnet"): Promise<string> {
+export async function getEncryptedEmotionByBlob(
+  blobId: string, 
+  network?: "testnet" | "mainnet",
+  accessToken?: string
+): Promise<string> {
   try {
-    const networkQuery = network ? `?network=${network}` : "";
-    const { data, error } = await supabase.functions.invoke(
-      `get-encrypted-blob/${encodeURIComponent(blobId)}${networkQuery}`,
-      { method: 'GET' }
-    );
+    const headers: Record<string, string> = {};
     
-    if (error) {
-      console.error("[API] Failed to fetch encrypted blob:", error);
-      throw new Error(error.message || "Failed to fetch encrypted data");
+    // Add auth header if we have an access token
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
     }
     
-    if (!data || !data.success || !data.encryptedData) {
-      throw new Error(data?.error || "Failed to fetch encrypted data from server.");
+    // Build the full URL with query parameters
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const functionUrl = `${supabaseUrl}/functions/v1/get-encrypted-blob?blobId=${encodeURIComponent(blobId)}${network ? `&network=${network}` : ''}`;
+    
+    const res = await fetch(functionUrl, {
+      method: 'GET',
+      headers: {
+        ...headers,
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    const data = await res.json();
+    
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || "Failed to fetch encrypted data");
+    }
+    
+    if (!data.encryptedData) {
+      throw new Error("Failed to fetch encrypted data from server.");
     }
     
     return data.encryptedData as string;

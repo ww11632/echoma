@@ -661,7 +661,7 @@ const AuthTimeline = () => {
           console.warn(`[Timeline] Walrus fetch failed for ${record.blob_id}, falling back to server backup`, walrusError);
           try {
             encryptedDataString = await retryWithBackoff(
-              () => getEncryptedEmotionByBlob(record.blob_id, recordNetwork),
+              () => getEncryptedEmotionByBlob(record.blob_id, recordNetwork, session?.access_token),
               2,
               500
             );
