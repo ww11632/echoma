@@ -378,8 +378,9 @@ export async function getOrCreateJournal(
   // 1. 檢查本地存儲（使用網絡特定的鍵）
   let journalId = getJournalId(walletAddress, targetNetwork);
   if (journalId) {
-      // 驗證 Journal 是否仍然存在於正確的網絡上
+      // 驗證 Journal 是否仍然存在於正確的網絡上，且類型匹配當前 Package ID
       try {
+        const packageId = getPackageId(targetNetwork);
         const journal = await getClientForNetwork(targetNetwork).getObject({ 
           id: journalId,
           options: {
@@ -387,14 +388,31 @@ export async function getOrCreateJournal(
             showType: true,
           },
         });
-        // 驗證對象確實存在且類型正確
-        if (journal.data) {
-          console.log(`[mintContract] Found existing Journal ${journalId} on ${targetNetwork}`);
+        // 驗證對象確實存在
+        if (!journal.data) {
+          throw new Error("Journal object not found");
+        }
+        
+        // 驗證類型是否匹配當前 Package ID
+        const expectedType = `${packageId}::${MODULE}::Journal`;
+        const actualType = journal.data.type;
+        
+        if (actualType !== expectedType) {
+          console.warn(
+            `[mintContract] Journal type mismatch. Expected ${expectedType}, but got ${actualType}. ` +
+            `This Journal was created with an old package ID. Clearing cache and will create new Journal.`
+          );
+          // Journal 類型不匹配（可能是舊的 Package ID），清除本地存儲
+          clearJournalId(walletAddress);
+          journalId = null;
+        } else {
+          // Journal 存在且類型正確
+          console.log(`[mintContract] Found existing Journal ${journalId} on ${targetNetwork} with correct type`);
           return journalId;
         }
       } catch (error: any) {
-        console.warn(`[mintContract] Journal ${journalId} not found on ${targetNetwork}, clearing cache:`, error.message);
-        // Journal 不存在，清除本地存儲
+        console.warn(`[mintContract] Journal ${journalId} verification failed on ${targetNetwork}, clearing cache:`, error.message);
+        // Journal 不存在或驗證失敗，清除本地存儲
         clearJournalId(walletAddress);
         journalId = null;
       }
