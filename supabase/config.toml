@@ -5,3 +5,12 @@ verify_jwt = true
 
 [functions.ai-emotion-response]
 verify_jwt = false
+
+[functions.get-encrypted-blob]
+verify_jwt = false
+
+[functions.get-emotions-by-wallet]
+verify_jwt = false
+
+[functions.get-emotions]
+verify_jwt = true
