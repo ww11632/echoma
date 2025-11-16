@@ -537,6 +537,44 @@ export async function mintEntry(
   const audioDurationValue = audioDurationMs || 0;
 
   const packageId = getPackageId(currentNetwork);
+  
+  // Verify Journal object exists and has correct type before building transaction
+  try {
+    const journal = await getClientForNetwork(currentNetwork).getObject({
+      id: journalId,
+      options: {
+        showType: true,
+        showContent: true,
+      },
+    });
+    
+    if (!journal.data) {
+      throw new Error(`Journal object ${journalId} not found on ${currentNetwork}`);
+    }
+    
+    const expectedType = `${packageId}::${MODULE}::Journal`;
+    const actualType = journal.data.type;
+    
+    if (actualType !== expectedType) {
+      throw new Error(
+        `Journal type mismatch. Expected ${expectedType}, but got ${actualType}. ` +
+        `This Journal may be from a different network or package.`
+      );
+    }
+    
+    console.log("[mintContract] Journal verified:", {
+      journalId,
+      type: actualType,
+      network: currentNetwork,
+    });
+  } catch (error: any) {
+    console.error("[mintContract] Journal verification failed:", error);
+    throw new Error(
+      `Failed to verify Journal object: ${error.message}. ` +
+      `Please ensure the Journal exists on ${currentNetwork} and belongs to package ${packageId}`
+    );
+  }
+  
   console.log("[mintContract] Building transaction with params:", {
     journalId,
     moodScore,
