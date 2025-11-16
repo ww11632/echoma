@@ -37,6 +37,7 @@ i18n
       },
     },
     fallbackLng: 'en',
+    lng: 'en', // Set default language to English
     defaultNS: 'translation',
     interpolation: {
       escapeValue: false,
@@ -51,15 +52,11 @@ i18n
     },
   });
 
-// 如果沒有手動設置語言，自動檢測並設置系統語言
+// 如果沒有手動設置語言，使用英文作為預設
 const storedLang = localStorage.getItem('i18nextLng');
 if (!storedLang || (storedLang !== 'zh-TW' && storedLang !== 'en')) {
-  // 檢測系統語言
-  const systemLang = navigator.language || (navigator as any).userLanguage || 'en';
-  const normalizedLang = normalizeLanguage(systemLang);
-  
-  // 設置檢測到的語言
-  i18n.changeLanguage(normalizedLang);
+  // 設置英文為預設語言
+  i18n.changeLanguage('en');
 }
 
 export default i18n;
