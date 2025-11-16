@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:3001";
+import { supabase } from "@/integrations/supabase/client";
 
 export async function postEmotion(payload: {
   emotion: string;
@@ -11,29 +11,18 @@ export async function postEmotion(payload: {
   network?: "testnet" | "mainnet";
 }) {
   try {
-    const res = await fetch(`${API_BASE}/api/emotion`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+    const { data, error } = await supabase.functions.invoke('upload-emotion', {
+      body: payload,
     });
     
-    let data;
-    try {
-      data = await res.json();
-    } catch (parseError) {
-      // If response is not JSON, read as text
-      const text = await res.text();
-      console.error("[API] Failed to parse response as JSON:", text);
-      throw new Error(`Server error (${res.status}): ${res.statusText || "Invalid response"}`);
+    if (error) {
+      console.error("[API] Request failed:", error);
+      throw new Error(error.message || "Failed to upload emotion");
     }
     
-    if (!res.ok || !data.success) {
-      const errorMessage = data.error || `Request failed with status ${res.status}`;
-      console.error("[API] Request failed:", {
-        status: res.status,
-        error: errorMessage,
-        data,
-      });
+    if (!data || !data.success) {
+      const errorMessage = data?.error || "Request failed";
+      console.error("[API] Request failed:", data);
       throw new Error(errorMessage);
     }
     
@@ -50,56 +39,82 @@ export async function postEmotion(payload: {
       };
     };
   } catch (error) {
-    // Re-throw if it's already an Error with a message
     if (error instanceof Error) {
       throw error;
     }
-    // Handle other types of errors
     console.error("[API] Unexpected error:", error);
     throw new Error("Network error. Please check your connection and try again.");
   }
 }
 
 export async function getEmotions(accessToken?: string) {
-  const headers: HeadersInit = { "Content-Type": "application/json" };
-  
-  // 如果有access token，添加到请求头
-  if (accessToken) {
-    headers["Authorization"] = `Bearer ${accessToken}`;
+  try {
+    const { data, error } = await supabase.functions.invoke('get-emotions', {
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    });
+    
+    if (error) {
+      console.error("[API] Failed to fetch emotions:", error);
+      throw new Error(error.message || "Failed to fetch emotions");
+    }
+    
+    if (!data || !data.success) {
+      throw new Error(data?.error || "Failed to fetch");
+    }
+    
+    return data.records as any[];
+  } catch (error) {
+    console.error("[API] Error fetching emotions:", error);
+    throw error;
   }
-  
-  const res = await fetch(`${API_BASE}/api/emotions`, {
-    headers,
-  });
-  
-  const data = await res.json();
-  if (!res.ok || !data.success) {
-    throw new Error(data.error || "Failed to fetch");
-  }
-  return data.records as any[];
 }
 
 // Get emotions by wallet address (for anonymous users)
 export async function getEmotionsByWallet(walletAddress: string) {
-  const res = await fetch(`${API_BASE}/api/emotions/by-wallet/${encodeURIComponent(walletAddress)}`, {
-    headers: { "Content-Type": "application/json" },
-  });
-  
-  const data = await res.json();
-  if (!res.ok || !data.success) {
-    throw new Error(data.error || "Failed to fetch");
+  try {
+    const { data, error } = await supabase.functions.invoke(
+      `get-emotions-by-wallet/${encodeURIComponent(walletAddress)}`,
+      { method: 'GET' }
+    );
+    
+    if (error) {
+      console.error("[API] Failed to fetch emotions by wallet:", error);
+      throw new Error(error.message || "Failed to fetch");
+    }
+    
+    if (!data || !data.success) {
+      throw new Error(data?.error || "Failed to fetch");
+    }
+    
+    return data.records as any[];
+  } catch (error) {
+    console.error("[API] Error fetching emotions by wallet:", error);
+    throw error;
   }
-  return data.records as any[];
 }
 
 // Fetch encrypted snapshot from server as Walrus fallback
 export async function getEncryptedEmotionByBlob(blobId: string, network?: "testnet" | "mainnet"): Promise<string> {
-  const networkQuery = network ? `?network=${network}` : "";
-  const res = await fetch(`${API_BASE}/api/emotions/blob/${encodeURIComponent(blobId)}${networkQuery}`);
-  const data = await res.json();
-  if (!res.ok || !data.success || !data.encryptedData) {
-    throw new Error(data.error || "Failed to fetch encrypted data from server.");
+  try {
+    const networkQuery = network ? `?network=${network}` : "";
+    const { data, error } = await supabase.functions.invoke(
+      `get-encrypted-blob/${encodeURIComponent(blobId)}${networkQuery}`,
+      { method: 'GET' }
+    );
+    
+    if (error) {
+      console.error("[API] Failed to fetch encrypted blob:", error);
+      throw new Error(error.message || "Failed to fetch encrypted data");
+    }
+    
+    if (!data || !data.success || !data.encryptedData) {
+      throw new Error(data?.error || "Failed to fetch encrypted data from server.");
+    }
+    
+    return data.encryptedData as string;
+  } catch (error) {
+    console.error("[API] Error fetching encrypted blob:", error);
+    throw error;
   }
-  return data.encryptedData as string;
 }
 
