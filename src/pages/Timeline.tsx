@@ -1020,7 +1020,13 @@ const Timeline = () => {
               console.log(`[Timeline] Successfully fetched from Walrus`);
             } catch (walrusError) {
               console.error(`[Timeline] Walrus fetch failed:`, walrusError);
-              throw new Error(`This record is stored on Walrus decentralized storage, but it's currently unavailable. This may be due to: network connectivity issues, Walrus service downtime, or the data may have expired. Please try again later.`);
+              // Create a more specific error for Walrus unavailability
+              const walrusUnavailableError = new Error(
+                `Network error: Walrus decentralized storage is currently unavailable. This may be due to: CORS restrictions, network connectivity issues, Walrus service downtime, or the data may have expired. Please try again later.`
+              );
+              (walrusUnavailableError as any).isWalrusError = true;
+              (walrusUnavailableError as any).originalError = walrusError;
+              throw walrusUnavailableError;
             }
           } else {
             // Other database errors
