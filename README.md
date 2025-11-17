@@ -162,6 +162,8 @@ Echoma layers multiple defenses to keep data private and verifiable:
 **Data Flow:** Record → Encrypt → Store (Walrus) → Verify (Sui NFT)
 
 📖 **Detailed documentation:**
+- [THREAT_MODEL_EN.md](./THREAT_MODEL_EN.md) – threat model and design trade-offs (English)
+- [THREAT_MODEL.md](./THREAT_MODEL.md) – 威脅模型與設計取捨 (中文)
 - [SECURITY_FEATURES.md](./SECURITY_FEATURES.md) – comprehensive security overview
 - [SECURITY_BEST_PRACTICES.md](./SECURITY_BEST_PRACTICES.md) – security audit checklist
 - [Security_Test_Guide.md](./Security_Test_Guide.md) – security test suite guide

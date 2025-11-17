@@ -165,6 +165,7 @@ Echoma 採用多層安全防護，保護用戶數據和隱私：
 **數據流程：** 記錄 → 加密 → 儲存（Walrus）→ 驗證（Sui NFT）
 
 📖 **詳細文檔：**
+- [THREAT_MODEL.md](./THREAT_MODEL.md) – 威脅模型與設計取捨
 - [SECURITY_FEATURES.md](./SECURITY_FEATURES.md) – 完整安全功能說明
 - [SECURITY_BEST_PRACTICES.md](./SECURITY_BEST_PRACTICES.md) – 安全審計檢查清單
 - [Security_Test_Guide.md](./Security_Test_Guide.md) – 安全測試套件指南
@@ -351,6 +352,7 @@ Echoma 提供三種不同的使用模式，滿足不同需求：
 - [Sui 區塊鏈文檔](https://docs.sui.io/)
 - [Walrus 儲存文檔](https://docs.walrus.space/)
 - [shadcn/ui 文檔](https://ui.shadcn.com/)
+- [威脅模型](./THREAT_MODEL.md) - 威脅來源分析與設計取捨理由
 - [安全功能說明](./SECURITY_FEATURES.md) - AI 安全防護、審計日誌、API key rotation
 - [安全最佳實踐](./SECURITY_BEST_PRACTICES.md) - 加密機制安全審計報告
 - [Security_Test_Guide.md](./Security_Test_Guide.md) - 完整的安全測試套件文檔（可重現、可量測、可審計）
