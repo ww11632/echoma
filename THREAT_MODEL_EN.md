@@ -1,17 +1,132 @@
 # Threat Model and Security Design Trade-offs
 
-## Overview
+## One-Sentence Version
+
+Echoma treats "emotions" as medical-grade sensitive data: content is only decrypted on the client side, but the fact and timestamp of existence can be verified on-chain by anyone.
+
+---
+
+## 📋 Executive Summary (1-2 Minutes Read)
+
+### 1. What Are We Protecting?
+
+- **Highly personal emotional and psychological event narratives**
+- **Corresponding timelines, emotional intensity, and optional on-chain proofs (NFTs)**
+
+This data is more dangerous than typical transaction records—once leaked, it's not just "money lost," but an entire life story exposed to the world.
+
+### 2. Who Are the Adversaries?
+
+#### ① Users Themselves (Future Self)
+- **Threats**: Accidental deletion, device change, forgotten keys
+- **Mitigation**:
+  - Deterministic key derivation based on user secrets (wallet signatures / login credentials) → enables cross-device recovery
+  - Walrus decentralized storage → not bound to a single device
+  - Sui NFT → even if local data is lost, can still prove that "emotional event" existed
+
+#### ② External Attackers
+- **Threats**: Eavesdropping, DB breaches, man-in-the-middle, brute-force attacks
+- **Mitigation**:
+  - Client-side AES-256-GCM encryption, data is ciphertext before leaving device
+  - PBKDF2 / Argon2id key strengthening, reduces brute-force feasibility
+  - GCM authentication tags automatically detect passive/active tampering
+  - Walrus distributed storage reduces "take down one DB and get everything" risk
+
+#### ③ Cloud Platforms and Infrastructure Providers
+- **Threats**: Supabase administrators, cloud providers, forced data handover
+- **Mitigation**:
+  - Server only holds ciphertext and minimal necessary metadata, maintains "practical zero-knowledge" of content
+  - Users can choose "full Walrus + wallet mode," independent of any account system
+  - Anonymous mode doesn't bind to email / Web2 identity
+
+#### ④ Governments and Regulatory Agencies
+- **Threats**: Judicial subpoenas, censorship, state-level surveillance
+- **Mitigation**:
+  - Even if server is forced to hand over data, only ciphertext is available
+  - Walrus + Sui decentralized architecture prevents single country from completely shutting down data source
+  - On-chain NFTs only expose "an encrypted emotional event at a certain timestamp," not content
+
+#### ⑤ Development Team Itself
+- **Threats**: Backdoors, malicious updates, "casual viewing" of data during growth
+- **Mitigation**:
+  - Open-source encryption logic → auditable
+  - Client-side encryption by design → team doesn't hold decryption keys
+  - Threat model in README itself serves as self-constraint
+
+#### ⑥ Future Attackers and Quantum Computers
+- **Threats**: Stronger brute-force capabilities, AI-assisted cryptanalysis
+- **Mitigation**:
+  - Use AES-256 (still requires 2¹²⁸ level operations under Grover's model)
+  - Preserve version and algorithm fields in ciphertext header → can upgrade to PQC (e.g., Kyber) in future
+  - On-chain timestamps guarantee "authenticity of records at that time," even if encryption is broken decades later
+
+### 3. Why "AES-GCM + Walrus + Sui NFT"?
+
+**Data Flow:**
+```
+User Input → Client-side AES-GCM Encryption → Walrus Blob Storage → Sui NFT Proof (with Walrus blob reference)
+```
+
+**This combination simultaneously satisfies:**
+- **Confidentiality**: Only key holders can see content
+- **Verifiability**: Anyone can verify "this record existed at a certain time"
+- **Availability and Cost**: Walrus handles long-term blob storage, chain only stores indices and proofs, gas costs are controllable
+- **Evolvability**: Encryption versions, KDF parameters, storage strategies can all be rolled out incrementally
+
+**Why Walrus is Particularly Suitable for Emotional Journals:**
+
+Emotional journal requirements:
+- **Highly sensitive content** → must be end-to-end encrypted
+- **Yet must be accessible to future self / doctors / partners** → requires verifiable long-term attestation
+
+Traditional clouds only achieve the former, blockchains usually only achieve the latter. Echoma uses Walrus to make both possible simultaneously for the first time.
+
+### 4. Why We Deliberately Didn't Choose Other Solutions?
+
+#### ❌ Simple DB only
+- **Pros**: Fast development
+- **Cons**: Everyone must trust that DB; completely insufficient for emotional data
+
+#### ❌ IPFS
+- **Pros**: Content-addressable
+- **Cons**: Persistence and availability depend on pin services, effectively semi-centralized, also slow
+
+#### ❌ EVM Chain + NFT
+- **Pros**: Mature tooling
+- **Cons**: Gas too expensive, throughput too low, not practical for daily emotional journaling
+
+#### ❌ zk-Proof from the start
+- **Pros**: Academically elegant
+- **Cons**: Cost and complexity not worth it at MVP stage; overkill for "validate requirements first"
+
+**Walrus + Sui's positioning hits a sweet spot:**
+- Price and performance make daily use reasonable
+- Decentralization sufficient to resist single-point failures and censorship
+- Can serve as foundation for future zk extensions (has on-chain commitments, stable blob layer)
+
+### 5. Future Security Upgrade Roadmap
+
+- Make Argon2id the default KDF (currently enhanced PBKDF2)
+- Add "passphrase mode" so non-wallet users can also get high-strength keys
+- Add optional zk-Proof mode for specific use cases (e.g., clinical psychology integration)
+- Prepare PQC upgrade path (ciphertext headers already versioned)
+
+---
+
+## 📖 Detailed Version
+
+### Overview
 
 This document outlines Echoma's threat model, security objectives, and the rationale behind our technical design choices. Echoma employs a **client-side encryption + decentralized storage + blockchain verifiability** architecture to protect privacy while providing tamper-proof attestations.
 
 ---
 
-## Threat Source Analysis
+## Threat Source Analysis (Detailed)
 
 ### 1. Users Themselves
 - **Threats**: Accidental deletion, device loss, forgotten keys
 - **Mitigation**:
-  - Deterministic key derivation (based on wallet address or user ID), enabling cross-device recovery
+  - Deterministic key derivation based on user secrets (wallet signatures, login credentials), enabling cross-device recovery
   - Walrus decentralized storage, data not dependent on a single device
   - NFT on-chain proofs, allowing verification of record existence even if local data is lost
 
@@ -26,7 +141,7 @@ This document outlines Echoma's threat model, security objectives, and the ratio
 ### 3. Cloud Platforms (Supabase/Service Providers)
 - **Threats**: Server-side data breaches, backend administrator access, data handover under compliance requirements
 - **Mitigation**:
-  - **Zero-knowledge architecture**: Servers only store encrypted data, cannot decrypt
+  - **Practical zero-knowledge architecture**: Server only sees encrypted payloads, maintains "practical zero-knowledge" of content, cannot decrypt on its own
   - **Optional decentralized storage**: Users can choose Walrus over Supabase, completely independent of centralized services
   - **Anonymous mode**: No registration required, reducing identity correlation
 
@@ -34,7 +149,7 @@ This document outlines Echoma's threat model, security objectives, and the ratio
 - **Threats**: Legal requirements to hand over data, surveillance, censorship
 - **Mitigation**:
   - **Client-side encryption**: Even if data is requested, it cannot be decrypted (unless keys are obtained)
-  - **Decentralized storage**: Walrus is based on Sui blockchain, no single entity can control it
+  - **Decentralized storage**: Walrus provides stronger persistence and censorship resistance than single DB through on-chain commitments + decentralized replicators
   - **Blockchain immutability**: NFTs prove record existence and timestamps, preventing post-facto modification
 
 ### 5. Vendors/Development Team
@@ -77,7 +192,7 @@ This document outlines Echoma's threat model, security objectives, and the ratio
 
 ---
 
-## Design Trade-off Rationale
+## Design Trade-off Rationale (Detailed)
 
 ### Why Choose **AES-GCM + Walrus + NFT**?
 
@@ -128,7 +243,7 @@ User Input → Client-side AES-GCM Encryption → Walrus Decentralized Storage �
 - ❌ **Insufficient verifiability**: IPFS itself doesn't provide timestamp proofs, requires additional blockchain layer
 
 **Our Solution Advantages:**
-- ✅ Walrus is based on Sui blockchain, data persistence guaranteed by blockchain
+- ✅ Walrus provides stronger persistence and censorship resistance than single DB through on-chain commitments + decentralized replicators
 - ✅ Fast Walrus retrieval, suitable for real-time applications
 - ✅ Controllable costs (pay per epochs, predictable)
 - ✅ NFTs directly provide timestamps and existence proofs
@@ -212,12 +327,12 @@ User Input → Client-side AES-GCM Encryption → Walrus Decentralized Storage �
 2. **Key Derivation**: PBKDF2 100k-1M iterations, complies with OWASP recommendations
 3. **Data Integrity**: AES-GCM authentication tags + blockchain hashes, dual protection
 4. **Immutability**: Blockchain NFTs provide undeniable existence proofs
-5. **Zero-Knowledge Architecture**: Servers cannot decrypt user data (unless keys are obtained)
+5. **Practical Zero-Knowledge Architecture**: Servers cannot decrypt user data (unless keys are obtained)
 
 ### Audit Points
 
 - ✅ Encryption algorithms and parameters comply with industry standards (NIST, OWASP)
-- ✅ Client-side encryption ensures server zero-knowledge
+- ✅ Client-side encryption ensures server practical zero-knowledge
 - ✅ Decentralized storage reduces single-point-of-failure risk
 - ✅ Blockchain proofs provide verifiable timestamps and existence
 - ✅ Versioned encryption headers support future algorithm upgrades
@@ -244,4 +359,3 @@ User Input → Client-side AES-GCM Encryption → Walrus Decentralized Storage �
 ---
 
 **Conclusion**: Echoma's threat model covers a wide range of threat scenarios from personal errors to future AI attacks. We chose the **AES-GCM + Walrus + Sui NFT** architecture, achieving the best balance between confidentiality, verifiability, performance, and cost. This design is verifiable, auditable, and complies with industry security standards.
-

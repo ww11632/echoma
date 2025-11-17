@@ -1,5 +1,15 @@
 # 安全功能實現說明
 
+## TL;DR – Threat Model in 5 Lines
+
+- **Data type**: 高度敏感的情緒日記資料（emotional journals）
+- **Adversaries**: 雲端供應商、政府、未來攻擊者、甚至未來後悔的自己（誤刪資料）
+- **Core guarantees**: 客戶端 AES-256-GCM、確定性密鑰派生、Walrus blobs、Sui NFTs
+- **Non-goals**: 我們不試圖隱藏鏈上存在性，只隱藏內容
+- **Why Walrus**: 長期、低成本、可驗證的加密儲存，而非 plain DB/IPFS
+
+---
+
 本文檔說明已實現的安全功能，用於防止 Prompt Injection、越權資料洩漏，並提供審計日誌和 API key rotation 支持。
 
 ## 一、防止 Prompt Injection / 越權資料洩漏
