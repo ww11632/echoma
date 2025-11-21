@@ -130,18 +130,57 @@ export const ShareRecordDialog: React.FC<ShareRecordDialogProps> = ({
               }
             } catch (error: any) {
               const errorMessage = error?.message || "";
-              if (errorMessage.includes("没有访问策略") || errorMessage.includes("does not have an access policy")) {
+              
+              // 检查是否是 RPC 序列化错误
+              const isRpcError = errorMessage.includes("RPC_SERIALIZATION_ERROR") ||
+                                errorMessage.includes("malformed utf8") ||
+                                errorMessage.includes("Deserialization error");
+              
+              if (isRpcError) {
+                // RPC 序列化错误，使用交易事件作为备选方案
+                console.warn("[ShareRecordDialog] ⚠️ RPC 序列化错误，尝试从交易事件验证...");
+                try {
+                  const checkResult = await checkIfMintedWithSealPolicies(entryNftId, currentNetwork, suiClient);
+                  if (checkResult.mintedWithPolicies && checkResult.policyCreatedEvent) {
+                    // 从事件中获取策略类型
+                    const isPublicFromEvent = checkResult.policyCreatedEvent.is_public || false;
+                    setPolicyExists(true);
+                    setIsPublicRecord(isPublicFromEvent);
+                    console.log("[ShareRecordDialog] ✅ 通过交易事件验证成功", { isPublic: isPublicFromEvent });
+                    
+                    // 如果是私有记录，尝试加载授权地址（可能也会失败，但不影响主流程）
+                    if (!isPublicFromEvent) {
+                      try {
+                        const authorized = await getAuthorizedAddresses(entryNftId, registryId, currentNetwork, suiClient);
+                        setAuthorizedAddresses(authorized);
+                      } catch {
+                        // 忽略错误，不影响分享功能
+                      }
+                    }
+                  } else {
+                    setPolicyExists(false);
+                    setIsPublicRecord(null);
+                    console.warn("[ShareRecordDialog] ⚠️ 交易事件中未找到策略");
+                  }
+                } catch (checkError) {
+                  setPolicyExists(false);
+                  setIsPublicRecord(null);
+                  console.warn("[ShareRecordDialog] ⚠️ RPC 错误且交易事件检查也失败:", checkError);
+                }
+              } else if (errorMessage.includes("没有访问策略") || errorMessage.includes("does not have an access policy")) {
                 // 可能是索引延迟，尝试从交易记录判定是否使用了 Seal Policies
                 console.warn("[ShareRecordDialog] ⚠️ 直接检查策略失败，尝试从交易记录判断是否已使用 Seal Access Policies 铸造...");
                 try {
                   const checkResult = await checkIfMintedWithSealPolicies(entryNftId, currentNetwork, suiClient);
                   if (checkResult.mintedWithPolicies) {
                     // 链上已创建策略，但索引未就绪
+                    const isPublicFromEvent = checkResult.policyCreatedEvent?.is_public || false;
                     setPolicyExists(true);
-                    setIsPublicRecord(false);
+                    setIsPublicRecord(isPublicFromEvent);
                     setPolicyVerificationPending(true);
-                    console.warn("[ShareRecordDialog] ⏳ 策略已创建，但索引未同步完成，稍后重试", {
+                    console.warn("[ShareRecordDialog] ⏳ 策略已创建，但索引未同步完成", {
                       transactionDigest: checkResult.transactionDigest,
+                      isPublic: isPublicFromEvent,
                     });
                   } else {
                     setPolicyExists(false);
