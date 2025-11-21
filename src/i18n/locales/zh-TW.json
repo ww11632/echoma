@@ -689,7 +689,9 @@
       "granted": "授權成功",
       "grantedDesc": "已授權該地址訪問此記錄",
       "revoked": "撤銷成功",
-      "revokedDesc": "已撤銷該地址的訪問權限"
+      "revokedDesc": "已撤銷該地址的訪問權限",
+      "labelSaved": "標籤已保存",
+      "labelSavedDesc": "地址標籤已成功更新"
     },
     "registryNotAvailable": "PolicyRegistry 不可用，請先部署合約",
     "publicRecord": "公開記錄",
@@ -709,6 +711,10 @@
     "noAuthorizedHint": "點擊上方按鈕授權他人訪問此記錄",
     "grantedAt": "授權於",
     "revokeAccess": "撤銷訪問",
+    "editLabel": "編輯標籤",
+    "addLabel": "添加標籤",
+    "saveLabel": "保存標籤",
+    "cancelEdit": "取消",
     "info": {
       "title": "鏈上驗證與審計",
       "verifiable": "所有授權操作都記錄在 Sui 區塊鏈上，可公開驗證",

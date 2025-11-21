@@ -699,7 +699,9 @@
       "granted": "Access Granted",
       "grantedDesc": "The address has been granted access to this record",
       "revoked": "Access Revoked",
-      "revokedDesc": "The address access has been revoked"
+      "revokedDesc": "The address access has been revoked",
+      "labelSaved": "Label Saved",
+      "labelSavedDesc": "Address label has been successfully updated"
     },
     "registryNotAvailable": "PolicyRegistry not available, please deploy contract first",
     "publicRecord": "Public Record",
@@ -719,6 +721,10 @@
     "noAuthorizedHint": "Click the button above to authorize others to access this record",
     "grantedAt": "Granted At",
     "revokeAccess": "Revoke Access",
+    "editLabel": "Edit Label",
+    "addLabel": "Add Label",
+    "saveLabel": "Save Label",
+    "cancelEdit": "Cancel",
     "info": {
       "title": "On-Chain Verification & Audit",
       "verifiable": "All authorization operations are recorded on Sui blockchain and publicly verifiable",

@@ -29,7 +29,7 @@ import {
   checkIfMintedWithSealPolicies,
 } from "@/lib/mintContract";
 import { saveAccessLabel, getAccessLabel, deleteAccessLabel } from "@/lib/accessLabels";
-import { UserPlus, UserMinus, Shield, Users, Loader2, Clock, History, CheckCircle2, XCircle, RefreshCw } from "lucide-react";
+import { UserPlus, UserMinus, Shield, Users, Loader2, Clock, History, CheckCircle2, XCircle, RefreshCw, Tag, Edit2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { SuiNetwork } from "@/lib/networkConfig";
 
@@ -85,6 +85,10 @@ export const AccessControlManager: React.FC<AccessControlManagerProps> = ({
   const [policyVerificationPending, setPolicyVerificationPending] = useState(false); // 链上策略已创建但索引未完成
   const [pendingTxDigest, setPendingTxDigest] = useState<string | null>(null);
   const retryTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  // 标签编辑状态
+  const [editingLabelAddress, setEditingLabelAddress] = useState<string | null>(null);
+  const [editingLabel, setEditingLabel] = useState("");
 
   // 清理重试定时器
   useEffect(() => {
@@ -499,6 +503,9 @@ export const AccessControlManager: React.FC<AccessControlManagerProps> = ({
         suiClient
       );
 
+      // 删除本地标签
+      deleteAccessLabel(entryNftId, address, effectiveNetwork);
+      
       if (txDigest) {
         toast({
           title: t("accessControl.success.revoked") || "撤銷成功",
@@ -535,6 +542,42 @@ export const AccessControlManager: React.FC<AccessControlManagerProps> = ({
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // 开始编辑标签
+  const handleStartEditLabel = (address: string, currentLabel?: string) => {
+    setEditingLabelAddress(address);
+    setEditingLabel(currentLabel || "");
+  };
+
+  // 保存标签
+  const handleSaveLabel = (address: string) => {
+    if (editingLabel.trim()) {
+      saveAccessLabel(entryNftId, address, editingLabel.trim(), effectiveNetwork);
+      
+      // 更新本地状态
+      setAuthorizedAddresses(prev => 
+        prev.map(item => 
+          item.address === address 
+            ? { ...item, label: editingLabel.trim() }
+            : item
+        )
+      );
+      
+      toast({
+        title: t("accessControl.success.labelSaved") || "標籤已保存",
+        description: t("accessControl.success.labelSavedDesc") || "地址標籤已成功更新",
+      });
+    }
+    
+    setEditingLabelAddress(null);
+    setEditingLabel("");
+  };
+
+  // 取消编辑标签
+  const handleCancelEditLabel = () => {
+    setEditingLabelAddress(null);
+    setEditingLabel("");
   };
 
   if (!policyRegistryId) {
@@ -784,33 +827,102 @@ export const AccessControlManager: React.FC<AccessControlManagerProps> = ({
           </p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {authorizedAddresses.map((item) => (
             <div
               key={item.address}
-              className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50 transition-colors"
+              className="group flex items-start justify-between p-4 border rounded-lg hover:bg-muted/30 transition-colors"
             >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  {item.label && (
-                    <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full">
-                      {item.label}
-                    </span>
+              <div className="flex-1 min-w-0 space-y-2">
+                {/* 标签和地址行 */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {editingLabelAddress === item.address ? (
+                    // 编辑模式
+                    <div className="flex items-center gap-2">
+                      <Select value={editingLabel} onValueChange={setEditingLabel}>
+                        <SelectTrigger className="h-7 w-32">
+                          <SelectValue placeholder={t("accessControl.selectRole") || "選擇角色"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {presetLabels.map((preset) => (
+                            <SelectItem key={preset.value} value={preset.label}>
+                              {preset.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2"
+                        onClick={() => handleSaveLabel(item.address)}
+                      >
+                        <CheckCircle2 className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2"
+                        onClick={handleCancelEditLabel}
+                      >
+                        <XCircle className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    // 显示模式
+                    <>
+                      {item.label ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm px-3 py-1 bg-primary/20 text-primary rounded-full font-medium flex items-center gap-1">
+                            <Tag className="h-3 w-3" />
+                            {item.label}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:opacity-100"
+                            onClick={() => handleStartEditLabel(item.address, item.label)}
+                            title={t("accessControl.editLabel") || "編輯標籤"}
+                          >
+                            <Edit2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-6 text-xs"
+                          onClick={() => handleStartEditLabel(item.address)}
+                        >
+                          <Tag className="h-3 w-3 mr-1" />
+                          {t("accessControl.addLabel") || "添加標籤"}
+                        </Button>
+                      )}
+                    </>
                   )}
-                  <span className="text-sm font-medium font-mono truncate">
-                    {item.address.slice(0, 10)}...{item.address.slice(-8)}
+                </div>
+                
+                {/* 地址行 */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground font-mono">
+                    {item.address.slice(0, 14)}...{item.address.slice(-10)}
                   </span>
                 </div>
+                
+                {/* 授权时间 */}
                 {item.grantedAt && (
-                  <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     {t("accessControl.grantedAt") || "授權於"} {new Date(item.grantedAt).toLocaleString("zh-TW")}
                   </div>
                 )}
               </div>
+              
+              {/* 撤销按钮 */}
               <Button
                 size="sm"
                 variant="ghost"
+                className="ml-2"
                 onClick={() => handleRevokeAccess(item.address)}
                 disabled={isLoading}
                 title={t("accessControl.revokeAccess") || "撤銷訪問"}
