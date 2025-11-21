@@ -24,6 +24,8 @@
 
 **One-line pitch:** *"We encrypt your emotions before they leave your device, store them on decentralized Walrus, and prove their existence with NFTs on Sui—all while maintaining zero-knowledge privacy."*
 
+**Key innovation:** Emotional data becomes a governed, revocable, verifiable, zero-knowledge data primitive on Sui.
+
 ---
 
 ## 🎯 Why This Matters for DATA SECURITY & PRIVACY
@@ -35,6 +37,11 @@ Emotional and mental health data is among the **most sensitive personal informat
 -  **Privacy laws**: GDPR/CCPA require user data sovereignty, but platforms don't deliver
 
 ### Our Solution: Four-Layer Defense
+
+- **Layer 1:** Client-side cryptography (Argon2id → AES-GCM)
+- **Layer 2:** Encrypted blobs on Walrus
+- **Layer 3:** NFT attestations on Sui
+- **Layer 4:** Seal-based grant/revoke governance
 
 ```
 📝 User Input
@@ -55,7 +62,7 @@ Emotional and mental health data is among the **most sensitive personal informat
 | Requirement | Our Implementation | Evidence |
 |-------------|-------------------|----------|
 | **Fraud Detection** | AI crisis detection + audit logs | [SECURITY_FEATURES.md](./SECURITY_FEATURES.md#ai-safeguards) |
-| **Zero-Knowledge Proofs** | End-to-end encryption; platform has zero knowledge of content | [Encryption Guide](./Encryption_Mechanism_Guide.md) |
+| **Zero-Knowledge Privacy (ZK-property)** | End-to-end encryption ensures the platform never learns plaintext | [Encryption Guide](./Encryption_Mechanism_Guide.md) |
 | **Verifiable Storage** | Walrus blob IDs + Sui NFT proofs | [WALRUS_SETUP.md](./WALRUS_SETUP.md) |
 | **Compliance Privacy** | User-controlled keys, GDPR-aligned data sovereignty | [THREAT_MODEL_EN.md](./THREAT_MODEL_EN.md) |
 
@@ -76,7 +83,7 @@ graph LR
     style E fill:#f59f00,stroke:#e67700,color:#fff
 ```
 
-### 🎯 What Makes echōma Different?
+### 🎯 What Makes Echoma Different?
 
 | Feature | Web3 Apps Without Client-Side Encryption | Echoma |
 |---------|------------------------|---------|
@@ -88,7 +95,7 @@ graph LR
 
 ### Competitive Advantage
 
-| Feature | Day One | Notion | Echoma |
+| Feature | Centralized mental-health apps | IPFS-based Web3 diaries | Echoma |
 |---------|---------|--------|--------|
 | End-to-End Encryption | ❌ | ❌ | ✅ |
 | User Controls Keys | ❌ | ❌ | ✅ |
@@ -562,6 +569,8 @@ Mental health data breaches have **real consequences**:
 - In 2023, therapy platform BetterHelp paid $7.8M for selling patient data
 - Traditional EHR systems leaked 133M+ records in 2022
 - Depression/anxiety journals used for insurance discrimination
+
+(Sources: FTC BetterHelp settlement 2023; HIPAA breach reports 2022; academic/industry reports on insurance discrimination.)
 
 **Echoma proves Web3 can fix this.** By putting privacy *before* features and *sovereignty before convenience*, we show that blockchain isn't just for DeFi—it's for **human dignity**.
 
