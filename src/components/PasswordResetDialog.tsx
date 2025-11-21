@@ -25,7 +25,6 @@ import {
   getPasswordContext,
   clearPasswordConfig 
 } from "@/lib/userPassword";
-import { PasswordStrengthIndicator } from "./PasswordStrengthIndicator";
 
 interface PasswordResetDialogProps {
   open: boolean;
@@ -157,19 +156,6 @@ export function PasswordResetDialog({
             </AlertDescription>
           </Alert>
 
-          {/* Backup Reminder */}
-          <Alert variant="default" className="border-red-200 bg-red-50 dark:bg-red-950/20">
-            <AlertTriangle className="h-4 w-4 text-red-600" />
-            <AlertDescription className="text-sm text-red-900 dark:text-red-100">
-              <strong>{t("settings.backupReminder.title", "⚠️ 重要：請先備份數據")}</strong>
-              <ul className="mt-2 list-disc list-inside space-y-1 text-xs">
-                <li>{t("settings.backupReminder.step1", "建議先導出時間線中的所有記錄（CSV/JSON 格式）")}</li>
-                <li>{t("settings.backupReminder.step2", "如果密碼重置失敗，備份可以幫助您恢復數據")}</li>
-                <li>{t("settings.backupReminder.step3", "此操作不可撤銷，請謹慎操作")}</li>
-              </ul>
-            </AlertDescription>
-          </Alert>
-
           <div className="space-y-2">
             <Label htmlFor="old-password">{t("password.oldPassword", "舊密碼")} *</Label>
             <div className="relative">
@@ -220,9 +206,6 @@ export function PasswordResetDialog({
                 {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
-            
-            {/* Password Strength Indicator */}
-            <PasswordStrengthIndicator password={newPassword} />
           </div>
 
           <div className="space-y-2">

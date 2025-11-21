@@ -10,7 +10,6 @@ export interface EmotionRecord {
   isPublic?: boolean; // 是否公開分享（可選，向後兼容）
   intensity?: number; // 情緒強度 0-100（可選，向後兼容）
   tags?: string[]; // 標籤/分類（可選）
-  network?: "testnet" | "mainnet" | "local"; // 網絡標識（可選，向後兼容）用於區分不同網絡的數據
 }
 
 export const EMOTION_OPTIONS: { label: string; value: EmotionType }[] = [

@@ -10,7 +10,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Sparkles, ArrowLeft } from "lucide-react";
 import { PasswordSetupDialog } from "@/components/PasswordSetupDialog";
 import { hasPasswordSetup, passwordCache, getPasswordContext } from "@/lib/userPassword";
-import MvpGlobalControls from "@/components/MvpGlobalControls";
 
 const MvpRecord = () => {
   const navigate = useNavigate();
@@ -50,7 +49,6 @@ const MvpRecord = () => {
         note: note.trim(),
         proof: null,
         version: "1.0.0",
-        network: "local", // MVP模式是本地存储，不涉及网络
       };
       await addEmotionRecord(record);
       toast({
@@ -93,11 +91,6 @@ const MvpRecord = () => {
         onComplete={handlePasswordSetupComplete}
         onSkip={handlePasswordSetupSkip}
       />
-      
-      {/* Global Controls */}
-      <div className="fixed top-4 right-4 z-50">
-        <MvpGlobalControls />
-      </div>
       
       <div className="max-w-2xl mx-auto">
         <Button

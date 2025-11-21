@@ -19,7 +19,6 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Eye, EyeOff, Lock, Info } from "lucide-react";
 import { validatePasswordStrength, savePasswordConfig, passwordCache, getPasswordContext } from "@/lib/userPassword";
-import { PasswordStrengthIndicator } from "./PasswordStrengthIndicator";
 
 interface PasswordSetupDialogProps {
   open: boolean;
@@ -134,9 +133,6 @@ export function PasswordSetupDialog({
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
-            
-            {/* Password Strength Indicator */}
-            <PasswordStrengthIndicator password={password} />
           </div>
 
           <div className="space-y-2">
