@@ -81,7 +81,13 @@
     "confirmNewPassword": "確認新密碼",
     "newHint": "新密碼提示",
     "resetting": "重置中...",
-    "resetPassword": "重置密碼"
+    "resetPassword": "重置密碼",
+    "strength": {
+      "weak": "弱",
+      "medium": "中等",
+      "strong": "強",
+      "good": "密碼強度良好"
+    }
   },
   "share": {
     "title": "分享記錄",
@@ -723,5 +729,63 @@
     },
     "retry": "重試",
     "retrying": "重試中..."
+  },
+  "settings": {
+    "title": "設置",
+    "password": {
+      "title": "密碼管理",
+      "description": "管理您的加密密碼，保護本地數據安全",
+      "status": "狀態",
+      "configured": "已設置加密密碼",
+      "notConfigured": "未設置加密密碼",
+      "active": "已啟用",
+      "inactive": "未啟用",
+      "setup": "設置密碼",
+      "reset": "重置密碼",
+      "setupSuccess": "密碼設置成功",
+      "resetSuccess": "密碼重置成功",
+      "resetSuccessDesc": "已重新加密 {{private}} 條私密記錄和 {{public}} 條公開記錄"
+    },
+    "keyVersion": {
+      "title": "密鑰版本",
+      "description": "查看當前加密密鑰版本信息",
+      "current": "當前版本",
+      "created": "創建時間",
+      "derived": "派生密鑰",
+      "password": "密碼密鑰"
+    },
+    "migration": {
+      "title": "數據遷移",
+      "recommended": "建議進行數據遷移",
+      "recommendedDesc": "檢測到您使用的是舊版本密鑰，建議遷移到新版本以增強安全性",
+      "start": "開始遷移",
+      "confirmDesc": "此操作將使用新版本密鑰重新加密所有本地數據。確定要繼續嗎？",
+      "migrating": "遷移中...",
+      "success": "遷移成功",
+      "successDesc": "已遷移 {{private}} 條私密記錄和 {{public}} 條公開記錄",
+      "failed": "遷移失敗"
+    },
+    "cache": {
+      "title": "緩存管理",
+      "description": "清除密碼緩存，下次使用時需要重新輸入密碼",
+      "clear": "清除緩存",
+      "cleared": "緩存已清除",
+      "clearedDesc": "密碼緩存已清除，下次使用時需要重新輸入",
+      "clearConfirm": "確認清除緩存？",
+      "clearConfirmDesc": "清除後需要重新輸入密碼才能訪問加密數據"
+    },
+    "security": {
+      "title": "安全提示",
+      "passwordNotStored": "密碼從不存儲或上傳到任何服務器",
+      "cannotRecover": "如果忘記密碼，我們無法幫您恢復數據",
+      "usePasswordManager": "建議使用密碼管理器或記下密碼提示",
+      "localDataOnly": "密碼僅用於本地/MVP模式數據，不影響雲端數據"
+    },
+    "backupReminder": {
+      "title": "⚠️ 重要：請先備份數據",
+      "step1": "建議先導出時間線中的所有記錄（CSV/JSON 格式）",
+      "step2": "如果密碼重置失敗，備份可以幫助您恢復數據",
+      "step3": "此操作不可撤銷，請謹慎操作"
+    }
   }
 }

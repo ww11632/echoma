@@ -101,6 +101,12 @@ const AuthRecord = () => {
   }, [user]);
 
   const handleSignOut = async () => {
+    // Clear password cache before signing out
+    if (user) {
+      const context = getPasswordContext(null, user.id);
+      passwordCache.clear(context);
+    }
+    
     await supabase.auth.signOut();
     toast({
       title: t("authRecord.success.signedOut"),

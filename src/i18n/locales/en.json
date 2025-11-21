@@ -81,7 +81,13 @@
     "confirmNewPassword": "Confirm New Password",
     "newHint": "New Password Hint",
     "resetting": "Resetting...",
-    "resetPassword": "Reset Password"
+    "resetPassword": "Reset Password",
+    "strength": {
+      "weak": "Weak",
+      "medium": "Medium",
+      "strong": "Strong",
+      "good": "Password strength is good"
+    }
   },
   "share": {
     "title": "Share Record",
@@ -733,5 +739,63 @@
     },
     "retry": "Retry",
     "retrying": "Retrying..."
+  },
+  "settings": {
+    "title": "Settings",
+    "password": {
+      "title": "Password Management",
+      "description": "Manage your encryption password to protect local data",
+      "status": "Status",
+      "configured": "Encryption password configured",
+      "notConfigured": "No encryption password",
+      "active": "Active",
+      "inactive": "Inactive",
+      "setup": "Setup Password",
+      "reset": "Reset Password",
+      "setupSuccess": "Password setup successful",
+      "resetSuccess": "Password reset successful",
+      "resetSuccessDesc": "Re-encrypted {{private}} private records and {{public}} public records"
+    },
+    "keyVersion": {
+      "title": "Key Version",
+      "description": "View current encryption key version information",
+      "current": "Current Version",
+      "created": "Created At",
+      "derived": "Derived Key",
+      "password": "Password Key"
+    },
+    "migration": {
+      "title": "Data Migration",
+      "recommended": "Data migration recommended",
+      "recommendedDesc": "Detected old key version. Recommend migrating to new version for enhanced security",
+      "start": "Start Migration",
+      "confirmDesc": "This will re-encrypt all local data with the new key version. Continue?",
+      "migrating": "Migrating...",
+      "success": "Migration successful",
+      "successDesc": "Migrated {{private}} private records and {{public}} public records",
+      "failed": "Migration failed"
+    },
+    "cache": {
+      "title": "Cache Management",
+      "description": "Clear password cache, will require re-entry next time",
+      "clear": "Clear Cache",
+      "cleared": "Cache cleared",
+      "clearedDesc": "Password cache cleared, will require re-entry next time",
+      "clearConfirm": "Confirm clear cache?",
+      "clearConfirmDesc": "You will need to re-enter your password to access encrypted data"
+    },
+    "security": {
+      "title": "Security Notice",
+      "passwordNotStored": "Password is never stored or uploaded to any server",
+      "cannotRecover": "If you forget your password, we cannot help recover your data",
+      "usePasswordManager": "Recommend using a password manager or writing down your password hint",
+      "localDataOnly": "Password only applies to local/MVP mode data, does not affect cloud data"
+    },
+    "backupReminder": {
+      "title": "⚠️ Important: Please Backup Your Data First",
+      "step1": "Recommend exporting all records from Timeline (CSV/JSON format)",
+      "step2": "If password reset fails, backups can help you recover data",
+      "step3": "This operation is irreversible, please proceed with caution"
+    }
   }
 }

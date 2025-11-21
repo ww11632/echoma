@@ -144,6 +144,57 @@ export function validatePasswordStrength(password: string): string | undefined {
 class PasswordCache {
   private cache: Map<string, { password: string; timestamp: number }> = new Map();
   private readonly CACHE_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+  private cleanupInterval: ReturnType<typeof setInterval> | null = null;
+  
+  constructor() {
+    // Start automatic cleanup on creation
+    this.startAutoCleanup();
+    
+    // Listen for page unload to clear cache
+    if (typeof window !== "undefined") {
+      window.addEventListener("beforeunload", () => {
+        this.clearAll();
+      });
+      
+      // Listen for page visibility changes (tab switching, minimize)
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+          // Page is hidden, start a timer to clear cache after some time
+          setTimeout(() => {
+            if (document.hidden) {
+              console.log("[PasswordCache] Clearing cache due to prolonged inactivity");
+              this.clearAll();
+            }
+          }, 5 * 60 * 1000); // 5 minutes of inactivity
+        }
+      });
+    }
+  }
+  
+  /**
+   * Start automatic cleanup of expired entries
+   */
+  private startAutoCleanup(): void {
+    if (this.cleanupInterval) return;
+    
+    // Check for expired entries every minute
+    this.cleanupInterval = setInterval(() => {
+      this.removeExpired();
+    }, 60 * 1000);
+  }
+  
+  /**
+   * Remove expired entries from cache
+   */
+  private removeExpired(): void {
+    const now = Date.now();
+    for (const [context, cached] of this.cache.entries()) {
+      if (now - cached.timestamp > this.CACHE_DURATION_MS) {
+        this.cache.delete(context);
+        console.log(`[PasswordCache] Expired password cache for context: ${context.slice(0, 10)}...`);
+      }
+    }
+  }
   
   /**
    * Cache password for a specific context (wallet address, user ID, or "anonymous")
@@ -187,6 +238,18 @@ class PasswordCache {
    */
   clearAll(): void {
     this.cache.clear();
+    console.log("[PasswordCache] All password caches cleared");
+  }
+  
+  /**
+   * Stop automatic cleanup (for cleanup on unmount)
+   */
+  destroy(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+    this.clearAll();
   }
 }
 

@@ -156,8 +156,11 @@ Echoma layers multiple defenses to keep data private and verifiable:
 - **User-defined passwords** – Optional custom encryption passwords (recommended for enhanced security)
 - **Key derivation** – PBKDF2 (Argon2id planned) with auto-scaling iterations
 - **Password management** – Password reset/change with automatic data re-encryption
-- **Key versioning** – Version control for encryption keys with automatic migration
+- **Key versioning** – Version control for encryption keys (V1/V2) with automatic migration
+- **Smart password caching** – 15-minute cache with auto-cleanup on logout, tab close, or inactivity
+- **Network data isolation** – Local records tagged with network (testnet/mainnet/local) to prevent confusion
 - **Seal permission model** – public/private record separation with smart decryption
+- **Access control labels** – Authorize addresses with custom labels (e.g., "Partner", "Family"), synced to cloud
 - **AI safeguards** – prompt injection controls, crisis detection, audit logging
 - **Multi-layer rate limiting** – User-based (10/min authenticated, 3/min anonymous) + IP-based (20/min) protection
 - **Security test suite** – end-to-end cryptographic validation (reproducible/measurable/auditable)
@@ -215,12 +218,16 @@ Echoma offers three flows tailored to different needs.
 #### 3. MVP Mode (Local Mode)
 - **Routes:** `/mvp`, `/mvp-timeline`
 - **Best for:** Quick demos, offline use, no wallet/login required
-- **Features:** Fully local storage, AES-GCM 256 encryption, automatic key management
+- **Features:** 
+  - Fully local storage, AES-GCM 256 encryption, automatic key management
+  - Settings access (⚙️) for password management and data migration
+  - Language/theme switcher (no network switcher as it's local-only)
 
 ### Timeline Experience
 
 **Features:**
 - Search, filter (tags, dates, storage), and sort entries
+- **Network badges** – Visual indicators showing record origin (🧪 Testnet / 🌐 Mainnet / 💻 Local)
 - Bulk operations (export/delete)
 - Data export (CSV/JSON/PDF/Markdown) with custom fields and date formats
 - Emotion analytics (distribution, trends, forecasts, correlation, calendar)
@@ -237,49 +244,100 @@ Available in both Anonymous and Authenticated modes.
 - Rate limits: 3/min (anonymous), 10/min (authenticated)
 - Safety features: prompt injection controls, crisis detection, audit logging
 
-## 🔑 Password Management
+### 🔒 Access Control & Sharing
 
-Echoma now supports user-defined encryption passwords for enhanced security.
+**Seal Access Policies** – Grant and revoke access to private NFT records on-chain.
 
-### Features
+**Features:**
+- **Authorize addresses** – Grant specific wallet addresses access to your private records
+- **Custom labels** – Tag authorized addresses with roles (e.g., "Partner", "Family", "Therapist", "Doctor", "AI Agent")
+- **Cloud sync** – Labels are synced to the cloud (Supabase) and accessible across devices
+- **On-chain verification** – All authorization operations are recorded on Sui blockchain
+- **Revoke anytime** – Instantly revoke access with immediate effect
+- **Access history** – View complete audit trail of all grant/revoke operations
+- **Public records** – Public records are accessible to anyone (no authorization needed)
+
+**How to use:**
+1. Mint an emotion record as an NFT with "Enable Seal Access Policies" option
+2. In Timeline, click "Access Control" on a record card
+3. Enter wallet address and optional role label
+4. Grant access (on-chain transaction)
+5. Authorized addresses can now decrypt and view your private record
+
+**Label management:**
+- Add labels when granting access or edit them later
+- Labels are stored locally and synced to cloud for multi-device access
+- Labels are automatically deleted when you revoke access
+
+## 🔑 Password Management & Settings
+
+Echoma provides comprehensive password management and security settings.
+
+### Settings Page
+
+Access via the **⚙️ Settings** icon in the top-right corner of any page.
+
+**Features:**
+- **Password Management** – Set up, reset, or view password status
+- **Key Version Info** – View current encryption key version and creation time
+- **Data Migration** – One-click migration from old key versions to new ones
+- **Cache Management** – Clear password cache manually
+- **Security Tips** – Important reminders about password safety
+
+### Password Features
 
 - **Custom passwords** – Set your own encryption password (recommended for stronger security than wallet-only encryption)
+- **Password strength indicator** – Real-time visual feedback with color-coded progress bar (weak/medium/strong)
 - **First-time setup** – Optional password setup dialog on first use (can be skipped)
 - **Password reset** – Change your password and automatically re-encrypt all data
-- **Session caching** – Password cached for 15 minutes to reduce repeated input
+- **Backup reminders** – Important warnings before password reset or data migration operations
+- **Smart caching** – Password cached for 15 minutes, auto-cleared on logout or page close
 - **Password hints** – Optional hints stored locally (plaintext) to help you remember
-- **Key versioning** – Automatic version tracking and migration support
+- **Key versioning** – Automatic version tracking (V1: derived key, V2: password key)
 
 ### How It Works
 
 1. **Initial Setup** (Optional)
    - On first use, you'll be prompted to set an encryption password
-   - You can skip and set it later
+   - You can skip and set it later in Settings
    - Password requirements: minimum 8 characters with letters and numbers/symbols
 
-2. **Password Reset**
+2. **Password Reset** (via Settings)
    - Enter your old password to verify
    - Set a new password
    - All local data is automatically re-encrypted with the new password
 
-3. **Data Migration**
-   - Automatic migration from v1 (wallet/user ID only) to v2 (with password)
+3. **Data Migration** (via Settings)
+   - Automatic detection of old key versions
+   - One-click migration from V1 (wallet/user ID only) to V2 (with password)
    - Backward compatible - old data can still be accessed
-   - Key version tracking prevents incompatibility issues
+   - Progress tracking during migration
+
+4. **Smart Cache Cleanup**
+   - Auto-expires after 15 minutes of inactivity
+   - Auto-clears when you sign out
+   - Auto-clears when browser tab closes
+   - Auto-clears after 5 minutes of tab being hidden
 
 ### Security Notes
 
 ⚠️ **Important:**
 - Your password is **never stored or uploaded** anywhere
 - If you forget your password, you **cannot** decrypt your data
+- **Always backup your data** before password reset or migration (export to CSV/JSON)
 - Use a password manager or write down your password hint
 - Password only applies to local/MVP mode data (not Walrus-stored data)
+
+📖 **Database Migrations:**
+- Some features require database schema updates (e.g., Access Control Labels cloud sync)
+- See [DATABASE_MIGRATION_GUIDE.md](./DATABASE_MIGRATION_GUIDE.md) for step-by-step instructions
+- Migrations can be applied via Supabase CLI or Dashboard
 
 ## 🚧 Roadmap
 
 ### ✅ Recently Completed
 - **NFT Minting on Sui** – Deployed to testnet and mainnet
-  - Daily mint limit: **Testnet** - one NFT per day per journal; **Mainnet** - unlimited mints per day
+  - Daily mint limit: **Testnet** - unlimited mints per day; **Mainnet** - unlimited mints per day
   - **Testnet Package ID**: `0x55f1c575f979ad2b16c264191627ca6716c9b0b397ab041280da1ad6bce37e71`
   - **Mainnet Package ID**: `0x6ec7914c755708fd77ed3fe0dc8aed25ec5ccae2ff781267da3a5ca3549535b9`
   - Auto-migration from old package IDs, CORS fixes
@@ -288,13 +346,21 @@ Echoma now supports user-defined encryption passwords for enhanced security.
 ### ✅ Key Features Shipped
 - Client-side AES-GCM 256 encryption, Walrus storage, Sui NFT minting
 - Supabase auth + cloud sync, AI emotion analysis (anonymous + authenticated)
+- User-defined encryption passwords with key versioning (V1/V2)
+- **Password strength indicator** with real-time visual feedback (weak/medium/strong)
+- **Backup reminders** before critical operations (password reset, data migration)
+- Settings page with password management, data migration, and cache control
+- Access control labels with cloud sync across devices
+- Smart password caching with auto-cleanup (logout, tab close, inactivity)
+- Network data isolation with **visual badges** (testnet/mainnet/local)
+- **MVP mode enhancements**: Settings access, language/theme switcher
+- Database migration guide for Supabase schema updates
 - Bilingual UI (ZH/EN), iOS support, network switching
 - Virtualized timeline, emotion analytics, data export (CSV/JSON/PDF/Markdown)
 - Security test suite, comprehensive error handling
 
 ### 🚧 In Progress / Planned
 - Full Argon2id support (currently enhanced PBKDF2 fallback)
-- User password/phrase input UI for stronger keys
 - Realtime security monitoring alerts
 
 ## 🧪 Testing

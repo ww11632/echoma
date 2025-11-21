@@ -316,6 +316,7 @@ const Record = () => {
       isPublic: isPublicValue,
       intensity: intensityValue, // 保存強度值（如果提供）
       tags: tagsValue && tagsValue.length > 0 ? tagsValue : [], // 統一使用空數組表示無標籤
+      network: currentNetwork, // 記錄當前網絡（testnet/mainnet）
     };
 
     // The addEmotionRecord function will handle encryption key selection and storage

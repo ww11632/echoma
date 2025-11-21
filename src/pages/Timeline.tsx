@@ -37,6 +37,7 @@ import jsPDF from "jspdf";
 import { useSelectedNetwork } from "@/hooks/useSelectedNetwork";
 import { useNetworkChangeListener } from "@/hooks/useNetworkChangeListener";
 import { extractNetworkFromWalrusUrl } from "@/lib/networkConfig";
+import { passwordCache, getPasswordContext } from "@/lib/userPassword";
 
 interface EmotionRecord {
   id: string;
@@ -54,6 +55,7 @@ interface EmotionRecord {
   encrypted_data?: string | null;
   tags?: string[];
   transaction_digest?: string | null; // NFT 鑄造交易的 digest
+  network?: "testnet" | "mainnet" | "local"; // 網絡標識
 }
 
 type FilterType = "all" | "local" | "walrus" | "sealPolicies";
@@ -3076,6 +3078,13 @@ const Timeline = () => {
                 variant="outline"
                 size="sm"
                 onClick={async () => {
+                  // Clear password cache before signing out
+                  const { data: { session } } = await supabase.auth.getSession();
+                  if (session?.user) {
+                    const context = getPasswordContext(currentAccount?.address, session.user.id);
+                    passwordCache.clear(context);
+                  }
+                  
                   await supabase.auth.signOut();
                   toast({
                     title: t("timeline.loggedOut"),
@@ -3908,13 +3917,29 @@ const Timeline = () => {
                               <span className="text-xs text-muted-foreground">
                                 {new Date(record.created_at).toLocaleDateString(i18n.language === 'zh-TW' ? 'zh-TW' : 'en-US')}
                               </span>
-                              <span className={`text-xs px-2 py-1 rounded-full inline-block ${
-                                isLocal 
-                                  ? "bg-purple-500/10 text-purple-500" 
-                                  : "bg-cyan-500/10 text-cyan-500"
-                              }`}>
-                                {isLocal ? "💾 " + t("timeline.filter.local") : "☁️ " + t("timeline.filter.walrus")}
-                              </span>
+                              <div className="flex items-center gap-1">
+                                <span className={`text-xs px-2 py-1 rounded-full inline-block ${
+                                  isLocal 
+                                    ? "bg-purple-500/10 text-purple-500" 
+                                    : "bg-cyan-500/10 text-cyan-500"
+                                }`}>
+                                  {isLocal ? "💾 " + t("timeline.filter.local") : "☁️ " + t("timeline.filter.walrus")}
+                                </span>
+                                {/* Network badge */}
+                                {record.network && (
+                                  <span className={`text-xs px-2 py-1 rounded-full inline-block ${
+                                    record.network === "testnet" 
+                                      ? "bg-orange-500/10 text-orange-500" 
+                                      : record.network === "mainnet"
+                                      ? "bg-green-500/10 text-green-500"
+                                      : "bg-gray-500/10 text-gray-500"
+                                  }`}>
+                                    {record.network === "testnet" && "🧪 Testnet"}
+                                    {record.network === "mainnet" && "🌐 Mainnet"}
+                                    {record.network === "local" && "💻 Local"}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             {/* 訪問權限管理按鈕 - 僅當記錄是 NFT 時顯示 */}
                             {!selectionMode && record.sui_ref && record.id === record.sui_ref && (

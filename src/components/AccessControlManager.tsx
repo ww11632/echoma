@@ -29,6 +29,11 @@ import {
   checkIfMintedWithSealPolicies,
 } from "@/lib/mintContract";
 import { saveAccessLabel, getAccessLabel, deleteAccessLabel } from "@/lib/accessLabels";
+import { 
+  saveAccessLabelToCloud, 
+  deleteAccessLabelFromCloud,
+  getAllAccessLabelsFromCloud 
+} from "@/lib/accessLabelsSync";
 import { UserPlus, UserMinus, Shield, Users, Loader2, Clock, History, CheckCircle2, XCircle, RefreshCw, Tag, Edit2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { SuiNetwork } from "@/lib/networkConfig";
@@ -506,6 +511,9 @@ export const AccessControlManager: React.FC<AccessControlManagerProps> = ({
       // 删除本地标签
       deleteAccessLabel(entryNftId, address, effectiveNetwork);
       
+      // 同步删除云端标签
+      await deleteAccessLabelFromCloud(entryNftId, address, effectiveNetwork);
+      
       if (txDigest) {
         toast({
           title: t("accessControl.success.revoked") || "撤銷成功",
@@ -551,9 +559,13 @@ export const AccessControlManager: React.FC<AccessControlManagerProps> = ({
   };
 
   // 保存标签
-  const handleSaveLabel = (address: string) => {
+  const handleSaveLabel = async (address: string) => {
     if (editingLabel.trim()) {
+      // 保存到本地存储
       saveAccessLabel(entryNftId, address, editingLabel.trim(), effectiveNetwork);
+      
+      // 同步到云端（如果用户已登录）
+      await saveAccessLabelToCloud(entryNftId, address, editingLabel.trim(), effectiveNetwork);
       
       // 更新本地状态
       setAuthorizedAddresses(prev => 

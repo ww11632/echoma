@@ -15,6 +15,7 @@ import { useTranslation } from "react-i18next";
 import "@mysten/dapp-kit/dist/index.css";
 import { getCurrentNetwork } from "@/lib/networkConfig";
 import { initializeKeyVersioning } from "@/lib/keyVersioning";
+import { syncLabelsFromCloud } from "@/lib/accessLabelsSync";
 
 // 程式碼分割：懶載入頁面組件
 const Index = lazy(() => import("./pages/Index"));
@@ -26,6 +27,7 @@ const AuthTimeline = lazy(() => import("./pages/AuthTimeline"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const MvpRecord = lazy(() => import("./pages/MvpRecord"));
 const MvpTimeline = lazy(() => import("./pages/MvpTimeline"));
+const Settings = lazy(() => import("./pages/Settings"));
 
 const queryClient = new QueryClient();
 
@@ -59,9 +61,14 @@ const LoadingFallback = () => {
 };
 
 const App = () => {
-  // Initialize key versioning on app start
+  // Initialize key versioning and sync labels on app start
   useEffect(() => {
     initializeKeyVersioning();
+    
+    // Sync access control labels from cloud to localStorage
+    syncLabelsFromCloud().catch(error => {
+      console.error("[App] Failed to sync labels from cloud:", error);
+    });
   }, []);
   
   return (
@@ -89,6 +96,8 @@ const App = () => {
               {/* MVP local-only flow */}
               <Route path="/mvp" element={<MvpRecord />} />
               <Route path="/mvp-timeline" element={<MvpTimeline />} />
+              {/* Settings */}
+              <Route path="/settings" element={<Settings />} />
               {/* Security Tests - 只在开发环境或 VITE_ENABLE_SECURITY_TESTS=true 时可用 */}
               {SecurityTests && (
                 <Route 

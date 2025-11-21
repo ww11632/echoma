@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { listEmotionRecords, clearEmotionRecords } from "@/lib/localIndex";
 import type { EmotionRecord } from "@/lib/dataSchema";
 import { ArrowLeft, Clock, Sparkles, Trash2 } from "lucide-react";
+import MvpGlobalControls from "@/components/MvpGlobalControls";
 
 const MvpTimeline = () => {
   const navigate = useNavigate();
@@ -30,6 +31,11 @@ const MvpTimeline = () => {
 
   return (
     <div className="min-h-screen p-6">
+      {/* Global Controls */}
+      <div className="fixed top-4 right-4 z-50">
+        <MvpGlobalControls />
+      </div>
+      
       <div className="max-w-3xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <Button variant="ghost" onClick={() => navigate("/")} className="text-muted-foreground">

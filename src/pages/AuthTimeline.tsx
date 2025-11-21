@@ -33,6 +33,7 @@ import jsPDF from "jspdf";
 import { useSelectedNetwork } from "@/hooks/useSelectedNetwork";
 import { useNetworkChangeListener } from "@/hooks/useNetworkChangeListener";
 import { extractNetworkFromWalrusUrl } from "@/lib/networkConfig";
+import { passwordCache, getPasswordContext } from "@/lib/userPassword";
 
 interface EmotionRecord {
   id: string;
@@ -49,6 +50,7 @@ interface EmotionRecord {
   wallet_address?: string | null;
   encrypted_data?: string | null;
   tags?: string[];
+  network?: "testnet" | "mainnet" | "local";
 }
 
 type FilterType = "all" | "database" | "walrus"; // database = 数据库存储, walrus = Walrus 去中心化存储
@@ -2141,6 +2143,12 @@ const AuthTimeline = () => {
                 variant="outline"
                 size="sm"
                 onClick={async () => {
+                  // Clear password cache before signing out
+                  if (user) {
+                    const context = getPasswordContext(null, user.id);
+                    passwordCache.clear(context);
+                  }
+                  
                   await supabase.auth.signOut();
                   toast({
                     title: t("timeline.loggedOut"),
@@ -2918,13 +2926,29 @@ const AuthTimeline = () => {
                               <span className="text-xs text-muted-foreground">
                                 {new Date(record.created_at).toLocaleDateString(i18n.language === 'zh-TW' ? 'zh-TW' : 'en-US')}
                               </span>
-                              <span className={`text-xs px-2 py-1 rounded-full inline-block ${
-                                isLocal 
-                                  ? "bg-purple-500/10 text-purple-500" 
-                                  : "bg-cyan-500/10 text-cyan-500"
-                              }`}>
-                                {isLocal ? "💾 " + getStorageLabel(record) : "☁️ " + getStorageLabel(record)}
-                              </span>
+                              <div className="flex items-center gap-1">
+                                <span className={`text-xs px-2 py-1 rounded-full inline-block ${
+                                  isLocal 
+                                    ? "bg-purple-500/10 text-purple-500" 
+                                    : "bg-cyan-500/10 text-cyan-500"
+                                }`}>
+                                  {isLocal ? "💾 " + getStorageLabel(record) : "☁️ " + getStorageLabel(record)}
+                                </span>
+                                {/* Network badge */}
+                                {record.network && (
+                                  <span className={`text-xs px-2 py-1 rounded-full inline-block ${
+                                    record.network === "testnet" 
+                                      ? "bg-orange-500/10 text-orange-500" 
+                                      : record.network === "mainnet"
+                                      ? "bg-green-500/10 text-green-500"
+                                      : "bg-gray-500/10 text-gray-500"
+                                  }`}>
+                                    {record.network === "testnet" && "🧪 Testnet"}
+                                    {record.network === "mainnet" && "🌐 Mainnet"}
+                                    {record.network === "local" && "💻 Local"}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             {/* Actions Menu */}
                             {!selectionMode && (

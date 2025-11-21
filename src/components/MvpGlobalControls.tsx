@@ -1,10 +1,13 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Settings } from "lucide-react";
-import NetworkSwitcher from "./NetworkSwitcher";
 import LanguageSwitcher from "./LanguageSwitcher";
 
-const GlobalControls = () => {
+/**
+ * Simplified global controls for MVP mode
+ * Only includes Settings and Language/Theme switcher (no network switcher)
+ */
+const MvpGlobalControls = () => {
   const navigate = useNavigate();
   
   return (
@@ -17,10 +20,10 @@ const GlobalControls = () => {
       >
         <Settings className="h-5 w-5" />
       </Button>
-      <NetworkSwitcher />
       <LanguageSwitcher />
     </div>
   );
 };
 
-export default GlobalControls;
+export default MvpGlobalControls;
+
