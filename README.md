@@ -20,11 +20,13 @@
 
 [中文版本](./README.zh.md)
 
-**Echoma** is the first Web3-native emotional journaling app that treats user privacy as a first-class citizen. We combine military-grade client-side encryption, decentralized storage via Walrus, and blockchain attestations on Sui to ensure that sensitive emotional data remains private yet permanently verifiable.
+**Echoma** is the first Web3-native emotional journaling app that treats user privacy as a first-class citizen. We combine production-grade client-side encryption, decentralized storage via Walrus, and blockchain attestations on Sui to ensure that sensitive emotional data remains private yet permanently verifiable.
 
 **One-line pitch:** *"We encrypt your emotions before they leave your device, store them on decentralized Walrus, and prove their existence with NFTs on Sui—all while maintaining zero-knowledge privacy."*
 
 **Key innovation:** Emotional data becomes a governed, revocable, verifiable, zero-knowledge data primitive on Sui.
+
+**Note:** Zero-knowledge here refers to a platform-zero-knowledge property via end-to-end encryption, not a zk-SNARK computation proof.
 
 ---
 
@@ -85,7 +87,7 @@ graph LR
 
 ### 🎯 What Makes Echoma Different?
 
-| Feature | Web3 Apps Without Client-Side Encryption | Echoma |
+| Feature | Public-by-Default IPFS Diaries | Echoma |
 |---------|------------------------|---------|
 | **Encryption** | ❌ None or Server-side | ✅ **Client-side AES-GCM-256** |
 | **Key Derivation** | 🔴 PBKDF2 (weak) | 🟢 **Argon2id (64MB Memory-Hard)** |
@@ -243,26 +245,7 @@ Sui NFT(blob_id, timestamp) → On-Chain Proof
 
 ## 📱 iOS App Support
 
-Echoma ships as a native iOS app via **Capacitor**. Wrap the web app and deploy directly to devices.
-
-### Quick iOS Setup
-
-1. **Upgrade Node.js (>= 20.0.0)**
-   ```bash
-   nvm install 20
-   nvm use 20
-   ```
-2. **Build and add the iOS platform**
-   ```bash
-   npm run build
-   npm run cap:add:ios
-   ```
-3. **Open the project in Xcode**
-   ```bash
-   npm run cap:open:ios
-   ```
-
-See the [iOS Development Guide](./IOS_Development_Guide.md) for full details.
+Echoma ships as a native iOS app via **Capacitor**. See the [iOS Development Guide](./IOS_Development_Guide.md) for setup and deployment details.
 
 ---
 
@@ -280,7 +263,7 @@ See the [iOS Development Guide](./IOS_Development_Guide.md) for full details.
 
 - Node.js 18+ with npm (install via [nvm](https://github.com/nvm-sh/nvm#installing-and-updating))
 - Sui wallet (Sui Wallet, Ethos Wallet, etc.)
-- iOS builds need Node.js 20+, Xcode 14+, and CocoaPods
+- For iOS builds: Node.js 20+, Xcode 14+, and CocoaPods (see [iOS Development Guide](./IOS_Development_Guide.md))
 
 ### Installation
 
@@ -318,21 +301,7 @@ npm run build
 npm run preview
 ```
 
-### iOS Commands
-
-```sh
-# Add iOS platform (first run)
-npm run cap:add:ios
-
-# Sync web build -> native project
-npm run cap:sync
-
-# Open Xcode
-npm run cap:open:ios
-
-# Build + sync + open in one go
-npm run cap:build:ios
-```
+For iOS commands and setup, see [iOS Development Guide](./IOS_Development_Guide.md).
 
 ---
 
@@ -344,6 +313,8 @@ npm run cap:build:ios
 **Backend:** Supabase (auth + storage), Supabase Edge Functions (AI API)  
 **Key Libraries:** TanStack Query/Virtual, React Router, React Hook Form, Zod, i18next, Capacitor  
 **Performance:** Code splitting, lazy loading, virtualized scrolling
+
+📖 See [Project Structure](#-project-structure) and [Security Features](#-security-features) for detailed architecture.
 
 ---
 
@@ -369,29 +340,18 @@ See the codebase for detailed file structure.
 
 ## 🔐 Security Features
 
-Echoma layers multiple defenses to keep data private and verifiable:
-
-- **Client-side encryption** – AES-GCM 256-bit encryption before data leaves your device
-- **User-defined passwords** – Optional custom encryption passwords (recommended for enhanced security)
-- **Key derivation** – **Argon2id with WASM integration** (memory-hard, GPU/ASIC resistant) with automatic fallback to enhanced PBKDF2
-- **Password management** – Password reset/change with automatic data re-encryption
-- **Key versioning** – Version control for encryption keys with automatic migration
-- **Seal permission model** – public/private record separation with smart decryption
-- **AI safeguards** – prompt injection controls, crisis detection, audit logging
-- **Multi-layer rate limiting** – User-based (10/min authenticated, 3/min anonymous) + IP-based (20/min) protection
-- **Security test suite** – end-to-end cryptographic validation (reproducible/measurable/auditable)
-- **Backward compatibility** – automatic migration of legacy formats
+Echoma layers multiple defenses to keep data private and verifiable: memory-hard key derivation (Argon2id), AES-GCM-256 encryption, Seal-based access control, AI safeguards, and comprehensive security testing.
 
 **Data Flow:** Record → Encrypt (with user password) → Store (Walrus) → Verify (Sui NFT)
 
 📖 **Detailed documentation:**
+- [SECURITY_FEATURES.md](./SECURITY_FEATURES.md) – comprehensive security overview
 - [THREAT_MODEL_EN.md](./THREAT_MODEL_EN.md) – threat model and design trade-offs (English)
 - [THREAT_MODEL.md](./THREAT_MODEL.md) – 威脅模型與設計取捨 (中文)
-- [SECURITY_FEATURES.md](./SECURITY_FEATURES.md) – comprehensive security overview
 - [SECURITY_BEST_PRACTICES.md](./SECURITY_BEST_PRACTICES.md) – security audit checklist
 - [Security_Test_Guide.md](./Security_Test_Guide.md) – security test suite guide
-- [ARGON2ID_UPGRADE_SUMMARY.md](./ARGON2ID_UPGRADE_SUMMARY.md) – **NEW!** Argon2id integration complete guide
-- [ARGON2ID_QUICK_START.md](./ARGON2ID_QUICK_START.md) – **NEW!** Quick start for Argon2id
+- [ARGON2ID_UPGRADE_SUMMARY.md](./ARGON2ID_UPGRADE_SUMMARY.md) – Argon2id integration complete guide
+- [ARGON2ID_QUICK_START.md](./ARGON2ID_QUICK_START.md) – Quick start for Argon2id
 
 ---
 
@@ -581,10 +541,10 @@ Echoma now supports user-defined encryption passwords for enhanced security.
 
 Mental health data breaches have **real consequences**:
 - In 2023, therapy platform BetterHelp paid $7.8M for selling patient data
-- Traditional EHR systems leaked 133M+ records in 2022
+- In 2023, HIPAA-reportable breaches exposed ~133M+ healthcare records
 - Depression/anxiety journals used for insurance discrimination
 
-(Sources: FTC BetterHelp settlement 2023; HIPAA breach reports 2022; academic/industry reports on insurance discrimination.)
+(Sources: FTC BetterHelp settlement 2023; HIPAA breach reports 2023; academic/industry reports on insurance discrimination.)
 
 **Echoma proves Web3 can fix this.** By putting privacy *before* features and *sovereignty before convenience*, we show that blockchain isn't just for DeFi—it's for **human dignity**.
 
