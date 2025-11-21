@@ -289,7 +289,7 @@
       "shareOption": "點擊下方「分享記錄」按鈕，授權特定地址訪問",
       "timelineOption": "或直接返回 Timeline 查看記錄"
     },
-    "backToTimeline": "← 返回 Timeline",
+    "backToTimeline": "返回 Timeline",
     "policyVerification": {
       "pending": "策略验证中，请稍候... 分享功能可能暂时不可用",
       "pendingTooltip": "策略验证中，请稍候..."

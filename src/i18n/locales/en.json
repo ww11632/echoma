@@ -289,7 +289,7 @@
       "shareOption": "Click the \"Share Record\" button below to authorize specific addresses to access",
       "timelineOption": "Or directly return to Timeline to view records"
     },
-    "backToTimeline": "← Back to Timeline",
+    "backToTimeline": "Back to Timeline",
     "policyVerification": {
       "pending": "Policy verification in progress, please wait... Share feature may be temporarily unavailable",
       "pendingTooltip": "Policy verification in progress, please wait..."
