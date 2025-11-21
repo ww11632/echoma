@@ -24,7 +24,7 @@
 
 **One-line pitch:** *"We encrypt your emotions before they leave your device, store them on decentralized Walrus, and prove their existence with NFTs on Sui—all while maintaining zero-knowledge privacy."*
 
-**Key innovation:** Emotional data becomes a governed, revocable, verifiable, zero-knowledge data primitive on Sui.
+**Key innovation:** Emotional data as a revocable, verifiable, zero-knowledge primitive on Sui.
 
 **Note:** Zero-knowledge here refers to a platform-zero-knowledge property via end-to-end encryption, not a zk-SNARK computation proof.
 
@@ -56,7 +56,7 @@ Emotional and mental health data is among the **most sensitive personal informat
     ↓
 🔒 Layer 4: Dynamic Access Control (Seal Policies)
     ↓
-✅ Zero-Knowledge Archive
+✅ Platform-Zero-Knowledge Archive (E2EE)
 ```
 
 ### How We Address Track Requirements
@@ -95,18 +95,7 @@ graph LR
 | **Access Control** | ❌ NFT = Full Access | ✅ **Dynamic Grant/Revoke** |
 | **Privacy** | 🔴 Metadata Leakage | 🟢 **Zero-Knowledge** |
 
-### Competitive Advantage
-
-| Feature | Centralized mental-health apps | IPFS-based Web3 diaries | Echoma |
-|---------|---------|--------|--------|
-| End-to-End Encryption | ❌ | ❌ | ✅ |
-| User Controls Keys | ❌ | ❌ | ✅ |
-| Decentralized Storage | ❌ | ❌ | ✅ |
-| Blockchain Proof | ❌ | ❌ | ✅ |
-| Dynamic Access Control | ❌ | ❌ | ✅ |
-| AI Privacy (no training) | ❌ | ❌ | ✅ |
-
-📖 **[View Complete Architecture Diagrams →](./ARCHITECTURE_VISUAL.md)**
+📖 **See full comparison:** [SECURITY_FEATURES.md](./SECURITY_FEATURES.md) | [THREAT_MODEL_EN.md](./THREAT_MODEL_EN.md) | [View Complete Architecture Diagrams →](./ARCHITECTURE_VISUAL.md)
 
 ---
 
@@ -303,6 +292,8 @@ npm run preview
 
 For iOS commands and setup, see [iOS Development Guide](./IOS_Development_Guide.md).
 
+For full usage modes, password flows, and roadmap, see the docs below.
+
 ---
 
 ## 🛠️ Tech Stack
@@ -379,6 +370,62 @@ Walrus uploads require **SUI** and **WAL** tokens on testnet.
 - Walrus Faucet: [WAL Tokens](https://discord.gg/walrus)
 
 📖 See [Faucet Test Token Guide](./Faucet_Test_Token_Guide.md) for faucet links and walkthroughs.
+
+---
+
+## 💡 Real-World Impact
+
+### Target Users
+1. **Mental health patients** seeking HIPAA/GDPR-compliant journaling
+2. **Privacy-conscious individuals** in oppressive regimes
+3. **Web3 natives** wanting sovereign personal data
+4. **Therapists** needing secure client communication channels
+
+### Why This Matters
+
+Mental health data breaches have **real consequences**:
+- In 2023, therapy platform BetterHelp paid $7.8M for selling patient data
+- In 2023, HIPAA-reportable breaches exposed ~133M+ healthcare records
+- Depression/anxiety journals used for insurance discrimination
+
+Sources in [THREAT_MODEL_EN.md](./THREAT_MODEL_EN.md).
+
+**Echoma proves Web3 can fix this.** By putting privacy *before* features and *sovereignty before convenience*, we show that blockchain isn't just for DeFi—it's for **human dignity**.
+
+---
+
+## 🧪 Testing
+
+📖 See [Functional_Test_Guide.md](./Functional_Test_Guide.md) for detailed testing steps.
+
+**Quick test:** Run `npm run dev`, open DevTools Console, paste `Quick_Test_Script.js` and execute.
+
+---
+
+## 🤝 Contributing
+
+Issues and PRs are welcome!
+
+---
+
+## 📄 License
+
+Hackathon project for Haulout Hackathon.
+
+---
+
+## 🔗 Resources
+
+- **GitHub:** [github.com/ww11632/echoma](https://github.com/ww11632/echoma)
+- **Live Demo:** [echoma.lovable.app](https://echoma.lovable.app)
+- **Sui Contract:** [View on Explorer](https://suiscan.xyz/mainnet/object/0x45f9ba755acaf2306525b4a5b67d32bd4905f56108499306449da7312b76330d)
+- [Sui Docs](https://docs.sui.io/)
+- [Walrus Docs](https://docs.walrus.space/)
+- [shadcn/ui Docs](https://ui.shadcn.com/)
+- [Security Features](./SECURITY_FEATURES.md)
+- [Security Best Practices](./SECURITY_BEST_PRACTICES.md)
+- [Security Test Guide](./Security_Test_Guide.md)
+- [Functional Test Guide](./Functional_Test_Guide.md)
 
 ---
 
@@ -509,62 +556,6 @@ Echoma now supports user-defined encryption passwords for enhanced security.
 - Mobile apps (Android via Capacitor)
 - Integration with health data oracles (Apple Health, Fitbit)
 - Anonymous peer support matching (ZK identity)
-
----
-
-## 💡 Real-World Impact
-
-### Target Users
-1. **Mental health patients** seeking HIPAA/GDPR-compliant journaling
-2. **Privacy-conscious individuals** in oppressive regimes
-3. **Web3 natives** wanting sovereign personal data
-4. **Therapists** needing secure client communication channels
-
-### Why This Matters
-
-Mental health data breaches have **real consequences**:
-- In 2023, therapy platform BetterHelp paid $7.8M for selling patient data
-- In 2023, HIPAA-reportable breaches exposed ~133M+ healthcare records
-- Depression/anxiety journals used for insurance discrimination
-
-(Sources: FTC BetterHelp settlement 2023; HIPAA breach reports 2023; academic/industry reports on insurance discrimination.)
-
-**Echoma proves Web3 can fix this.** By putting privacy *before* features and *sovereignty before convenience*, we show that blockchain isn't just for DeFi—it's for **human dignity**.
-
----
-
-## 🧪 Testing
-
-📖 See [Functional_Test_Guide.md](./Functional_Test_Guide.md) for detailed testing steps.
-
-**Quick test:** Run `npm run dev`, open DevTools Console, paste `Quick_Test_Script.js` and execute.
-
----
-
-## 🤝 Contributing
-
-Issues and PRs are welcome!
-
----
-
-## 📄 License
-
-Hackathon project for Haulout Hackathon.
-
----
-
-## 🔗 Resources
-
-- **GitHub:** [github.com/ww11632/echoma](https://github.com/ww11632/echoma)
-- **Live Demo:** [echoma.lovable.app](https://echoma.lovable.app)
-- **Sui Contract:** [View on Explorer](https://suiscan.xyz/mainnet/object/0x45f9ba755acaf2306525b4a5b67d32bd4905f56108499306449da7312b76330d)
-- [Sui Docs](https://docs.sui.io/)
-- [Walrus Docs](https://docs.walrus.space/)
-- [shadcn/ui Docs](https://ui.shadcn.com/)
-- [Security Features](./SECURITY_FEATURES.md)
-- [Security Best Practices](./SECURITY_BEST_PRACTICES.md)
-- [Security Test Guide](./Security_Test_Guide.md)
-- [Functional Test Guide](./Functional_Test_Guide.md)
 
 ---
 
