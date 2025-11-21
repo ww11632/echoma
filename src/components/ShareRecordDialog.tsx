@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useCurrentAccount, useCurrentWallet, useSuiClient } from "@mysten/dapp-kit";
 import { useSelectedNetwork } from "@/hooks/useSelectedNetwork";
 import { getClientForNetwork } from "@/lib/suiClient";
-import { grantAccess, getOrQueryPolicyRegistry, isPublicSeal, getAuthorizedAddresses } from "@/lib/mintContract";
+import { grantAccess, getOrQueryPolicyRegistry, isPublicSeal, getAuthorizedAddresses, checkIfMintedWithSealPolicies } from "@/lib/mintContract";
 import { createSignerFromWallet } from "@/lib/walrus";
 import { Share2, UserPlus, Loader2, QrCode } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -55,6 +55,7 @@ export const ShareRecordDialog: React.FC<ShareRecordDialogProps> = ({
   const [isPublicRecord, setIsPublicRecord] = useState<boolean | null>(null); // null=检查中，true=公开，false=私有
   const [checkingPolicy, setCheckingPolicy] = useState(false);
   const [authorizedAddresses, setAuthorizedAddresses] = useState<string[]>([]); // 已授权地址列表
+  const [policyVerificationPending, setPolicyVerificationPending] = useState(false); // 链上已创建但索引未就绪
 
   // 预设分享选项
   const sharePresets: SharePreset[] = [
@@ -102,6 +103,7 @@ export const ShareRecordDialog: React.FC<ShareRecordDialogProps> = ({
       const loadPolicyRegistryAndCheck = async () => {
         setCheckingPolicy(true);
         setPolicyExists(null);
+        setPolicyVerificationPending(false);
         try {
           const registryId = await getOrQueryPolicyRegistry(currentNetwork, suiClient);
           setPolicyRegistryId(registryId);
@@ -129,9 +131,28 @@ export const ShareRecordDialog: React.FC<ShareRecordDialogProps> = ({
             } catch (error: any) {
               const errorMessage = error?.message || "";
               if (errorMessage.includes("没有访问策略") || errorMessage.includes("does not have an access policy")) {
-                setPolicyExists(false);
-                setIsPublicRecord(null);
-                console.warn("[ShareRecordDialog] ⚠️ 策略不存在，NFT 可能未使用 Seal Access Policies 铸造");
+                // 可能是索引延迟，尝试从交易记录判定是否使用了 Seal Policies
+                console.warn("[ShareRecordDialog] ⚠️ 直接检查策略失败，尝试从交易记录判断是否已使用 Seal Access Policies 铸造...");
+                try {
+                  const checkResult = await checkIfMintedWithSealPolicies(entryNftId, currentNetwork, suiClient);
+                  if (checkResult.mintedWithPolicies) {
+                    // 链上已创建策略，但索引未就绪
+                    setPolicyExists(true);
+                    setIsPublicRecord(false);
+                    setPolicyVerificationPending(true);
+                    console.warn("[ShareRecordDialog] ⏳ 策略已创建，但索引未同步完成，稍后重试", {
+                      transactionDigest: checkResult.transactionDigest,
+                    });
+                  } else {
+                    setPolicyExists(false);
+                    setIsPublicRecord(null);
+                    console.warn("[ShareRecordDialog] ⚠️ 策略不存在，NFT 可能未使用 Seal Access Policies 铸造");
+                  }
+                } catch (checkError) {
+                  setPolicyExists(false);
+                  setIsPublicRecord(null);
+                  console.warn("[ShareRecordDialog] ⚠️ 策略检查失败，且交易记录检查也失败:", checkError);
+                }
               } else {
                 // 其他错误，可能是网络问题或索引延迟
                 // 更保守的处理：设置为 false，但显示警告信息，允许用户重试
@@ -165,6 +186,7 @@ export const ShareRecordDialog: React.FC<ShareRecordDialogProps> = ({
       setIsPublicRecord(null);
       setCheckingPolicy(false);
       setAuthorizedAddresses([]);
+      setPolicyVerificationPending(false);
     }
   }, [isOpen, entryNftId, currentNetwork, suiClient]);
 
@@ -393,7 +415,7 @@ export const ShareRecordDialog: React.FC<ShareRecordDialogProps> = ({
               />
               <Button
                 onClick={() => handleShare(customAddress)}
-                disabled={isLoading || !customAddress.trim() || policyExists === false || isPublicRecord === true || checkingPolicy}
+                disabled={isLoading || !customAddress.trim() || policyExists === false || isPublicRecord === true || checkingPolicy || policyVerificationPending}
                 className="w-full"
                 title={isPublicRecord === true ? (t("share.publicRecordTooltip") || "公开记录无需分享") : undefined}
               >
@@ -417,6 +439,15 @@ export const ShareRecordDialog: React.FC<ShareRecordDialogProps> = ({
               {t("share.selectOption") || "請選擇要分享的對象"}
             </div>
           )}
+
+          {policyVerificationPending && (
+            <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+              <div className="text-sm text-yellow-800 dark:text-yellow-200 space-y-1">
+                <div>⏳ {t("share.policyVerificationPending") || "已检测到此 NFT 使用 Seal Access Policies 铸造，但链上索引尚未完成。请等待 10-30 秒后再试。"}</div>
+                <div className="text-xs">{t("share.policyVerificationPendingHint") || "如果持续出现，请刷新页面后重试。"}</div>
+              </div>
+            </div>
+          )}
         </div>
 
         <DialogFooter>
@@ -428,4 +459,3 @@ export const ShareRecordDialog: React.FC<ShareRecordDialogProps> = ({
     </Dialog>
   );
 };
-
