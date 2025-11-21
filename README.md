@@ -4,7 +4,7 @@
 
 
 
-📺 [Watch Demo Video](YOUR_YOUTUBE_LINK) | 📄 [Full Submission](./hackathon_submission.md) | 🌐 [Live App](https://echoma.lovable.app)
+📺 [Watch Demo Video](YOUR_YOUTUBE_LINK) | 📄 [Full Submission](./hackathon_submission.md) 
 
 
 
@@ -30,9 +30,9 @@
 
 ### The Problem
 Emotional and mental health data is among the **most sensitive personal information**, yet current solutions fail users:
-- 🔴 **Traditional apps**: Centralized servers can be hacked, seized, or monetized
-- 🔴 **Web3 alternatives**: Store plaintext data on IPFS/Arweave—anyone with the CID can read it
-- 🔴 **Privacy laws**: GDPR/CCPA require user data sovereignty, but platforms don't deliver
+-  **Traditional apps**: Centralized servers can be hacked, seized, or monetized
+-  **Web3 alternatives**: Store plaintext data on IPFS/Arweave—anyone with the CID can read it
+-  **Privacy laws**: GDPR/CCPA require user data sovereignty, but platforms don't deliver
 
 ### Our Solution: Four-Layer Defense
 
@@ -78,7 +78,7 @@ graph LR
 
 ### 🎯 What Makes echōma Different?
 
-| Feature | Traditional Web3 Diary | echōma |
+| Feature | Web3 Apps Without Client-Side Encryption | Echoma |
 |---------|------------------------|---------|
 | **Encryption** | ❌ None or Server-side | ✅ **Client-side AES-GCM-256** |
 | **Key Derivation** | 🔴 PBKDF2 (weak) | 🟢 **Argon2id (64MB Memory-Hard)** |
@@ -492,7 +492,7 @@ Echoma now supports user-defined encryption passwords for enhanced security.
 ## 📊 Metrics & Achievements
 
 ### Technical Milestones
-✅ **Mainnet Deployment:** Package ID `0x45f9ba7...76330d`  
+✅ **Mainnet Deployment:** Package ID `0x45f9ba755acaf2306525b4a5b67d32bd4905f56108499306449da7312b76330d`  
 ✅ **Encryption Strength:** Argon2id 64MB (OWASP recommended)  
 ✅ **Decentralization:** 100% client-side crypto + Walrus storage  
 ✅ **NFT Minting:** Unlimited on Mainnet (vs 1/day on Testnet)  
