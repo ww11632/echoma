@@ -1,6 +1,5 @@
-# 🏗️ echōma Architecture Visual Guide
+# 🏗️ Echoma Architecture Visual Guide
 
-> **一眼看懂 echōma 的技术架构与差异化价值**
 
 ---
 
