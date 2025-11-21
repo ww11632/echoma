@@ -6,6 +6,37 @@
 
 Echoma 是一個基於 Web3 的情感記錄應用，結合了客戶端加密、去中心化儲存和區塊鏈驗證，為你的情感數據提供隱私保護和永久儲存。
 
+---
+
+## 🏗️ 一眼看懂架構
+
+```mermaid
+graph LR
+    A[📝 書寫] --> B[🔐 加密<br/>Argon2id+AES]
+    B --> C[☁️ 儲存<br/>Walrus]
+    C --> D[⛓️ 驗證<br/>Sui NFT]
+    D --> E[🔐 控制<br/>Seal Policy]
+    
+    style B fill:#ff6b6b,stroke:#c92a2a,color:#fff
+    style C fill:#20c997,stroke:#0ca678,color:#fff
+    style D fill:#845ef7,stroke:#5f3dc4,color:#fff
+    style E fill:#f59f00,stroke:#e67700,color:#fff
+```
+
+### 🎯 echōma 的差異化優勢
+
+| 功能 | 傳統 Web3 日記 | echōma |
+|------|---------------|---------|
+| **加密方式** | ❌ 無或伺服器端 | ✅ **客戶端 AES-GCM-256** |
+| **密鑰派生** | 🔴 PBKDF2（弱） | 🟢 **Argon2id（64MB 記憶體困難）** |
+| **儲存方案** | 🟡 IPFS 網關 | 🟢 **Walrus（Sui 原生）** |
+| **訪問控制** | ❌ NFT = 完全訪問 | ✅ **動態授權/撤銷** |
+| **隱私保護** | 🔴 元數據洩露 | 🟢 **零知識證明** |
+
+📖 **[查看完整架構圖 →](./ARCHITECTURE_VISUAL.md)**
+
+---
+
 ## ⚠️ 重要聲明
 
 **Echoma 僅提供情感記錄與一般性支持，不能替代專業醫療建議。**

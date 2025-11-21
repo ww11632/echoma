@@ -11,6 +11,37 @@
 
 Echoma is a Web3-native emotion journaling app that combines client-side encryption, decentralized storage, and blockchain attestations so your emotional data stays private yet permanently verifiable.
 
+---
+
+## 🏗️ Architecture at a Glance
+
+```mermaid
+graph LR
+    A[📝 Write] --> B[🔐 Encrypt<br/>Argon2id+AES]
+    B --> C[☁️ Store<br/>Walrus]
+    C --> D[⛓️ Verify<br/>NFT on Sui]
+    D --> E[🔐 Control<br/>Seal Policy]
+    
+    style B fill:#ff6b6b,stroke:#c92a2a,color:#fff
+    style C fill:#20c997,stroke:#0ca678,color:#fff
+    style D fill:#845ef7,stroke:#5f3dc4,color:#fff
+    style E fill:#f59f00,stroke:#e67700,color:#fff
+```
+
+### 🎯 What Makes echōma Different?
+
+| Feature | Traditional Web3 Diary | echōma |
+|---------|------------------------|---------|
+| **Encryption** | ❌ None or Server-side | ✅ **Client-side AES-GCM-256** |
+| **Key Derivation** | 🔴 PBKDF2 (weak) | 🟢 **Argon2id (64MB Memory-Hard)** |
+| **Storage** | 🟡 IPFS Gateway | 🟢 **Walrus (Sui Native)** |
+| **Access Control** | ❌ NFT = Full Access | ✅ **Dynamic Grant/Revoke** |
+| **Privacy** | 🔴 Metadata Leakage | 🟢 **Zero-Knowledge** |
+
+📖 **[View Complete Architecture Diagrams →](./ARCHITECTURE_VISUAL.md)**
+
+---
+
 ## ⚠️ Important Notice
 
 **Echoma only offers journaling and general emotional support. It is NOT a substitute for professional medical advice.**
