@@ -8,7 +8,7 @@ import { extractBlobIdFromUrl } from "./walrus";
 // 合約常數
 // Testnet Package ID
 const TESTNET_PACKAGE_ID =
-  "0x6a63d7a634079a8a3505f58d8d35cc5c5828de47ed4f8985291fa30f71a89115";
+  "0x555c509131e6e41a12ff3cca245ba5ef762ed2cf0da0e3342c10d34dc416dc47";
 // Mainnet Package ID
 // 可以通過環境變數 MAINNET_PACKAGE_ID 覆蓋
 const MAINNET_PACKAGE_ID =

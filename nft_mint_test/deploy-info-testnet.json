@@ -1,0 +1,15 @@
+{
+  "network": "testnet",
+  "packageId": "0x555c509131e6e41a12ff3cca245ba5ef762ed2cf0da0e3342c10d34dc416dc47",
+  "policyRegistryId": "0x7b9993416d4658b186acbb62dfead9582510aa726c2a3a73d2f3335d05adcc69",
+  "upgradeCap": "0xebb8466097b2b9a4468173a964b6892a4ccafc9f03501a517d78a0d82cee8ca7",
+  "transactionDigest": "89WwZ9h8Bay8YHphoSPjFFXyVqQpN4XQnwS6m7qiVJXK",
+  "deployedAt": "2025-11-21T10:49:08Z",
+  "modules": [
+    "diary",
+    "diary_with_policy",
+    "seal_access_policies"
+  ],
+  "explorerUrl": "https://suiexplorer.com/?network=testnet&object=0x555c509131e6e41a12ff3cca245ba5ef762ed2cf0da0e3342c10d34dc416dc47"
+}
+
