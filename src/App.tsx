@@ -6,7 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { SuiClientProvider, WalletProvider } from "@mysten/dapp-kit";
 import { getFullnodeUrl } from "@mysten/sui/client";
 import { createNetworkConfig } from "@mysten/dapp-kit";
-import React, { lazy, Suspense } from "react";
+import React, { lazy, Suspense, useEffect } from "react";
 import { ThemeProvider } from "next-themes";
 import { MedicalDisclaimer } from "@/components/MedicalDisclaimer";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -14,6 +14,7 @@ import { Onboarding } from "@/components/Onboarding";
 import { useTranslation } from "react-i18next";
 import "@mysten/dapp-kit/dist/index.css";
 import { getCurrentNetwork } from "@/lib/networkConfig";
+import { initializeKeyVersioning } from "@/lib/keyVersioning";
 
 // 程式碼分割：懶載入頁面組件
 const Index = lazy(() => import("./pages/Index"));
@@ -57,16 +58,22 @@ const LoadingFallback = () => {
   );
 };
 
-const App = () => (
-  <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-  <QueryClientProvider client={queryClient}>
-    <SuiClientProvider networks={networkConfig} defaultNetwork={initialNetwork}>
-      <WalletProvider autoConnect>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <MedicalDisclaimer />
-          <BrowserRouter>
+const App = () => {
+  // Initialize key versioning on app start
+  useEffect(() => {
+    initializeKeyVersioning();
+  }, []);
+  
+  return (
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+    <QueryClientProvider client={queryClient}>
+      <SuiClientProvider networks={networkConfig} defaultNetwork={initialNetwork}>
+        <WalletProvider autoConnect>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <MedicalDisclaimer />
+            <BrowserRouter>
               <Onboarding />
               <ErrorBoundary>
                 <Suspense fallback={<LoadingFallback />}>
@@ -98,12 +105,13 @@ const App = () => (
             </Routes>
                 </Suspense>
               </ErrorBoundary>
-          </BrowserRouter>
-        </TooltipProvider>
-      </WalletProvider>
-    </SuiClientProvider>
-  </QueryClientProvider>
-  </ThemeProvider>
-);
+            </BrowserRouter>
+          </TooltipProvider>
+        </WalletProvider>
+      </SuiClientProvider>
+    </QueryClientProvider>
+    </ThemeProvider>
+  );
+};
 
 export default App;

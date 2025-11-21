@@ -242,6 +242,7 @@ export async function queryJournalByOwner(
 
 /**
  * 查詢用戶的所有 EntryNFT（從鏈上）
+ * 添加網絡驗證以防止混淆不同網絡的數據
  */
 export async function queryEntryNFTsByOwner(
   ownerAddress: string,
@@ -261,7 +262,7 @@ export async function queryEntryNFTsByOwner(
   try {
     const targetNetwork = network || getCurrentNetwork();
     const packageId = getPackageId(targetNetwork);
-    console.log(`[mintContract] Querying EntryNFTs for owner: ${ownerAddress} on ${targetNetwork}`);
+    console.log(`[mintContract] Querying EntryNFTs for owner: ${ownerAddress} on ${targetNetwork} with package ${packageId}`);
     
       const objects = await getClientForNetwork(targetNetwork).getOwnedObjects({
         owner: ownerAddress,
@@ -277,11 +278,24 @@ export async function queryEntryNFTsByOwner(
       limit: 50, // 限制查詢數量，Sui RPC 最大限制为 50
     });
 
-    console.log(`[mintContract] Found ${objects.data.length} EntryNFTs`);
+    console.log(`[mintContract] Found ${objects.data.length} EntryNFTs on ${targetNetwork}`);
 
     const nfts = [];
     for (const obj of objects.data) {
       if (!obj.data) continue;
+      
+      // 驗證對象類型是否匹配當前網絡的 Package ID
+      const expectedType = `${packageId}::${MODULE}::EntryNFT`;
+      const actualType = obj.data.type;
+      
+      if (actualType !== expectedType) {
+        console.warn(
+          `[mintContract] Skipping NFT ${obj.data.objectId}: type mismatch. ` +
+          `Expected ${expectedType}, got ${actualType}. ` +
+          `This NFT may belong to a different network or package.`
+        );
+        continue;
+      }
       
       const content = obj.data.content;
       if (content && 'fields' in content) {
@@ -313,7 +327,7 @@ export async function queryEntryNFTsByOwner(
     // 按時間戳排序（最新的在前）
     nfts.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-    console.log(`[mintContract] Processed ${nfts.length} EntryNFTs`);
+    console.log(`[mintContract] Processed ${nfts.length} verified EntryNFTs from ${targetNetwork}`);
     return nfts;
   } catch (error) {
     console.error("[mintContract] Error querying EntryNFTs:", error);

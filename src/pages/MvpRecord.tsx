@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,6 +8,8 @@ import { EMOTION_OPTIONS, type EmotionType, type EmotionRecord } from "@/lib/dat
 import { addEmotionRecord } from "@/lib/localIndex";
 import { useToast } from "@/hooks/use-toast";
 import { Sparkles, ArrowLeft } from "lucide-react";
+import { PasswordSetupDialog } from "@/components/PasswordSetupDialog";
+import { hasPasswordSetup, passwordCache, getPasswordContext } from "@/lib/userPassword";
 
 const MvpRecord = () => {
   const navigate = useNavigate();
@@ -15,6 +17,19 @@ const MvpRecord = () => {
   const [emotion, setEmotion] = useState<EmotionType | "">("");
   const [note, setNote] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [showPasswordSetup, setShowPasswordSetup] = useState(false);
+
+  // Check if password setup is needed on mount
+  useEffect(() => {
+    const setupComplete = hasPasswordSetup();
+    const context = getPasswordContext(null, null); // anonymous context for MVP mode
+    const cachedPassword = passwordCache.get(context);
+    
+    // Show password setup dialog if not completed and no cached password
+    if (!setupComplete && !cachedPassword) {
+      setShowPasswordSetup(true);
+    }
+  }, []);
 
   const handleSave = async () => {
     if (!emotion || !note.trim()) {
@@ -52,8 +67,31 @@ const MvpRecord = () => {
     }
   };
 
+  const handlePasswordSetupComplete = (password: string) => {
+    setShowPasswordSetup(false);
+    toast({
+      title: "密碼設置完成",
+      description: "您的加密密碼已設置成功，數據將被安全加密。",
+    });
+  };
+
+  const handlePasswordSetupSkip = () => {
+    setShowPasswordSetup(false);
+    toast({
+      title: "已跳過密碼設置",
+      description: "您可以稍後在設置中配置密碼。",
+      variant: "default",
+    });
+  };
+
   return (
     <div className="min-h-screen p-6">
+      <PasswordSetupDialog
+        open={showPasswordSetup}
+        onComplete={handlePasswordSetupComplete}
+        onSkip={handlePasswordSetupSkip}
+      />
+      
       <div className="max-w-2xl mx-auto">
         <Button
           variant="ghost"

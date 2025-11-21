@@ -662,14 +662,8 @@ const Record = () => {
             }
             console.log("[Record] Journal ID:", journalId);
             
-            // 檢查今天是否已經鑄造過 NFT（僅在測試網限制，主網允許每天多次鑄造）
-            if (currentNetwork === "testnet") {
-              const { checkTodayMinted } = await import("@/lib/mintContract");
-              const alreadyMintedToday = await checkTodayMinted(journalId, currentNetwork);
-              if (alreadyMintedToday) {
-                throw new Error("今天已經鑄造過 NFT，每天只能鑄造一次。請明天再試。");
-              }
-            }
+            // Note: 合約支持同一天多次鑄造（使用遞增的 count 作為唯一鍵）
+            // 不再限制每日鑄造次數，與合約邏輯保持一致
             
             // Calculate mood score (1-10) from intensity (0-100)
             moodScore = Math.max(1, Math.min(10, Math.round(intensityValue / 10)));

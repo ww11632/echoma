@@ -3,6 +3,8 @@ import { StorageService, LocalJsonAdapter, EncryptedLocalAdapter } from "./stora
 import { generateUserKey, generateUserKeyFromId, PUBLIC_SEAL_KEY } from "./encryption";
 import { getAnonymousUserKey } from "./anonymousIdentity";
 import { supabase } from "@/integrations/supabase/client";
+import { passwordCache, getPasswordContext } from "./userPassword";
+import { saveKeyParams, getKeyParams } from "./keyVersioning";
 
 // Simple local index built on top of local storage
 // Use plain adapter for backward compatibility
@@ -159,23 +161,42 @@ export async function addEmotionRecord(
   
   // Determine the private key for private records (even if current record is public)
   let privateKey: string;
+  
+  // Try to get user password from cache first
+  const context = getPasswordContext(currentWalletAddress, session?.user?.id);
+  const userPassword = passwordCache.get(context);
+  
   if (currentWalletAddress) {
     // Private record with wallet: use wallet key
     const cacheKey = `wallet_${currentWalletAddress}`;
+    const keyContext = `wallet_${currentWalletAddress}`;
     if (KEY_CACHE.has(cacheKey)) {
       privateKey = KEY_CACHE.get(cacheKey)!.key;
     } else {
-      privateKey = await generateUserKey(currentWalletAddress);
-      KEY_CACHE.set(cacheKey, { key: privateKey, type: 'Wallet Address' });
+      // Use user password if available for stronger security
+      privateKey = await generateUserKey(currentWalletAddress, undefined, userPassword);
+      KEY_CACHE.set(cacheKey, { key: privateKey, type: userPassword ? 'Wallet + Password' : 'Wallet Address' });
+      // Save key parameters for version tracking
+      saveKeyParams(keyContext, {
+        version: 2,
+        hasUserPassword: !!userPassword,
+      });
     }
   } else if (session?.user?.id) {
     // Private record with Supabase session: use Supabase key
     const cacheKey = `supabase_${session.user.id}`;
+    const keyContext = `user_${session.user.id}`;
     if (KEY_CACHE.has(cacheKey)) {
       privateKey = KEY_CACHE.get(cacheKey)!.key;
     } else {
-      privateKey = await generateUserKeyFromId(session.user.id);
-      KEY_CACHE.set(cacheKey, { key: privateKey, type: 'Supabase User' });
+      // Use user password if available for stronger security
+      privateKey = await generateUserKeyFromId(session.user.id, userPassword);
+      KEY_CACHE.set(cacheKey, { key: privateKey, type: userPassword ? 'User ID + Password' : 'Supabase User' });
+      // Save key parameters for version tracking
+      saveKeyParams(keyContext, {
+        version: 2,
+        hasUserPassword: !!userPassword,
+      });
     }
   } else {
     // Private record anonymous: use anonymous key
@@ -184,11 +205,17 @@ export async function addEmotionRecord(
       throw new Error("Cannot determine encryption key for anonymous private record");
     }
     const cacheKey = 'anonymous';
+    const keyContext = 'anonymous';
     if (KEY_CACHE.has(cacheKey)) {
       privateKey = KEY_CACHE.get(cacheKey)!.key;
     } else {
       privateKey = anonymousKey;
       KEY_CACHE.set(cacheKey, { key: privateKey, type: 'Anonymous' });
+      // Save key parameters for version tracking
+      saveKeyParams(keyContext, {
+        version: 2,
+        hasUserPassword: false,
+      });
     }
   }
   
@@ -258,6 +285,10 @@ export async function listEmotionRecords(): Promise<EmotionRecord[]> {
 async function getAllPossibleKeys(currentWalletAddress?: string | null): Promise<Array<{ key: string; type: string }>> {
   const { data: { session } } = await supabase.auth.getSession();
   const possibleKeys: Array<{ key: string; type: string }> = [];
+  
+  // Try to get user password from cache
+  const context = getPasswordContext(currentWalletAddress, session?.user?.id);
+  const userPassword = passwordCache.get(context);
 
   try {
     // 0. Always try public seal key first (for public records)
@@ -270,10 +301,22 @@ async function getAllPossibleKeys(currentWalletAddress?: string | null): Promise
       if (KEY_CACHE.has(cacheKey)) {
         possibleKeys.push(KEY_CACHE.get(cacheKey)!);
       } else {
-        const supabaseKey = await generateUserKeyFromId(session.user.id);
-        const keyEntry = { key: supabaseKey, type: 'Supabase User' };
+        // Use user password if available
+        const supabaseKey = await generateUserKeyFromId(session.user.id, userPassword);
+        const keyEntry = { key: supabaseKey, type: userPassword ? 'User ID + Password' : 'Supabase User' };
         possibleKeys.push(keyEntry);
         KEY_CACHE.set(cacheKey, keyEntry);
+      }
+      
+      // Also try without password for backward compatibility
+      if (userPassword) {
+        const legacyCacheKey = `supabase_${session.user.id}_legacy`;
+        if (!KEY_CACHE.has(legacyCacheKey)) {
+          const legacyKey = await generateUserKeyFromId(session.user.id);
+          const legacyEntry = { key: legacyKey, type: 'Supabase User (Legacy)' };
+          possibleKeys.push(legacyEntry);
+          KEY_CACHE.set(legacyCacheKey, legacyEntry);
+        }
       }
     }
 
@@ -296,10 +339,22 @@ async function getAllPossibleKeys(currentWalletAddress?: string | null): Promise
       if (KEY_CACHE.has(cacheKey)) {
         possibleKeys.push(KEY_CACHE.get(cacheKey)!);
       } else {
-        const walletKey = await generateUserKey(currentWalletAddress);
-        const keyEntry = { key: walletKey, type: 'Wallet Address' };
+        // Use user password if available
+        const walletKey = await generateUserKey(currentWalletAddress, undefined, userPassword);
+        const keyEntry = { key: walletKey, type: userPassword ? 'Wallet + Password' : 'Wallet Address' };
         possibleKeys.push(keyEntry);
         KEY_CACHE.set(cacheKey, keyEntry);
+      }
+      
+      // Also try without password for backward compatibility
+      if (userPassword) {
+        const legacyCacheKey = `wallet_${currentWalletAddress}_legacy`;
+        if (!KEY_CACHE.has(legacyCacheKey)) {
+          const legacyKey = await generateUserKey(currentWalletAddress);
+          const legacyEntry = { key: legacyKey, type: 'Wallet Address (Legacy)' };
+          possibleKeys.push(legacyEntry);
+          KEY_CACHE.set(legacyCacheKey, legacyEntry);
+        }
       }
     }
   } catch (keyError) {
@@ -315,6 +370,7 @@ async function getAllPossibleKeys(currentWalletAddress?: string | null): Promise
 export function clearKeyCache(): void {
   KEY_CACHE.clear();
   recordsCache = null;
+  passwordCache.clearAll();
 }
 
 /**

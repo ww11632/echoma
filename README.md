@@ -200,7 +200,7 @@ Echoma offers three flows tailored to different needs.
 - **Features:**
   - Optional AI emotion analysis (3 requests/min, no login)
   - Walrus storage with configurable retention (1–1000 epochs, ~1 day each)
-  - NFT minting: **Testnet** - 1/day per journal; **Mainnet** - unlimited
+  - NFT minting: **Unlimited** on both Testnet and Mainnet (contract supports multiple mints per day)
   - Automatic Journal creation, transaction tracking, Timeline badges
 
 #### 2. Authenticated Mode (Secure Mode)

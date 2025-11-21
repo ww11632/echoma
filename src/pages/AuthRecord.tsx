@@ -16,6 +16,8 @@ import { prepareEmotionSnapshot } from "@/lib/walrus";
 import { emotionSnapshotSchema } from "@/lib/validation";
 import GlobalControls from "@/components/GlobalControls";
 import { useSelectedNetwork } from "@/hooks/useSelectedNetwork";
+import { PasswordSetupDialog } from "@/components/PasswordSetupDialog";
+import { hasPasswordSetup, passwordCache, getPasswordContext } from "@/lib/userPassword";
 import type { User, Session } from "@supabase/supabase-js";
 
 const emotionValues = [
@@ -41,6 +43,7 @@ const AuthRecord = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [aiResponse, setAiResponse] = useState<string>("");
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [showPasswordSetup, setShowPasswordSetup] = useState(false);
   
   // Track component mount status to prevent navigation after unmount
   const isMountedRef = useRef(true);
@@ -83,6 +86,20 @@ const AuthRecord = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  // Check if password setup is needed when user is authenticated
+  useEffect(() => {
+    if (!user) return;
+    
+    const setupComplete = hasPasswordSetup();
+    const context = getPasswordContext(null, user.id);
+    const cachedPassword = passwordCache.get(context);
+    
+    // Show password setup dialog if not completed and no cached password
+    if (!setupComplete && !cachedPassword) {
+      setShowPasswordSetup(true);
+    }
+  }, [user]);
+
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     toast({
@@ -90,6 +107,23 @@ const AuthRecord = () => {
       description: t("authRecord.success.signedOutDesc"),
     });
     navigate("/");
+  };
+
+  const handlePasswordSetupComplete = (password: string) => {
+    setShowPasswordSetup(false);
+    toast({
+      title: t("password.setupTitle", "密碼設置完成"),
+      description: t("password.setupDescription", "您的加密密碼已設置成功，數據將被安全加密。"),
+    });
+  };
+
+  const handlePasswordSetupSkip = () => {
+    setShowPasswordSetup(false);
+    toast({
+      title: t("password.skipSetup", "已跳過密碼設置"),
+      description: t("authRecord.success.skipPasswordDesc", "您可以稍後在設置中配置密碼。"),
+      variant: "default",
+    });
   };
 
   const getAiResponse = async () => {
@@ -342,6 +376,13 @@ const AuthRecord = () => {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
+      <PasswordSetupDialog
+        open={showPasswordSetup}
+        onComplete={handlePasswordSetupComplete}
+        onSkip={handlePasswordSetupSkip}
+        userId={user?.id}
+      />
+      
       {/* Language Switcher */}
       <div className="absolute top-4 right-4 z-20">
         <GlobalControls />
