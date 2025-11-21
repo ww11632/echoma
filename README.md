@@ -153,13 +153,17 @@ See the codebase for detailed file structure.
 Echoma layers multiple defenses to keep data private and verifiable:
 
 - **Client-side encryption** – AES-GCM 256-bit encryption before data leaves your device
+- **User-defined passwords** – Optional custom encryption passwords (recommended for enhanced security)
 - **Key derivation** – PBKDF2 (Argon2id planned) with auto-scaling iterations
+- **Password management** – Password reset/change with automatic data re-encryption
+- **Key versioning** – Version control for encryption keys with automatic migration
 - **Seal permission model** – public/private record separation with smart decryption
 - **AI safeguards** – prompt injection controls, crisis detection, audit logging
+- **Multi-layer rate limiting** – User-based (10/min authenticated, 3/min anonymous) + IP-based (20/min) protection
 - **Security test suite** – end-to-end cryptographic validation (reproducible/measurable/auditable)
 - **Backward compatibility** – automatic migration of legacy formats
 
-**Data Flow:** Record → Encrypt → Store (Walrus) → Verify (Sui NFT)
+**Data Flow:** Record → Encrypt (with user password) → Store (Walrus) → Verify (Sui NFT)
 
 📖 **Detailed documentation:**
 - [THREAT_MODEL_EN.md](./THREAT_MODEL_EN.md) – threat model and design trade-offs (English)
@@ -232,6 +236,44 @@ Available in both Anonymous and Authenticated modes.
 - Warm, empathetic responses in English or Traditional Chinese
 - Rate limits: 3/min (anonymous), 10/min (authenticated)
 - Safety features: prompt injection controls, crisis detection, audit logging
+
+## 🔑 Password Management
+
+Echoma now supports user-defined encryption passwords for enhanced security.
+
+### Features
+
+- **Custom passwords** – Set your own encryption password (recommended for stronger security than wallet-only encryption)
+- **First-time setup** – Optional password setup dialog on first use (can be skipped)
+- **Password reset** – Change your password and automatically re-encrypt all data
+- **Session caching** – Password cached for 15 minutes to reduce repeated input
+- **Password hints** – Optional hints stored locally (plaintext) to help you remember
+- **Key versioning** – Automatic version tracking and migration support
+
+### How It Works
+
+1. **Initial Setup** (Optional)
+   - On first use, you'll be prompted to set an encryption password
+   - You can skip and set it later
+   - Password requirements: minimum 8 characters with letters and numbers/symbols
+
+2. **Password Reset**
+   - Enter your old password to verify
+   - Set a new password
+   - All local data is automatically re-encrypted with the new password
+
+3. **Data Migration**
+   - Automatic migration from v1 (wallet/user ID only) to v2 (with password)
+   - Backward compatible - old data can still be accessed
+   - Key version tracking prevents incompatibility issues
+
+### Security Notes
+
+⚠️ **Important:**
+- Your password is **never stored or uploaded** anywhere
+- If you forget your password, you **cannot** decrypt your data
+- Use a password manager or write down your password hint
+- Password only applies to local/MVP mode data (not Walrus-stored data)
 
 ## 🚧 Roadmap
 
