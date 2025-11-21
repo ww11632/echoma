@@ -1707,38 +1707,47 @@ const Record = () => {
                               {t("record.nftMinted.title")}
                             </p>
                             <ul className="text-xs text-green-700 dark:text-green-300 space-y-1 ml-4 list-disc">
-                              <li>{t("record.nftMinted.shareOption")}</li>
+                              {!isPublic && <li>{t("record.nftMinted.shareOption")}</li>}
                               <li>{t("record.nftMinted.timelineOption")}</li>
                             </ul>
+                            {/* 公开记录提示 */}
+                            {isPublic && (
+                              <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-xs text-blue-800 dark:text-blue-200">
+                                ℹ️ {t("record.publicRecordInfo") || "此記錄為公開記錄，任何人都可以訪問，無需授權特定地址"}
+                              </div>
+                            )}
                             {/* 策略验证状态提示 */}
-                            {policyVerified === false && (
+                            {!isPublic && policyVerified === false && (
                               <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs text-yellow-800 dark:text-yellow-200">
                                 ⚠️ {t("record.policyVerification.pending") || "策略验证中，请稍候... 分享功能可能暂时不可用"}
                               </div>
                             )}
                           </div>
                           
-                          <ShareRecordDialog
-                            entryNftId={lastMintedNftId}
-                            trigger={
-                              <Button 
-                                variant="outline" 
-                                className="w-full" 
-                                type="button"
-                                // 不再依赖 policyVerified，让 ShareRecordDialog 自己检查策略状态
-                                title={policyVerified === false ? (t("record.policyVerification.pendingTooltip") || "策略验证中，请稍候...") : undefined}
-                              >
-                                <Share2 className="h-4 w-4 mr-2" />
-                                {t("record.share.shareRecord") || "分享記錄"}
-                              </Button>
-                            }
-                            onShared={() => {
-                              toast({
-                                title: t("record.share.success") || "分享成功",
-                                description: t("record.share.successDesc") || "已授權該地址訪問此記錄",
-                              });
-                            }}
-                          />
+                          {/* 只有私有记录才显示分享按钮 */}
+                          {!isPublic && (
+                            <ShareRecordDialog
+                              entryNftId={lastMintedNftId}
+                              trigger={
+                                <Button 
+                                  variant="outline" 
+                                  className="w-full" 
+                                  type="button"
+                                  // 不再依赖 policyVerified，让 ShareRecordDialog 自己检查策略状态
+                                  title={policyVerified === false ? (t("record.policyVerification.pendingTooltip") || "策略验证中，请稍候...") : undefined}
+                                >
+                                  <Share2 className="h-4 w-4 mr-2" />
+                                  {t("record.share.shareRecord") || "分享記錄"}
+                                </Button>
+                              }
+                              onShared={() => {
+                                toast({
+                                  title: t("record.share.success") || "分享成功",
+                                  description: t("record.share.successDesc") || "已授權該地址訪問此記錄",
+                                });
+                              }}
+                            />
+                          )}
                           
                           <Button 
                             variant="default" 
