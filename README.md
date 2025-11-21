@@ -470,23 +470,6 @@ Echoma now supports user-defined encryption passwords for enhanced security.
 
 ---
 
-## 📊 Metrics & Achievements
-
-### Technical Milestones
-✅ **Mainnet Deployment:** Package ID `0x45f9ba755acaf2306525b4a5b67d32bd4905f56108499306449da7312b76330d`  
-✅ **Encryption Strength:** Argon2id 64MB (OWASP recommended)  
-✅ **Decentralization:** 100% client-side crypto + Walrus storage  
-✅ **NFT Minting:** Unlimited on Mainnet (vs 1/day on Testnet)  
-✅ **iOS Support:** Native app via Capacitor  
-
-### Code Quality
-- 📝 **20,000+ lines** of production TypeScript/Move code
-- 📚 **15+ technical documents** covering threat models, security, deployment
-- 🧪 **5 automated security tests** (all passing)
-- 🌍 **Full i18n** (English + Traditional Chinese)
-
----
-
 ## 🚧 Roadmap
 
 ### ✅ Recently Completed
