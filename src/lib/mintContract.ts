@@ -1475,16 +1475,27 @@ export async function isPublicSeal(
   } catch (error: any) {
     // 检查是否是预期的错误（没有访问策略）
     const errorMessage = error.message || "";
-    const isExpectedError = 
+    
+    // "malformed utf8" 和 "Deserialization error" 是 RPC 临时问题，不一定代表策略不存在
+    // 这些错误应该视为验证失败（需要重试），而不是策略不存在
+    const isRpcError = 
+      errorMessage.includes("malformed utf8") ||
+      errorMessage.includes("Deserialization error");
+    
+    const isPolicyNotFoundError = 
       errorMessage.includes("borrow_child_object_mut") ||
       errorMessage.includes("dynamic_field") ||
       errorMessage.includes("not found") ||
-      errorMessage.includes("malformed utf8") ||
-      errorMessage.includes("Deserialization error") ||
       errorMessage.includes("Entry does not exist");
     
+    if (isRpcError) {
+      // RPC 序列化错误，抛出特殊错误，让调用者知道需要重试
+      console.warn("[mintContract] RPC serialization error when checking policy, may need retry:", errorMessage);
+      throw new Error(`RPC_SERIALIZATION_ERROR: ${errorMessage}`);
+    }
+    
     // 如果是预期的错误（NFT 没有访问策略），静默处理，不记录错误日志
-    if (isExpectedError) {
+    if (isPolicyNotFoundError) {
       // 抛出特定错误，让调用者知道这是预期的（没有访问策略）
       throw new Error(`Entry NFT ${entryNftId} 没有访问策略。此 NFT 可能不是使用 Seal Access Policies 铸造的。`);
     }
@@ -1930,6 +1941,43 @@ export async function mintEntryWithPolicy(
         break;
       } catch (error: any) {
         const errorMessage = error?.message || "";
+        
+        // 检查是否是 RPC 序列化错误
+        if (errorMessage.includes("RPC_SERIALIZATION_ERROR")) {
+          console.warn(
+            `[mintContract] ⚠️ RPC 序列化错误（重试 ${retry + 1}/${POLICY_VERIFICATION_RETRIES}），尝试备选方案...`
+          );
+          
+          // 备选方案：检查交易事件是否有 PolicyCreatedEvent
+          try {
+            const txDetails = await client.getTransactionBlock({
+              digest: transactionDigest,
+              options: { showEvents: true },
+            });
+            
+            const policyEvent = txDetails.events?.find((e: any) => {
+              const typeName = e.type || "";
+              return typeName.includes("PolicyCreatedEvent") || typeName.includes("PolicyCreated");
+            });
+            
+            if (policyEvent) {
+              console.log(`[mintContract] ✅ 通过交易事件验证：策略已创建（跳过 RPC 查询）`);
+              policyVerified = true;
+              break;
+            } else {
+              console.warn(`[mintContract] ⚠️ 交易事件中未找到 PolicyCreatedEvent`);
+            }
+          } catch (eventError) {
+            console.warn(`[mintContract] 备选方案失败:`, eventError);
+          }
+          
+          // 如果还有重试机会，继续重试
+          if (retry < POLICY_VERIFICATION_RETRIES - 1) {
+            await new Promise((resolve) => setTimeout(resolve, POLICY_VERIFICATION_DELAY_MS));
+          }
+          continue;
+        }
+        
         if (errorMessage.includes("没有访问策略")) {
           const remaining = POLICY_VERIFICATION_RETRIES - retry - 1;
           const logFn = remaining > 0 ? console.info : console.warn;
