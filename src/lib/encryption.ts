@@ -3,16 +3,16 @@
  * Uses Web Crypto API for AES-GCM encryption with versioned headers
  * 
  * Security improvements:
- * - Argon2id support (memory-hard, GPU/ASIC resistant)
+ * - Argon2id support (memory-hard, GPU/ASIC resistant) with WASM integration
+ * - Automatic fallback to enhanced PBKDF2 if WASM fails
  * - Configurable PBKDF2 iterations based on device capability
  * - Versioned encryption headers for backward compatibility
  * - Strict salt (≥16 bytes) and IV (12 bytes) validation
  * - Enhanced error handling with clear failure reasons
  */
 
-// Argon2id support (optional - will fallback to PBKDF2 if not available)
-// TODO: Add argon2-browser when WASM build issues are resolved
-// For now, Argon2id requests will automatically fallback to PBKDF2
+// Import Argon2id from hash-wasm for WASM implementation
+import { argon2id } from 'hash-wasm';
 
 // ============================================================================
 // Constants
@@ -48,13 +48,60 @@ const MIN_PBKDF2_ITERATIONS = 100000;
 /** Maximum PBKDF2 iterations (for high-end devices) */
 const MAX_PBKDF2_ITERATIONS = 1000000;
 
-/** Argon2id default parameters */
+/** Argon2id default parameters (OWASP recommendations for sensitive data) */
 const ARGON2_DEFAULT_PARAMS = {
-  hashLength: 32, // 256 bits
-  time: 3, // 3 iterations
-  mem: 65536, // 64 MB memory
-  parallelism: 4, // 4 threads
+  hashLength: 32, // 256 bits (32 bytes)
+  time: 3, // 3 iterations (time cost)
+  mem: 65536, // 64 MB memory (memory cost in KB)
+  parallelism: 4, // 4 threads (parallelism)
 };
+
+// ============================================================================
+// Argon2id WASM Support and Fallback
+// ============================================================================
+
+/**
+ * Global flag to track Argon2id WASM availability
+ * Initially null (not tested), then true (available) or false (not available)
+ */
+let argon2Available: boolean | null = null;
+
+/**
+ * Test if Argon2id WASM is available and working
+ * This is called lazily on first use
+ */
+async function testArgon2Availability(): Promise<boolean> {
+  if (argon2Available !== null) {
+    return argon2Available;
+  }
+  
+  try {
+    // Try a simple test derivation to verify WASM is working
+    const testSalt = new Uint8Array(16);
+    const testPassword = 'test';
+    
+    await argon2id({
+      password: testPassword,
+      salt: testSalt,
+      iterations: 1,
+      memorySize: 512, // 512 KB (minimal for testing)
+      parallelism: 1,
+      hashLength: 32,
+      outputType: 'binary',
+    });
+    
+    argon2Available = true;
+    console.log('✅ Argon2id WASM initialized successfully');
+    return true;
+  } catch (error) {
+    argon2Available = false;
+    console.warn(
+      '⚠️ Argon2id WASM not available, falling back to enhanced PBKDF2:',
+      error instanceof Error ? error.message : String(error)
+    );
+    return false;
+  }
+}
 
 // ============================================================================
 // IV Reuse Detection (Session-scoped)
@@ -127,30 +174,84 @@ async function generateKeyId(
       256 // 256 bits = 32 bytes
     );
   } else {
-    // Argon2id fallback to PBKDF2 (same logic as deriveKeyArgon2id)
-    // Use enhanced iterations to compensate for lack of memory-hard properties
-    const baseIterations = await detectDeviceCapability();
-    const iterations = Math.max(baseIterations * 2, 300000); // Use 2x iterations or minimum 300k
-    const hash = "SHA-256";
+    // Argon2id - try WASM first, fallback to PBKDF2 if unavailable
+    const wasmAvailable = await testArgon2Availability();
     
-    const keyMaterial = await crypto.subtle.importKey(
-      "raw",
-      encoder.encode(password),
-      "PBKDF2",
-      false,
-      ["deriveBits"]
-    );
-    
-    kekBits = await crypto.subtle.deriveBits(
-      {
-        name: "PBKDF2",
-        salt: salt,
-        iterations: iterations,
-        hash: hash,
-      },
-      keyMaterial,
-      256
-    );
+    if (wasmAvailable) {
+      try {
+        // Extract Argon2id parameters
+        const time = kdfParams.time || ARGON2_DEFAULT_PARAMS.time;
+        const mem = kdfParams.mem || ARGON2_DEFAULT_PARAMS.mem;
+        const parallelism = kdfParams.parallelism || ARGON2_DEFAULT_PARAMS.parallelism;
+        
+        // Convert salt to Uint8Array
+        const saltArray = new Uint8Array(salt);
+        
+        // Derive key using Argon2id WASM
+        const hashArray = await argon2id({
+          password: password,
+          salt: saltArray,
+          iterations: time,
+          memorySize: mem,
+          parallelism: parallelism,
+          hashLength: 32,
+          outputType: 'binary',
+        });
+        
+        kekBits = hashArray.buffer as ArrayBuffer;
+      } catch (error) {
+        console.error("Argon2id failed in generateKeyId, falling back to PBKDF2:", error);
+        argon2Available = false;
+        
+        // Fallback to enhanced PBKDF2
+        const baseIterations = await detectDeviceCapability();
+        const iterations = Math.max(baseIterations * 2, 300000);
+        const hash = "SHA-256";
+        
+        const keyMaterial = await crypto.subtle.importKey(
+          "raw",
+          encoder.encode(password),
+          "PBKDF2",
+          false,
+          ["deriveBits"]
+        );
+        
+        kekBits = await crypto.subtle.deriveBits(
+          {
+            name: "PBKDF2",
+            salt: salt,
+            iterations: iterations,
+            hash: hash,
+          },
+          keyMaterial,
+          256
+        );
+      }
+    } else {
+      // WASM not available, use enhanced PBKDF2
+      const baseIterations = await detectDeviceCapability();
+      const iterations = Math.max(baseIterations * 2, 300000);
+      const hash = "SHA-256";
+      
+      const keyMaterial = await crypto.subtle.importKey(
+        "raw",
+        encoder.encode(password),
+        "PBKDF2",
+        false,
+        ["deriveBits"]
+      );
+      
+      kekBits = await crypto.subtle.deriveBits(
+        {
+          name: "PBKDF2",
+          salt: salt,
+          iterations: iterations,
+          hash: hash,
+        },
+        keyMaterial,
+        256
+      );
+    }
   }
   
   // 將原始密鑰材料導入為 HKDF 可用的密鑰
@@ -416,23 +517,75 @@ async function deriveKeyPBKDF2(
 }
 
 /**
- * Derive key using Argon2id
- * Currently falls back to PBKDF2 (Argon2 library integration pending)
- * TODO: Integrate argon2-browser when WASM build issues are resolved
+ * Derive key using Argon2id with WASM
+ * Falls back to enhanced PBKDF2 if WASM is not available
+ * 
+ * Argon2id parameters explanation:
+ * - time (iterations): Number of passes through memory (default: 3)
+ * - mem (memory cost): Amount of memory in KB (default: 64 MB = 65536 KB)
+ * - parallelism: Number of parallel threads (default: 4)
+ * 
+ * These defaults follow OWASP recommendations for password storage
  */
 async function deriveKeyArgon2id(
   password: string,
   salt: ArrayBuffer,
   params: KDFParams
 ): Promise<CryptoKey> {
-  // Argon2id not yet integrated - use PBKDF2 with higher iterations as compensation
-  console.warn("Argon2id requested but not yet integrated, using PBKDF2 with enhanced parameters");
-  const iterations = await detectDeviceCapability();
-  // Use significantly higher iterations to compensate for lack of memory-hard properties
-  return deriveKeyPBKDF2(password, salt, {
-    iterations: Math.max(iterations * 2, 300000), // Use 2x iterations or minimum 300k
-    hash: "SHA-256",
-  });
+  // Test WASM availability on first use
+  const wasmAvailable = await testArgon2Availability();
+  
+  if (!wasmAvailable) {
+    // Fallback to enhanced PBKDF2 with increased iterations
+    console.warn("Argon2id WASM unavailable, using enhanced PBKDF2 fallback");
+    const iterations = await detectDeviceCapability();
+    // Use significantly higher iterations to compensate for lack of memory-hard properties
+    return deriveKeyPBKDF2(password, salt, {
+      iterations: Math.max(iterations * 2, 300000), // Use 2x iterations or minimum 300k
+      hash: "SHA-256",
+    });
+  }
+  
+  try {
+    // Extract Argon2id parameters (use defaults if not provided)
+    const time = params.time || ARGON2_DEFAULT_PARAMS.time;
+    const mem = params.mem || ARGON2_DEFAULT_PARAMS.mem;
+    const parallelism = params.parallelism || ARGON2_DEFAULT_PARAMS.parallelism;
+    const hashLength = ARGON2_DEFAULT_PARAMS.hashLength;
+    
+    // Convert salt ArrayBuffer to Uint8Array
+    const saltArray = new Uint8Array(salt);
+    
+    // Derive key using Argon2id WASM
+    const hashArray = await argon2id({
+      password: password,
+      salt: saltArray,
+      iterations: time,
+      memorySize: mem,
+      parallelism: parallelism,
+      hashLength: hashLength,
+      outputType: 'binary',
+    });
+    
+    // Import derived key into Web Crypto API for AES-GCM
+    return await crypto.subtle.importKey(
+      "raw",
+      hashArray,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt", "decrypt"]
+    );
+  } catch (error) {
+    // If Argon2id fails (e.g., WASM error), fallback to PBKDF2
+    console.error("Argon2id derivation failed, falling back to PBKDF2:", error);
+    argon2Available = false; // Mark as unavailable for future calls
+    
+    const iterations = await detectDeviceCapability();
+    return deriveKeyPBKDF2(password, salt, {
+      iterations: Math.max(iterations * 2, 300000),
+      hash: "SHA-256",
+    });
+  }
 }
 
 /**
@@ -540,11 +693,14 @@ function validateHeader(header: EncryptionHeader): void {
  * @param kdf - Key derivation function to use (default: "argon2id")
  * @param kdfParams - Optional KDF parameters (will use defaults if not provided)
  * @returns Encrypted data with versioned header
+ * 
+ * Security: Now defaults to Argon2id (memory-hard, ASIC/GPU resistant)
+ * with automatic fallback to enhanced PBKDF2 if WASM is unavailable
  */
 export async function encryptData(
   data: string,
   password: string,
-  kdf: KDFType = "pbkdf2", // Default to PBKDF2 until Argon2id is integrated
+  kdf: KDFType = "argon2id", // Default to Argon2id for better security
   kdfParams?: Partial<KDFParams>
 ): Promise<EncryptedData> {
   // Validate password is not empty
@@ -869,15 +1025,20 @@ export async function decryptDataWithMigration(
  * compatibility, but it's recommended to use a user-provided password/passphrase
  * with a random salt instead.
  * 
+ * Security Update: Now uses Argon2id (memory-hard) when available,
+ * with automatic fallback to enhanced PBKDF2 for maximum security.
+ * 
  * @param walletAddress - The user's wallet address (for domain separation only)
  * @param signature - Optional wallet signature bytes (provides additional entropy)
  * @param userPassword - User-provided password/passphrase (RECOMMENDED)
+ * @param useArgon2id - Use Argon2id instead of PBKDF2 (default: true)
  * @returns A secure key derived from the inputs
  */
 export async function generateUserKey(
   walletAddress: string,
   signature?: Uint8Array,
-  userPassword?: string
+  userPassword?: string,
+  useArgon2id: boolean = true
 ): Promise<string> {
   // Validate wallet address format
   if (!/^0x[a-fA-F0-9]{64}$/.test(walletAddress)) {
@@ -896,7 +1057,7 @@ export async function generateUserKey(
   // This ensures the same inputs always produce the same key, allowing decryption
   // The salt is derived from application name + user identifier for domain separation
   const encoder = new TextEncoder();
-  const appSaltBase = encoder.encode("echoma_key_derivation_v2");
+  const appSaltBase = encoder.encode("echoma_key_derivation_v3_argon2");
   const addressHash = await crypto.subtle.digest("SHA-256", encoder.encode(walletAddress));
   const addressHashArray = new Uint8Array(addressHash);
   
@@ -908,65 +1069,93 @@ export async function generateUserKey(
     salt[i] ^= addressHashArray[i];
   }
   
-  // Prepare key material
+  // Prepare key material (password input for KDF)
   const addressBytes = encoder.encode(walletAddress);
-  
-  let keyMaterial: Uint8Array;
+  let passwordInput: string;
   
   if (userPassword) {
     // Use user password as primary material (RECOMMENDED)
-    const passwordBytes = encoder.encode(userPassword);
     // Combine: password + address (for domain separation) + signature (if available)
-    const parts: Uint8Array[] = [passwordBytes, addressBytes];
+    const parts: string[] = [userPassword, walletAddress];
     if (signature && signature.length > 0) {
-      parts.push(new Uint8Array(signature));
+      parts.push(bufToHex(signature.buffer as ArrayBuffer));
     }
-    
-    const totalLength = parts.reduce((sum, part) => sum + part.length, 0);
-    keyMaterial = new Uint8Array(totalLength);
-    let offset = 0;
-    for (const part of parts) {
-      keyMaterial.set(part, offset);
-      offset += part.length;
-    }
+    passwordInput = parts.join('|');
   } else if (signature && signature.length > 0) {
     // Fallback: Use address + signature
-    const tempBuffer = new Uint8Array(addressBytes.length + signature.length);
-    tempBuffer.set(addressBytes, 0);
-    tempBuffer.set(new Uint8Array(signature), addressBytes.length);
-    keyMaterial = tempBuffer;
+    passwordInput = walletAddress + '|' + bufToHex(signature.buffer as ArrayBuffer);
   } else {
     // Last resort: Use address only (WEAK - should be avoided)
-    keyMaterial = addressBytes;
+    passwordInput = walletAddress;
   }
   
-  // Use PBKDF2 with FIXED iterations for deterministic key derivation
-  // CRITICAL: Must use fixed iterations so the same wallet address always produces
-  // the same derived key, allowing decryption
+  let derivedBits: ArrayBuffer;
+  
+  // Try Argon2id first if requested and available
+  if (useArgon2id) {
+    const wasmAvailable = await testArgon2Availability();
+    
+    if (wasmAvailable) {
+      try {
+        // Use Argon2id for stronger key derivation (memory-hard, ASIC/GPU resistant)
+        const hashArray = await argon2id({
+          password: passwordInput,
+          salt: salt,
+          iterations: ARGON2_DEFAULT_PARAMS.time,
+          memorySize: ARGON2_DEFAULT_PARAMS.mem,
+          parallelism: ARGON2_DEFAULT_PARAMS.parallelism,
+          hashLength: 32,
+          outputType: 'binary',
+        });
+        
+        derivedBits = hashArray.buffer as ArrayBuffer;
+        console.log('✅ Using Argon2id for user key derivation');
+      } catch (error) {
+        console.warn('Argon2id failed, falling back to PBKDF2:', error);
+        // Fallback to PBKDF2
+        derivedBits = await deriveBitsWithPBKDF2(passwordInput, salt);
+      }
+    } else {
+      // WASM not available, use PBKDF2
+      derivedBits = await deriveBitsWithPBKDF2(passwordInput, salt);
+    }
+  } else {
+    // Use PBKDF2 (for backward compatibility or when explicitly requested)
+    derivedBits = await deriveBitsWithPBKDF2(passwordInput, salt);
+  }
+  
+  // Convert to base64 for storage/transmission
+  return bufferToBase64(derivedBits);
+}
+
+/**
+ * Helper function to derive bits using PBKDF2
+ */
+async function deriveBitsWithPBKDF2(
+  password: string,
+  salt: Uint8Array
+): Promise<ArrayBuffer> {
+  const encoder = new TextEncoder();
   const iterations = DEFAULT_PBKDF2_ITERATIONS;
   
-  const keyMaterialKey = await crypto.subtle.importKey(
+  const keyMaterial = await crypto.subtle.importKey(
     "raw",
-    keyMaterial.buffer as ArrayBuffer,
+    encoder.encode(password),
     "PBKDF2",
     false,
     ["deriveBits"]
   );
   
-  // Derive 256 bits (32 bytes) for the key
-  const derivedBits = await crypto.subtle.deriveBits(
+  return await crypto.subtle.deriveBits(
     {
       name: "PBKDF2",
       salt: salt,
       iterations: iterations,
       hash: "SHA-256",
     },
-    keyMaterialKey,
+    keyMaterial,
     256
   );
-  
-  // Convert to base64 for storage/transmission
-  return bufferToBase64(derivedBits);
 }
 
 /**
@@ -977,13 +1166,18 @@ export async function generateUserKey(
  * compatibility, but it's recommended to use a user-provided password/passphrase
  * with a random salt instead.
  * 
+ * Security Update: Now uses Argon2id (memory-hard) when available,
+ * with automatic fallback to enhanced PBKDF2 for maximum security.
+ * 
  * @param userId - Supabase user ID (UUID format)
  * @param userPassword - User-provided password/passphrase (RECOMMENDED)
+ * @param useArgon2id - Use Argon2id instead of PBKDF2 (default: true)
  * @returns A secure key derived from the inputs
  */
 export async function generateUserKeyFromId(
   userId: string,
-  userPassword?: string
+  userPassword?: string,
+  useArgon2id: boolean = true
 ): Promise<string> {
   // Validate UUID format
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -1003,7 +1197,7 @@ export async function generateUserKeyFromId(
   // This ensures the same inputs always produce the same key, allowing decryption
   // The salt is derived from application name + user ID for domain separation
   const encoder = new TextEncoder();
-  const appSaltBase = encoder.encode("echoma_key_derivation_v2");
+  const appSaltBase = encoder.encode("echoma_key_derivation_v3_argon2");
   const userIdHash = await crypto.subtle.digest("SHA-256", encoder.encode(userId));
   const userIdHashArray = new Uint8Array(userIdHash);
   
@@ -1015,47 +1209,52 @@ export async function generateUserKeyFromId(
     salt[i] ^= userIdHashArray[i];
   }
   
-  // Encode user ID
-  const userIdBytes = encoder.encode(userId);
-  
-  let keyMaterial: Uint8Array;
+  // Prepare password input
+  let passwordInput: string;
   
   if (userPassword) {
     // Use user password as primary material (RECOMMENDED)
-    const passwordBytes = encoder.encode(userPassword);
     // Combine: password + userId (for domain separation)
-    keyMaterial = new Uint8Array(passwordBytes.length + userIdBytes.length);
-    keyMaterial.set(passwordBytes, 0);
-    keyMaterial.set(userIdBytes, passwordBytes.length);
+    passwordInput = userPassword + '|' + userId;
   } else {
     // Fallback: Use userId only (WEAK - should be avoided)
-    keyMaterial = userIdBytes;
+    passwordInput = userId;
   }
   
-  // Use PBKDF2 with FIXED iterations for deterministic key derivation
-  // CRITICAL: Must use fixed iterations so the same user ID always produces
-  // the same derived key, allowing decryption
-  const iterations = DEFAULT_PBKDF2_ITERATIONS;
+  let derivedBits: ArrayBuffer;
   
-  const keyMaterialKey = await crypto.subtle.importKey(
-    "raw",
-    keyMaterial.buffer as ArrayBuffer,
-    "PBKDF2",
-    false,
-    ["deriveBits"]
-  );
-  
-  // Derive 256 bits (32 bytes)
-  const derivedBits = await crypto.subtle.deriveBits(
-    {
-      name: "PBKDF2",
-      salt: salt,
-      iterations: iterations,
-      hash: "SHA-256",
-    },
-    keyMaterialKey,
-    256
-  );
+  // Try Argon2id first if requested and available
+  if (useArgon2id) {
+    const wasmAvailable = await testArgon2Availability();
+    
+    if (wasmAvailable) {
+      try {
+        // Use Argon2id for stronger key derivation
+        const hashArray = await argon2id({
+          password: passwordInput,
+          salt: salt,
+          iterations: ARGON2_DEFAULT_PARAMS.time,
+          memorySize: ARGON2_DEFAULT_PARAMS.mem,
+          parallelism: ARGON2_DEFAULT_PARAMS.parallelism,
+          hashLength: 32,
+          outputType: 'binary',
+        });
+        
+        derivedBits = hashArray.buffer as ArrayBuffer;
+        console.log('✅ Using Argon2id for user key derivation (from ID)');
+      } catch (error) {
+        console.warn('Argon2id failed, falling back to PBKDF2:', error);
+        // Fallback to PBKDF2
+        derivedBits = await deriveBitsWithPBKDF2(passwordInput, salt);
+      }
+    } else {
+      // WASM not available, use PBKDF2
+      derivedBits = await deriveBitsWithPBKDF2(passwordInput, salt);
+    }
+  } else {
+    // Use PBKDF2 (for backward compatibility or when explicitly requested)
+    derivedBits = await deriveBitsWithPBKDF2(passwordInput, salt);
+  }
   
   // Convert to base64
   return bufferToBase64(derivedBits);

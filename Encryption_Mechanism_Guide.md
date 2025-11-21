@@ -15,17 +15,22 @@
 
 ### 2. 密鑰生成
 
-#### 方式 A：有錢包地址時
+#### 方式 A：有錢包地址時（使用 Argon2id）
 ```typescript
-// 使用 PBKDF2 從錢包地址派生密鑰
-const userKey = await generateUserKey(walletAddress);
+// 使用 Argon2id 從錢包地址派生密鑰（自動 fallback 到 PBKDF2）
+const userKey = await generateUserKey(walletAddress, signature, userPassword);
 ```
 
 **過程**：
 1. 使用錢包地址作為基礎材料
-2. 使用應用特定的 salt：`"echoma_encryption_salt_v1"`
-3. 使用 **PBKDF2** 進行密鑰派生：
-   - 迭代次數：**100,000 次**
+2. 使用應用特定的 salt：`"echoma_key_derivation_v3_argon2"`
+3. **優先使用 Argon2id** 進行密鑰派生（記憶體困難，抗 ASIC/GPU）：
+   - 時間成本：**3 次迭代**
+   - 記憶體成本：**64 MB (65536 KB)**
+   - 並行度：**4 執行緒**
+   - 派生 256 位密鑰
+4. **自動 Fallback**：若 WASM 不可用，使用增強的 PBKDF2：
+   - 迭代次數：**300,000+ 次**（根據設備性能調整）
    - 哈希算法：**SHA-256**
    - 派生 256 位密鑰
 
@@ -35,7 +40,7 @@ const userKey = await generateUserKey(walletAddress);
 const randomKey = crypto.randomUUID();
 ```
 
-### 3. 加密過程
+### 3. 加密過程（使用 Argon2id）
 
 ```typescript
 // 1. 生成隨機 Salt（16 字節）
@@ -44,9 +49,16 @@ const salt = crypto.getRandomValues(new Uint8Array(16));
 // 2. 生成隨機 IV（初始化向量，12 字節）
 const iv = crypto.getRandomValues(new Uint8Array(12));
 
-// 3. 使用 PBKDF2 派生加密密鑰
-const key = await deriveKey(password, salt.buffer);
-// - 迭代次數：100,000
+// 3. 使用 Argon2id 派生加密密鑰（優先）
+const key = await deriveKey(password, salt.buffer, "argon2id");
+// Argon2id 參數：
+// - 時間成本：3 次迭代
+// - 記憶體成本：64 MB (65536 KB)
+// - 並行度：4 執行緒
+// - 輸出：AES-256 密鑰 (256 bits)
+//
+// 若 WASM 不可用，自動 fallback 到增強 PBKDF2：
+// - 迭代次數：300,000+ 次
 // - 哈希：SHA-256
 // - 輸出：AES-256 密鑰
 
@@ -55,26 +67,54 @@ const encryptedBuffer = await crypto.subtle.encrypt(
   {
     name: "AES-GCM",
     iv: iv,
+    tagLength: 128, // 128 bits 認證標籤
   },
   key,
   encoder.encode(data)
 );
 
-// 5. 返回加密結果（Base64 編碼）
+// 5. 返回加密結果（版本化結構）
 return {
-  ciphertext: bufferToBase64(encryptedBuffer),  // 加密後的數據
-  iv: bufferToBase64(iv.buffer),                // 初始化向量
-  salt: bufferToBase64(salt.buffer),            // 鹽值
+  header: {
+    v: 2,                  // 加密 schema 版本
+    kdf: "argon2id",       // 使用的 KDF 類型
+    kdfParams: {           // KDF 參數
+      time: 3,
+      mem: 65536,
+      parallelism: 4
+    },
+    salt: bufferToBase64(salt.buffer),  // 鹽值
+    iv: bufferToBase64(iv.buffer)       // 初始化向量
+  },
+  ciphertext: bufferToBase64(encryptedBuffer)  // 加密後的數據
 };
 ```
 
-### 4. 加密數據結構
+### 4. 加密數據結構（版本化）
 
 ```typescript
 interface EncryptedData {
-  ciphertext: string;  // Base64 編碼的加密數據
-  iv: string;          // Base64 編碼的初始化向量（12 字節）
-  salt: string;        // Base64 編碼的鹽值（16 字節）
+  header: EncryptionHeader;  // 版本化加密頭
+  ciphertext: string;        // Base64 編碼的加密數據
+}
+
+interface EncryptionHeader {
+  v: number;                 // Schema 版本（當前：2）
+  kdf: "argon2id" | "pbkdf2"; // 密鑰派生函數類型
+  kdfParams: KDFParams;      // KDF 參數
+  salt: string;              // Base64 編碼的鹽值（≥16 字節）
+  iv: string;                // Base64 編碼的初始化向量（12 字節）
+}
+
+interface KDFParams {
+  // Argon2id 參數
+  time?: number;        // 時間成本（迭代次數）
+  mem?: number;         // 記憶體成本（KB）
+  parallelism?: number; // 並行度
+  
+  // PBKDF2 參數
+  iterations?: number;  // 迭代次數
+  hash?: string;        // 哈希算法
 }
 ```
 
@@ -86,9 +126,11 @@ interface EncryptedData {
    - 數據在離開瀏覽器前就已加密
    - 服務器無法看到明文內容
 
-2. **強密鑰派生**
-   - PBKDF2 使用 100,000 次迭代
-   - 防止暴力破解攻擊
+2. **強密鑰派生（Argon2id）**
+   - 優先使用 Argon2id（記憶體困難，抗 ASIC/GPU 攻擊）
+   - 參數：3 次迭代 × 64 MB 記憶體 × 4 執行緒
+   - 自動 fallback 到增強 PBKDF2（300,000+ 次迭代）
+   - 有效防止暴力破解和彩虹表攻擊
 
 3. **隨機 Salt 和 IV**
    - 每次加密都使用新的隨機值
@@ -186,11 +228,26 @@ async function decryptDescription(record: EmotionRecord) {
 
 ## 技術細節
 
-### PBKDF2 參數
+### 密鑰派生函數（KDF）
+
+#### Argon2id 參數（優先使用）
+- **算法**：Argon2id (記憶體困難的密碼哈希函數)
+- **時間成本**：3 次迭代
+- **記憶體成本**：64 MB (65536 KB)
+- **並行度**：4 執行緒
+- **輸出長度**：256 位 (32 字節)
+- **優勢**：
+  - 記憶體困難，抗 GPU/ASIC 攻擊
+  - 混合 Argon2i 和 Argon2d 的優勢
+  - OWASP 和 NIST 推薦的現代 KDF
+  - 適合密碼存儲和密鑰派生
+
+#### PBKDF2 參數（Fallback）
 - **算法**：PBKDF2 (Password-Based Key Derivation Function 2)
-- **迭代次數**：100,000
+- **迭代次數**：300,000+ 次（根據設備性能自動調整）
 - **哈希函數**：SHA-256
 - **輸出長度**：256 位
+- **使用場景**：Argon2id WASM 不可用時自動 fallback
 
 ### AES-GCM 參數
 - **算法**：AES (Advanced Encryption Standard)
