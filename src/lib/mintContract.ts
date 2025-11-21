@@ -1573,13 +1573,19 @@ export async function queryAccessHistory(
         limit: 100,
       }).then(result => 
         result.data
-          .filter((e: any) => e.typeName?.includes("AccessGrantedEvent"))
+          .filter((e: any) => {
+            const eventType = e.type || e.typeName || "";
+            return eventType.includes("AccessGrantedEvent") || eventType.includes("AccessGranted");
+          })
           .filter((e: any) => {
             try {
               const parsed = typeof e.parsedJson === "string" 
                 ? JSON.parse(e.parsedJson) 
                 : e.parsedJson;
-              return parsed?.entry_nft_id === entryNftId;
+              // 比较时规范化地址格式（都转小写）
+              const eventNftId = parsed?.entry_nft_id?.toLowerCase();
+              const targetNftId = entryNftId.toLowerCase();
+              return eventNftId === targetNftId;
             } catch {
               return false;
             }
@@ -1606,13 +1612,19 @@ export async function queryAccessHistory(
         limit: 100,
       }).then(result =>
         result.data
-          .filter((e: any) => e.typeName?.includes("AccessRevokedEvent"))
+          .filter((e: any) => {
+            const eventType = e.type || e.typeName || "";
+            return eventType.includes("AccessRevokedEvent") || eventType.includes("AccessRevoked");
+          })
           .filter((e: any) => {
             try {
               const parsed = typeof e.parsedJson === "string" 
                 ? JSON.parse(e.parsedJson) 
                 : e.parsedJson;
-              return parsed?.entry_nft_id === entryNftId;
+              // 比较时规范化地址格式（都转小写）
+              const eventNftId = parsed?.entry_nft_id?.toLowerCase();
+              const targetNftId = entryNftId.toLowerCase();
+              return eventNftId === targetNftId;
             } catch {
               return false;
             }
