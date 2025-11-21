@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Sparkles, ArrowLeft, Loader2, Lock, Unlock, Database } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Sparkles, ArrowLeft, Loader2, Lock, Unlock, Database, Share2, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrentAccount, useCurrentWallet, useSuiClient } from "@mysten/dapp-kit";
 import { toBase64 } from "@mysten/sui/utils";
@@ -18,9 +19,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { addEmotionRecord, initializeEncryptedStorage } from "@/lib/localIndex";
 import type { EmotionRecord } from "@/lib/dataSchema";
 import { postEmotion } from "@/lib/api";
-import { getOrCreateJournal, mintEntry } from "@/lib/mintContract";
+import { getOrCreateJournal, mintEntry, mintEntryWithPolicy, getOrQueryPolicyRegistry } from "@/lib/mintContract";
 import GlobalControls from "@/components/GlobalControls";
 import WalletConnect from "@/components/WalletConnect";
+import { ShareRecordDialog } from "@/components/ShareRecordDialog";
 import { getOrCreateAnonymousUserKey, getOrCreateAnonymousUserId } from "@/lib/anonymousIdentity";
 import { TagInput } from "@/components/TagInput";
 import { useSelectedNetwork } from "@/hooks/useSelectedNetwork";
@@ -50,11 +52,100 @@ const Record = () => {
   // Track if component is mounted to prevent navigation after unmount
   const isMountedRef = useRef(true);
   
+  // State declarations - must be before useEffect hooks that use them
+  const [selectedEmotion, setSelectedEmotion] = useState<string>("");
+  const [intensity, setIntensity] = useState([50]);
+  const [description, setDescription] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
+  const [isPublic, setIsPublic] = useState(false);
+  const [saveLocally, setSaveLocally] = useState(true); // 默认保存到本地
+  const [backupToDatabase, setBackupToDatabase] = useState(true); // 是否備份到 Supabase
+  const [mintAsNFT, setMintAsNFT] = useState(false); // 是否鑄造為 NFT
+  const [useSealPolicies, setUseSealPolicies] = useState(false); // 是否使用 Seal Access Policies
+  const [policyRegistryId, setPolicyRegistryId] = useState<string | null>(null); // PolicyRegistry ID
+  const [loadingPolicyRegistry, setLoadingPolicyRegistry] = useState(false); // PolicyRegistry 是否正在加载
+  const [lastMintedNftId, setLastMintedNftId] = useState<string | null>(null); // 最后铸造的 NFT ID（用于分享）
+  const [policyVerified, setPolicyVerified] = useState<boolean | null>(null); // 策略验证状态（null=未验证，true=已验证，false=验证失败）
+  const [epochs, setEpochs] = useState([200]); // Walrus 儲存期限（epochs），預設 200 epochs
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<"idle" | "encrypting" | "uploading" | "saving" | "success" | "error">("idle");
+  const [aiResponse, setAiResponse] = useState<string>("");
+  
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
     };
   }, []);
+
+  // 加载 PolicyRegistry ID（当启用 Seal Policies 时）
+  useEffect(() => {
+    // 使用一个标志来跟踪这个 effect 是否仍然有效（避免网络切换时的竞态条件）
+    let isCancelled = false;
+    const currentNetworkSnapshot = currentNetwork;
+    
+    if (useSealPolicies && mintAsNFT) {
+      const loadPolicyRegistry = async () => {
+        setLoadingPolicyRegistry(true);
+        try {
+          console.log("[Record] 🔍 正在加载 PolicyRegistry...", { network: currentNetworkSnapshot });
+          const registryId = await getOrQueryPolicyRegistry(currentNetworkSnapshot, suiClient);
+          
+          // 检查是否已被取消（网络可能已切换）
+          if (isCancelled || currentNetworkSnapshot !== currentNetwork) {
+            console.log("[Record] ⚠️ PolicyRegistry 加载已取消（网络已切换）");
+            return;
+          }
+          
+          setPolicyRegistryId(registryId);
+          if (registryId) {
+            console.log("[Record] ✅ PolicyRegistry 加载成功:", registryId);
+            console.log("[Record] ✅ Seal Access Policies 已启用并准备就绪");
+          } else {
+            console.warn("[Record] ⚠️ PolicyRegistry 未找到，Seal Access Policies 将无法启用");
+            console.warn("[Record] 请确认 Seal Access Policies 合约已正确部署到", currentNetworkSnapshot);
+            toast({
+              title: t("record.sealPolicies.registryNotFound") || "PolicyRegistry 未找到",
+              description: t("record.sealPolicies.registryNotFoundDesc") || "請先部署 Seal Access Policies 合約",
+              variant: "destructive",
+            });
+          }
+        } catch (error) {
+          // 检查是否已被取消
+          if (isCancelled || currentNetworkSnapshot !== currentNetwork) {
+            console.log("[Record] ⚠️ PolicyRegistry 加载已取消（网络已切换）");
+            return;
+          }
+          console.error("[Record] ❌ 加载 PolicyRegistry 时出错:", error);
+          setPolicyRegistryId(null);
+        } finally {
+          // 再次检查是否已被取消
+          if (!isCancelled && currentNetworkSnapshot === currentNetwork) {
+            setLoadingPolicyRegistry(false);
+          }
+        }
+      };
+      loadPolicyRegistry();
+    } else {
+      // 只有当 Seal Access Policies 被禁用时才清除（且之前有加载过）
+      if (!useSealPolicies && policyRegistryId) {
+        // 只有在之前已经加载过 PolicyRegistry 的情况下才清除和输出日志
+        setPolicyRegistryId(null);
+        setLoadingPolicyRegistry(false);
+        console.log("[Record] Seal Access Policies 已禁用");
+      } else if (!useSealPolicies && !policyRegistryId) {
+        // 如果从未加载过，静默处理（避免初始化时的误导性日志）
+        setPolicyRegistryId(null);
+        setLoadingPolicyRegistry(false);
+      }
+      // 如果 useSealPolicies 为 true 但 mintAsNFT 为 false，保持当前状态
+      // 这样当用户稍后勾选 mintAsNFT 时，如果 PolicyRegistry 已加载，就不需要重新加载
+    }
+    
+    // 清理函数：当 effect 重新运行或组件卸载时，标记为已取消
+    return () => {
+      isCancelled = true;
+    };
+  }, [useSealPolicies, mintAsNFT, currentNetwork, suiClient]);
   
   // Safe navigation function that checks if component is still mounted
   const navigateToTimeline = () => {
@@ -78,18 +169,6 @@ const Record = () => {
     { label: t("emotions.confusion"), value: "confusion", color: "from-gray-400 to-slate-400" },
     { label: t("emotions.peace"), value: "peace", color: "from-green-400 to-teal-400" },
   ];
-  const [selectedEmotion, setSelectedEmotion] = useState<string>("");
-  const [intensity, setIntensity] = useState([50]);
-  const [description, setDescription] = useState("");
-  const [tags, setTags] = useState<string[]>([]);
-  const [isPublic, setIsPublic] = useState(false);
-  const [saveLocally, setSaveLocally] = useState(true); // 默认保存到本地
-  const [backupToDatabase, setBackupToDatabase] = useState(true); // 是否備份到 Supabase
-  const [mintAsNFT, setMintAsNFT] = useState(false); // 是否鑄造為 NFT
-  const [epochs, setEpochs] = useState([200]); // Walrus 儲存期限（epochs），預設 200 epochs
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState<"idle" | "encrypting" | "uploading" | "saving" | "success" | "error">("idle");
-  const [aiResponse, setAiResponse] = useState<string>("");
   const [isAiLoading, setIsAiLoading] = useState(false);
 
   // 標籤建議（可以從本地存儲中獲取常用標籤）
@@ -521,6 +600,34 @@ const Record = () => {
             console.log("[Record] 🎨 Starting NFT minting process...");
             setUploadStatus("uploading"); // Keep uploading status for NFT minting
             
+            // 如果启用了 Seal Access Policies，在铸造前再次验证 PolicyRegistry
+            if (useSealPolicies) {
+              console.log("[Record] 🔍 铸造前验证 Seal Access Policies 配置...");
+              let finalRegistryId = policyRegistryId;
+              
+              // 如果 policyRegistryId 为 null，尝试重新加载
+              if (!finalRegistryId) {
+                console.warn("[Record] ⚠️ PolicyRegistry ID 为 null，尝试重新加载...");
+                finalRegistryId = await getOrQueryPolicyRegistry(currentNetwork, suiClient);
+                if (finalRegistryId) {
+                  console.log("[Record] ✅ 重新加载成功，PolicyRegistry ID:", finalRegistryId);
+                  setPolicyRegistryId(finalRegistryId);
+                }
+              }
+              
+              // 如果仍然为 null，阻止铸造
+              if (!finalRegistryId) {
+                throw new Error(
+                  "Seal Access Policies 已启用，但 PolicyRegistry 未找到。\n\n" +
+                  "请确认：\n" +
+                  "1. Seal Access Policies 合约已正确部署到 " + currentNetwork + "\n" +
+                  "2. PolicyRegistry ID 已正确配置\n" +
+                  "3. 网络连接正常\n\n" +
+                  "如果问题持续，请取消勾选 Seal Access Policies 使用传统方式铸造，或联系开发者。"
+                );
+              }
+            }
+            
             // Import checkContractDeployed
             const { checkContractDeployed } = await import("@/lib/mintContract");
             
@@ -603,23 +710,95 @@ const Record = () => {
               imageMime,
             });
             
-            const mintResult = await mintEntry(
-              signAndExecute,
-              journalId,
-              moodScore,
-              sanitizedDescription,
-              tagsCsv,
-              imageUrl,
-              imageMime,
-              undefined, // imageSha256 - optional
-              undefined, // audioUrl - optional
-              undefined, // audioMime - optional
-              undefined, // audioSha256 - optional
-              undefined, // audioDurationMs - optional
-              currentAccount.address, // sender
-              currentNetwork, // network - 确保使用正确的网络
-              suiClient // suiClient - 使用 dapp-kit 提供的客户端避免 CORS
-            );
+            // 使用 Seal Policies 或传统方式铸造 NFT
+            let mintResult;
+            
+            // 检查 Seal Access Policies 配置
+            if (useSealPolicies && !policyRegistryId) {
+              // 用户勾选了但 PolicyRegistry 未找到，阻止铸造
+              console.error("[Record] ❌ Seal Access Policies 已勾选，但 PolicyRegistry 未找到！无法使用 Seal Access Policies 铸造。");
+              console.error("[Record] 当前状态:", {
+                useSealPolicies,
+                policyRegistryId,
+                network: currentNetwork,
+              });
+              
+              // 阻止铸造，要求用户先解决 PolicyRegistry 问题
+              throw new Error(
+                "Seal Access Policies 已启用，但 PolicyRegistry 未找到。\n\n" +
+                "请确认：\n" +
+                "1. Seal Access Policies 合约已正确部署到 " + currentNetwork + "\n" +
+                "2. PolicyRegistry ID 已正确配置\n" +
+                "3. 网络连接正常\n\n" +
+                "如果问题持续，请取消勾选 Seal Access Policies 使用传统方式铸造，或联系开发者。"
+              );
+            }
+            
+            // 再次确认配置（防止状态变化）
+            if (useSealPolicies && policyRegistryId) {
+              console.log("[Record] 🔍 最终确认 Seal Access Policies 配置:");
+              console.log("[Record]   - useSealPolicies:", useSealPolicies);
+              console.log("[Record]   - policyRegistryId:", policyRegistryId);
+              console.log("[Record]   - network:", currentNetwork);
+              // 使用 Seal Access Policies
+              console.log("[Record] ✅ 使用 Seal Access Policies 铸造 NFT");
+              console.log("[Record] PolicyRegistry ID:", policyRegistryId);
+              console.log("[Record] 访问策略类型:", isPublic ? "公开" : "私有");
+              mintResult = await mintEntryWithPolicy(
+                signAndExecute,
+                journalId,
+                moodScore,
+                sanitizedDescription,
+                tagsCsv,
+                imageUrl,
+                imageMime,
+                undefined, // imageSha256 - optional
+                undefined, // audioUrl - optional
+                undefined, // audioMime - optional
+                undefined, // audioSha256 - optional
+                undefined, // audioDurationMs - optional
+                isPublic, // isPublic - 记录到链上策略
+                policyRegistryId,
+                currentAccount.address, // sender
+                currentNetwork, // network
+                suiClient // suiClient
+              );
+              console.log("[Record] ✅ Seal Access Policies 铸造成功！NFT ID:", mintResult?.nftId);
+              // 保存策略验证状态
+              if (mintResult?.policyVerified !== undefined) {
+                setPolicyVerified(mintResult.policyVerified);
+                if (!mintResult.policyVerified) {
+                  console.warn("[Record] ⚠️ 策略验证失败，分享功能可能暂时不可用");
+                }
+              }
+            } else {
+              // 使用传统方式
+              if (useSealPolicies) {
+                // 这种情况不应该发生（因为上面已经检查过了），但为了安全还是记录
+                console.error("[Record] ❌ 严重错误：useSealPolicies 为 true 但 policyRegistryId 为 null，这不应该发生！");
+                console.error("[Record] 当前状态:", { useSealPolicies, policyRegistryId, network: currentNetwork });
+              }
+              console.log("[Record] ⚠️ 使用传统方式铸造 NFT（未使用 Seal Access Policies）");
+              console.log("[Record] useSealPolicies:", useSealPolicies, "policyRegistryId:", policyRegistryId);
+              mintResult = await mintEntry(
+                signAndExecute,
+                journalId,
+                moodScore,
+                sanitizedDescription,
+                tagsCsv,
+                imageUrl,
+                imageMime,
+                undefined, // imageSha256 - optional
+                undefined, // audioUrl - optional
+                undefined, // audioMime - optional
+                undefined, // audioSha256 - optional
+                undefined, // audioDurationMs - optional
+                currentAccount.address, // sender
+                currentNetwork, // network - 确保使用正确的网络
+                suiClient // suiClient - 使用 dapp-kit 提供的客户端避免 CORS
+              );
+              console.log("[Record] ✅ 传统方式铸造成功！NFT ID:", mintResult?.nftId);
+            }
             
             if (!mintResult || !mintResult.nftId) {
               throw new Error("NFT 鑄造完成但未返回 NFT ID");
@@ -628,6 +807,11 @@ const Record = () => {
             nftId = mintResult.nftId;
             nftTransactionDigest = mintResult.transactionDigest;
             
+            // 保存 NFT ID 用于后续分享功能
+            if (useSealPolicies && nftId) {
+              setLastMintedNftId(nftId);
+            }
+
             console.log("[Record] ✅ NFT minted successfully! NFT ID:", nftId, "Transaction:", nftTransactionDigest);
           } catch (nftError: any) {
             console.error("[Record] ❌ NFT minting failed:", nftError);
@@ -703,9 +887,13 @@ const Record = () => {
           });
         } else if (nftId) {
           // NFT 铸造成功
+          const usedSealPolicies = useSealPolicies && policyRegistryId;
           toast({
             title: t("record.success.recorded"),
-            description: t("record.success.recordedWithNFT") || `記錄已保存並鑄造為 NFT！NFT ID: ${nftId.slice(0, 8)}...`,
+            description: usedSealPolicies
+              ? t("record.success.recordedWithSealPolicies", { nftId: nftId.slice(0, 8) })
+              : t("record.success.recordedWithNFT", { nftId: nftId.slice(0, 8) }),
+            duration: usedSealPolicies ? 8000 : 5000, // 如果启用了 Seal Policies，显示更长时间
           });
         } else {
           // 没有选择铸造 NFT 或铸造成功
@@ -773,9 +961,23 @@ const Record = () => {
                 console.log("[Record] ✅ Successfully backed up to Supabase", nftId ? `with NFT ID: ${nftId}` : "", nftTransactionDigest ? `and transaction: ${nftTransactionDigest.slice(0, 8)}...` : "");
               }
             }
+          } else {
+            console.log("[Record] ⚠️ 跳过 Supabase 备份（用户未勾选）");
+            // 如果铸造了 NFT 但没有备份到数据库，提示用户
+            if (nftId) {
+              console.warn("[Record] ⚠️ NFT 已铸造但未保存到数据库。记录可能不会立即出现在 Timeline 中，可以使用 Timeline 的「同步 NFT」功能手动同步。");
+            }
           }
         } catch (metadataError) {
           console.warn("[Record] Metadata save failed (not critical):", metadataError);
+        }
+        
+        // 如果铸造了带 Seal Policies 的 NFT，不要自动跳转，让用户可以分享
+        // 否则，等待一段时间后自动跳转到 Timeline
+        if (nftId && useSealPolicies && policyRegistryId) {
+          console.log("[Record] ✅ NFT 已铸造（带 Seal Policies），停留在页面以便用户分享");
+          // 不跳转，让用户看到分享按钮
+          return;
         }
         
         // Wait a bit before navigating to show success message
@@ -1406,28 +1608,147 @@ const Record = () => {
                     
                     {/* NFT Minting Option */}
                     {currentAccount && (
-                      <Card className="p-4 border-border/50 bg-card/50">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-full bg-purple-500/10 flex items-center justify-center">
-                              <Sparkles className="h-5 w-5 text-purple-500" />
+                      <>
+                        <Card className="p-4 border-border/50 bg-card/50">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="h-10 w-10 rounded-full bg-purple-500/10 flex items-center justify-center">
+                                <Sparkles className="h-5 w-5 text-purple-500" />
+                              </div>
+                              <div className="flex-1">
+                                <Label htmlFor="mintNFT" className="text-sm font-semibold cursor-pointer">
+                                  {mintAsNFT ? (t("record.nft.mint") || "鑄造為 NFT") : (t("record.nft.mintDisabled") || "不鑄造 NFT")}
+                                </Label>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  {mintAsNFT 
+                                    ? (t("record.nft.mintDesc") || "將此記錄鑄造為 Sui 鏈上 NFT，永久保存")
+                                    : (t("record.nft.mintDisabledDesc") || "僅保存到 Walrus，不鑄造 NFT")}
+                                </p>
+                                {/* 提示：Seal Access Policies 只能在铸造 NFT 时使用 */}
+                                <p className="text-xs text-muted-foreground/70 mt-1 italic">
+                                  {t("record.nft.sealPoliciesHint") || "💡 Seal Access Policies 只能在鑄造 NFT 時使用"}
+                                </p>
+                              </div>
                             </div>
-                            <div className="flex-1">
-                              <Label htmlFor="mintNFT" className="text-sm font-semibold cursor-pointer">
-                                {mintAsNFT ? (t("record.nft.mint") || "鑄造為 NFT") : (t("record.nft.mintDisabled") || "不鑄造 NFT")}
-                              </Label>
-                              <p className="text-xs text-muted-foreground mt-0.5">
-                                {mintAsNFT 
-                                  ? (t("record.nft.mintDesc") || "將此記錄鑄造為 Sui 鏈上 NFT，永久保存")
-                                  : (t("record.nft.mintDisabledDesc") || "僅保存到 Walrus，不鑄造 NFT")}
-                              </p>
-                            </div>
+                            <Switch
+                              id="mintNFT"
+                              checked={mintAsNFT}
+                              onCheckedChange={(checked) => {
+                                setMintAsNFT(checked);
+                                // 如果取消 NFT 铸造，自动取消 Seal Access Policies
+                                if (!checked && useSealPolicies) {
+                                  setUseSealPolicies(false);
+                                  toast({
+                                    title: t("record.sealPolicies.requiresNFT") || "需要启用 NFT 铸造",
+                                    description: t("record.sealPolicies.requiresNFTDesc") || "Seal Access Policies 只能在铸造 NFT 时使用，已自动取消。",
+                                    variant: "default",
+                                  });
+                                }
+                              }}
+                            />
                           </div>
-                          <Switch
-                            id="mintNFT"
-                            checked={mintAsNFT}
-                            onCheckedChange={setMintAsNFT}
+                        </Card>
+
+                        {/* Seal Access Policies 独立开关 */}
+                        {mintAsNFT && (
+                          <Card className="p-4 border-border/50 bg-card/50 mt-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3 flex-1">
+                                <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center">
+                                  <Shield className="h-5 w-5 text-blue-500" />
+                                </div>
+                                <div className="flex-1">
+                                  <Label htmlFor="useSealPolicies" className="text-sm font-semibold cursor-pointer">
+                                    {t("record.sealPolicies.enable") || "啟用 Seal Access Policies"}
+                                  </Label>
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    {useSealPolicies
+                                      ? (t("record.sealPolicies.enabledDesc") || "啟用鏈上訪問策略，可以授權他人訪問")
+                                      : (t("record.sealPolicies.disabledDesc") || "使用傳統方式，不記錄訪問策略")}
+                                  </p>
+                                  {/* 显示 PolicyRegistry 加载状态 */}
+                                  {useSealPolicies && loadingPolicyRegistry && (
+                                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1">
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                      {t("record.sealPolicies.loading") || "正在加载 PolicyRegistry..."}
+                                    </p>
+                                  )}
+                                  {useSealPolicies && !loadingPolicyRegistry && !policyRegistryId && (
+                                    <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
+                                      {t("record.sealPolicies.registryNotFound") || "⚠️ PolicyRegistry 未找到"}
+                                    </p>
+                                  )}
+                                  {useSealPolicies && !loadingPolicyRegistry && policyRegistryId && (
+                                    <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                                      {t("record.sealPolicies.ready") || "✅ Seal Access Policies 已准备就绪"}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              <Switch
+                                id="useSealPolicies"
+                                checked={useSealPolicies}
+                                onCheckedChange={(checked) => {
+                                  setUseSealPolicies(checked);
+                                }}
+                              />
+                            </div>
+                          </Card>
+                        )}
+                      </>
+                    )}
+
+                    {/* 如果启用了 Seal Policies 且已铸造 NFT，显示分享按钮和返回按钮 */}
+                    {useSealPolicies && lastMintedNftId && (
+                      <Card className="p-4 border-border/50 bg-card/50 mt-3">
+                        <div className="space-y-2">
+                          <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                            <p className="text-sm text-green-800 dark:text-green-200 mb-2">
+                              {t("record.nftMinted.title")}
+                            </p>
+                            <ul className="text-xs text-green-700 dark:text-green-300 space-y-1 ml-4 list-disc">
+                              <li>{t("record.nftMinted.shareOption")}</li>
+                              <li>{t("record.nftMinted.timelineOption")}</li>
+                            </ul>
+                            {/* 策略验证状态提示 */}
+                            {policyVerified === false && (
+                              <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs text-yellow-800 dark:text-yellow-200">
+                                ⚠️ {t("record.policyVerification.pending") || "策略验证中，请稍候... 分享功能可能暂时不可用"}
+                              </div>
+                            )}
+                          </div>
+                          
+                          <ShareRecordDialog
+                            entryNftId={lastMintedNftId}
+                            trigger={
+                              <Button 
+                                variant="outline" 
+                                className="w-full" 
+                                type="button"
+                                // 不再依赖 policyVerified，让 ShareRecordDialog 自己检查策略状态
+                                title={policyVerified === false ? (t("record.policyVerification.pendingTooltip") || "策略验证中，请稍候...") : undefined}
+                              >
+                                <Share2 className="h-4 w-4 mr-2" />
+                                {t("record.share.shareRecord") || "分享記錄"}
+                              </Button>
+                            }
+                            onShared={() => {
+                              toast({
+                                title: t("record.share.success") || "分享成功",
+                                description: t("record.share.successDesc") || "已授權該地址訪問此記錄",
+                              });
+                            }}
                           />
+                          
+                          <Button 
+                            variant="default" 
+                            className="w-full" 
+                            type="button"
+                            onClick={() => navigate("/timeline")}
+                          >
+                            <ArrowLeft className="h-4 w-4 mr-2" />
+                            {t("record.backToTimeline")}
+                          </Button>
                         </div>
                       </Card>
                     )}
@@ -1491,10 +1812,22 @@ const Record = () => {
             {/* Submit Button */}
             <Button
               onClick={handleSubmit}
-              disabled={isSubmitting || !selectedEmotion || !description.trim()}
+              disabled={
+                isSubmitting || 
+                !selectedEmotion || 
+                !description.trim() ||
+                (useSealPolicies && mintAsNFT && (loadingPolicyRegistry || !policyRegistryId))
+              }
               className="w-full h-12 md:h-14 text-base font-semibold gradient-emotion hover:opacity-95 shadow-md disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
               size="lg"
               aria-busy={isSubmitting}
+              title={
+                useSealPolicies && mintAsNFT && loadingPolicyRegistry
+                  ? (t("record.sealPolicies.loadingTooltip") || "正在加载 PolicyRegistry，请稍候...")
+                  : useSealPolicies && mintAsNFT && !policyRegistryId
+                  ? (t("record.sealPolicies.registryNotFoundTooltip") || "PolicyRegistry 未找到，无法使用 Seal Access Policies。请先部署合约或取消勾选 Seal Access Policies。")
+                  : undefined
+              }
             >
               {isSubmitting ? (
                 <>

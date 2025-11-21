@@ -191,6 +191,56 @@ export function isValidBlobId(blobId: string): boolean {
 }
 
 /**
+ * Extract Walrus blob ID from either a raw ID or a Walrus URL.
+ * Normalizes away query/hash segments so different resources referencing the same blob
+ * can be matched reliably.
+ */
+export function extractBlobIdFromUrl(value?: string | null): string | null {
+  if (!value) return null;
+  
+  let candidate = value.trim();
+  if (!candidate) return null;
+
+  // Try parsing as URL to strip domain and query/hash parts
+  try {
+    const parsed = new URL(candidate);
+    const pathname = parsed.pathname || "";
+    const parts = pathname.split("/").filter(Boolean);
+    if (parts.length > 0) {
+      candidate = parts[parts.length - 1];
+    }
+  } catch {
+    // Not a URL; fall back to splitting by slash
+    const parts = candidate.split("/").filter(Boolean);
+    if (parts.length > 0) {
+      candidate = parts[parts.length - 1];
+    }
+  }
+
+  // Remove any leftover query/hash fragments
+  candidate = candidate.split(/[?#]/)[0];
+
+  // decodeURIComponent can throw on malformed sequences; best-effort only
+  try {
+    candidate = decodeURIComponent(candidate);
+  } catch {
+    // ignore decoding errors and use the raw candidate
+  }
+
+  if (isValidBlobId(candidate)) {
+    return candidate;
+  }
+
+  // As a last resort, look for a token that looks like a blob ID inside the string
+  const match = candidate.match(/[A-Za-z0-9_-]{32,128}/);
+  if (match && isValidBlobId(match[0])) {
+    return match[0];
+  }
+
+  return null;
+}
+
+/**
  * Read data from Walrus storage
  */
 export async function readFromWalrus(blobId: string, network?: SuiNetwork): Promise<string> {

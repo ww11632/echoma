@@ -52,7 +52,55 @@
     "toggleTheme": "切換主題",
     "light": "淺色",
     "dark": "深色",
-    "system": "跟隨系統"
+    "system": "跟隨系統",
+    "unknownError": "未知錯誤"
+  },
+  "share": {
+    "title": "分享記錄",
+    "description": "選擇要分享給的對象，或輸入自訂地址",
+    "address": "錢包地址",
+    "enterAddress": "輸入{{label}}的錢包地址",
+    "selectOption": "請選擇要分享的對象",
+    "share": "分享",
+    "presets": {
+      "therapist": "心理師",
+      "therapistDesc": "分享給您的心理治療師",
+      "partner": "伴侶",
+      "partnerDesc": "分享給您的伴侶",
+      "family": "家人",
+      "familyDesc": "分享給您的家人",
+      "doctor": "醫生",
+      "doctorDesc": "分享給您的醫生",
+      "friend": "朋友",
+      "friendDesc": "分享給您的朋友",
+      "custom": "自訂地址",
+      "customDesc": "輸入錢包地址"
+    },
+    "checkingPolicy": "正在檢查訪問策略...",
+    "policyNotFound": "無法驗證訪問策略，此 NFT 可能未使用 Seal Access Policies 鑄造。",
+    "policyNotFoundHint": "如果 NFT 確實使用 Seal Access Policies 鑄造，可能是索引延遲。請稍等 10-30 秒後關閉並重新打開此對話框重試。",
+    "publicRecord": "這是公開記錄，任何人都可以訪問，無需分享。",
+    "publicRecordTooltip": "公開記錄無需分享",
+    "success": {
+      "shared": "分享成功",
+      "sharedDesc": "已授權該地址訪問此記錄"
+    },
+    "errors": {
+      "registryNotFound": "PolicyRegistry 未找到",
+      "policyCheckFailed": "策略檢查失敗",
+      "policyCheckFailedDesc": "無法驗證訪問策略，可能是網絡問題或索引延遲。如果 NFT 確實使用 Seal Access Policies 鑄造，您可以稍後重試。",
+      "registryNotFoundDesc": "請先部署 Seal Access Policies 合約",
+      "walletRequired": "需要連接錢包",
+      "addressRequired": "請輸入地址",
+      "invalidAddress": "無效的地址格式",
+      "shareFailed": "分享失敗",
+      "publicRecord": "公開記錄無法分享",
+      "publicRecordDesc": "公開記錄任何人都可以訪問，無需授權特定地址。",
+      "cannotGrantToSelf": "無法授權給自己",
+      "cannotGrantToSelfDesc": "您作為 NFT 的所有者已經擁有訪問權限，無需授權給自己。",
+      "alreadyAuthorized": "地址已授權",
+      "alreadyAuthorizedDesc": "該地址已經擁有訪問權限，無需重複授權。"
+    }
   },
   "disclaimer": {
     "title": "重要聲明",
@@ -198,6 +246,7 @@
       "recordedLocalServer": "Walrus 服務暫時無法使用，資料已儲存到本地伺服器。",
       "recordedSDK": "已使用 SDK 儲存至 Walrus：{{blobId}}...",
       "recordedWithNFT": "記錄已保存並鑄造為 NFT！NFT ID: {{nftId}}...",
+      "recordedWithSealPolicies": "記錄已保存並鑄造為 NFT（已啟用 Seal Access Policies）！NFT ID: {{nftId}}...\n\n💡 您現在可以在右側「儲存設定」區域下方點擊「分享記錄」按鈕，授權特定地址訪問此記錄。",
       "recordedButNFTFailed": "記錄已保存到 Walrus，但 NFT 鑄造失敗。您可以在 Timeline 中查看記錄，稍後可以重新嘗試鑄造。",
       "uploading": "上傳中...",
       "uploadingDesc": "正在加密並儲存您的情緒快照"
@@ -214,7 +263,36 @@
       "mint": "鑄造為 NFT",
       "mintDisabled": "不鑄造 NFT",
       "mintDesc": "將此記錄鑄造為 Sui 鏈上 NFT，永久保存並可驗證",
-      "mintDisabledDesc": "僅保存到 Walrus，不鑄造 NFT"
+      "mintDisabledDesc": "僅保存到 Walrus，不鑄造 NFT",
+      "sealPoliciesHint": "💡 Seal Access Policies 只能在鑄造 NFT 時使用"
+    },
+    "sealPolicies": {
+      "enable": "啟用 Seal Access Policies",
+      "enabledDesc": "啟用鏈上訪問策略，可以授權他人訪問",
+      "disabledDesc": "使用傳統方式，不記錄訪問策略",
+      "loading": "正在加載 PolicyRegistry...",
+      "ready": "✅ Seal Access Policies 已準備就緒",
+      "registryNotFound": "PolicyRegistry 未找到",
+      "registryNotFoundDesc": "請先部署 Seal Access Policies 合約",
+      "loadingTooltip": "正在加載 PolicyRegistry，請稍候...",
+      "registryNotFoundTooltip": "PolicyRegistry 未找到，無法使用 Seal Access Policies。請先部署合約或取消勾選 Seal Access Policies。",
+      "requiresNFT": "需要啟用 NFT 鑄造",
+      "requiresNFTDesc": "Seal Access Policies 只能在鑄造 NFT 時使用。請先啟用「Mint as NFT」選項。"
+    },
+    "share": {
+      "shareRecord": "分享記錄",
+      "success": "分享成功",
+      "successDesc": "已授權該地址訪問此記錄"
+    },
+    "nftMinted": {
+      "title": "✅ NFT 已成功鑄造！您現在可以：",
+      "shareOption": "點擊下方「分享記錄」按鈕，授權特定地址訪問",
+      "timelineOption": "或直接返回 Timeline 查看記錄"
+    },
+    "backToTimeline": "← 返回 Timeline",
+    "policyVerification": {
+      "pending": "策略验证中，请稍候... 分享功能可能暂时不可用",
+      "pendingTooltip": "策略验证中，请稍候..."
     }
   },
   "timeline": {
@@ -358,6 +436,10 @@
     "noSelection": "未選擇記錄",
     "noSelectionDesc": "請先選擇要匯出的記錄",
     "viewDetails": "查看詳情",
+    "accessControl": "訪問權限管理",
+    "accessControlDesc": "管理此記錄的訪問權限，授權他人訪問或撤銷訪問權限",
+    "accessControlUpdated": "訪問權限已更新",
+    "accessControlUpdatedDesc": "訪問權限變更已成功",
     "delete": "刪除",
     "deleteConfirmTitle": "確認刪除",
     "deleteConfirmDesc": "確定要刪除這條記錄嗎？此操作無法撤銷。",
@@ -383,7 +465,8 @@
       "all": "全部",
       "local": "本地儲存",
       "database": "數據庫",
-      "walrus": "Walrus 上傳"
+      "walrus": "Walrus 上傳",
+      "sealPolicies": "Seal Access Policies"
     },
     "stats": {
       "total": "總記錄數",
@@ -423,7 +506,7 @@
       "avgIntensity": "平均強度"
     },
     "decryptAll": {
-      "button": "🔓 一鍵解密所有",
+      "button": "一鍵解密所有",
       "decrypting": "解密中...",
       "noRecords": "無需解密的記錄",
       "noRecordsDesc": "所有記錄已經解密或無需解密",
@@ -431,6 +514,21 @@
       "successDesc": "成功解密 {{count}} 條記錄",
       "partialSuccess": "部分解密成功",
       "partialSuccessDesc": "成功解密 {{success}} 條，失敗 {{fail}} 條"
+    },
+    "syncNFTs": {
+      "button": "同步 NFT",
+      "syncing": "同步中...",
+      "tooltip": "從鏈上同步所有 NFT 記錄到數據庫",
+      "needWallet": "需要連接錢包",
+      "needWalletDesc": "請先連接錢包以同步鏈上記錄",
+      "needLogin": "需要登錄",
+      "needLoginDesc": "請先登錄 Supabase 以保存記錄",
+      "noNFTs": "同步完成",
+      "noNFTsDesc": "沒有找到鏈上 NFT 記錄",
+      "success": "同步完成",
+      "successDesc": "已同步 {{synced}} 個新 NFT，跳過 {{skipped}} 個已存在的記錄",
+      "failed": "同步失敗",
+      "failedDesc": "{{error}}"
     },
     "localStorage": {
       "keyMismatchTitle": "⚠️ 本地記錄可能無法訪問",
@@ -530,5 +628,66 @@
       "recorded": "成功！",
       "recordedDesc": "您的情緒已安全記錄。"
     }
+  },
+  "accessControl": {
+    "labels": {
+      "partner": "伴侶",
+      "family": "家人",
+      "therapist": "心理師",
+      "doctor": "醫生",
+      "agent": "AI Agent",
+      "friend": "朋友",
+      "other": "其他"
+    },
+    "errors": {
+      "registryNotFound": "PolicyRegistry 未找到",
+      "registryNotFoundDesc": "請先部署 Seal Access Policies 合約",
+      "loadFailed": "載入失敗",
+      "walletRequired": "需要連接錢包",
+      "addressRequired": "請輸入地址",
+      "invalidAddress": "無效的地址格式",
+      "grantFailed": "授權失敗",
+      "revokeFailed": "撤銷失敗",
+      "alreadyAuthorized": "地址已授權",
+      "alreadyAuthorizedDesc": "該地址已經擁有訪問權限，無需重複授權。",
+      "notAuthorized": "地址未授權",
+      "notAuthorizedDesc": "該地址沒有訪問權限，無需撤銷。",
+      "publicRecord": "公開記錄無法授權",
+      "publicRecordDesc": "公開記錄任何人都可以訪問，無需授權特定地址。",
+      "cannotGrantToSelf": "無法授權給自己",
+      "cannotGrantToSelfDesc": "您作為 NFT 的所有者已經擁有訪問權限，無需授權給自己。"
+    },
+    "success": {
+      "granted": "授權成功",
+      "grantedDesc": "已授權該地址訪問此記錄",
+      "revoked": "撤銷成功",
+      "revokedDesc": "已撤銷該地址的訪問權限"
+    },
+    "registryNotAvailable": "PolicyRegistry 不可用，請先部署合約",
+    "publicRecord": "公開記錄",
+    "publicRecordDesc": "此記錄為公開記錄，任何人都可以訪問",
+    "authorizedAccess": "授權訪問",
+    "history": "歷史",
+    "grantAccess": "授權訪問",
+    "grantAccessDesc": "授權一個地址訪問此私有記錄",
+    "role": "角色（可選）",
+    "selectRole": "選擇角色",
+    "roleHint": "為授權對象選擇角色，方便識別和管理",
+    "address": "錢包地址",
+    "addressHint": "輸入要授權的 Sui 錢包地址（66 字符）",
+    "grant": "授權",
+    "accessHistory": "授權歷史",
+    "noAuthorizedAddresses": "暫無授權地址",
+    "noAuthorizedHint": "點擊上方按鈕授權他人訪問此記錄",
+    "grantedAt": "授權於",
+    "revokeAccess": "撤銷訪問",
+    "info": {
+      "title": "鏈上驗證與審計",
+      "verifiable": "所有授權操作都記錄在 Sui 區塊鏈上，可公開驗證",
+      "auditable": "完整的授權歷史可審計，確保訪問權限的透明度",
+      "revocable": "隨時可以撤銷授權，立即生效"
+    },
+    "retry": "重試",
+    "retrying": "重試中..."
   }
 }

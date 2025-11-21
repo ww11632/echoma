@@ -4,17 +4,19 @@ import { useTranslation } from "react-i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Home, Sparkles, Shield, Clock, Lock, Unlock, Loader2, BookOpen, BarChart3, Filter, Eye, EyeOff, Search, Download, ArrowUpDown, X, MoreVertical, Trash2, Calendar as CalendarIcon, CheckSquare, Square, TrendingUp, Link2 } from "lucide-react";
+import { ArrowLeft, Home, Sparkles, Shield, Clock, Lock, Unlock, Loader2, BookOpen, BarChart3, Filter, Eye, EyeOff, Search, Download, ArrowUpDown, X, MoreVertical, Trash2, Calendar as CalendarIcon, CheckSquare, Square, TrendingUp, Link2, Users } from "lucide-react";
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import { supabase } from "@/integrations/supabase/client";
 import { listEmotionRecords, initializeEncryptedStorage, listEmotionRecordsWithAllKeys, deleteEmotionRecord } from "@/lib/localIndex";
 import { getEmotions, getEmotionsByWallet, getEncryptedEmotionByBlob } from "@/lib/api";
-import { queryWalrusBlobsByOwner, getWalrusUrl, readFromWalrus } from "@/lib/walrus";
-import { queryEntryNFTsByOwner } from "@/lib/mintContract";
+import { queryWalrusBlobsByOwner, getWalrusUrl, readFromWalrus, extractBlobIdFromUrl, isValidBlobId } from "@/lib/walrus";
+import { queryEntryNFTsByOwner, getOrQueryPolicyRegistry, isPublicSeal, checkIfMintedWithSealPolicies } from "@/lib/mintContract";
+import { getClientForNetwork } from "@/lib/suiClient";
 import { decryptData, decryptDataWithMigration, generateUserKey, generateUserKeyFromId, DecryptionError, DecryptionErrorType, PUBLIC_SEAL_KEY } from "@/lib/encryption";
 import type { EncryptedData } from "@/lib/encryption";
 import { getAnonymousUserKey, getOrCreateAnonymousUserKey } from "@/lib/anonymousIdentity";
 import GlobalControls from "@/components/GlobalControls";
+import { AccessControlManager } from "@/components/AccessControlManager";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Legend, CartesianGrid } from "recharts";
 import { useToast } from "@/hooks/use-toast";
@@ -54,12 +56,17 @@ interface EmotionRecord {
   transaction_digest?: string | null; // NFT 鑄造交易的 digest
 }
 
-type FilterType = "all" | "local" | "walrus";
+type FilterType = "all" | "local" | "walrus" | "sealPolicies";
 type SortBy = "date" | "intensity" | "emotion";
 type SortOrder = "asc" | "desc";
 type ViewPeriod = "week" | "month" | "year";
 
 const Timeline = () => {
+  const SUPABASE_ENABLED = Boolean(
+    import.meta.env.VITE_ENABLE_SUPABASE !== "false" &&
+    import.meta.env.VITE_SUPABASE_URL &&
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+  );
   const navigate = useNavigate();
   const currentAccount = useCurrentAccount();
   const { t, i18n } = useTranslation();
@@ -97,6 +104,13 @@ const Timeline = () => {
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<EmotionRecord | null>(null);
   
+  // 訪問權限管理對話框
+  const [accessControlDialogOpen, setAccessControlDialogOpen] = useState(false);
+  const [selectedRecordForAccessControl, setSelectedRecordForAccessControl] = useState<EmotionRecord | null>(null);
+  const selectedRecordNetwork = selectedRecordForAccessControl
+    ? extractNetworkFromWalrusUrl(selectedRecordForAccessControl.walrus_url) || network
+    : network;
+  
   // 導出格式選擇對話框
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<"csv" | "json" | "pdf" | "markdown">("csv");
@@ -116,6 +130,11 @@ const Timeline = () => {
     transactionDigest: false,
   });
   const [dateFormat, setDateFormat] = useState<"locale" | "iso" | "custom">("locale");
+  
+  // Seal Access Policies 过滤：跟踪哪些记录有访问策略
+  const [recordsWithSealPolicies, setRecordsWithSealPolicies] = useState<Set<string>>(new Set());
+  const [checkingSealPolicies, setCheckingSealPolicies] = useState(false);
+  const checkingSealPoliciesRef = useRef(false);
 
   const emotionLabels = {
     joy: { label: t("emotions.joy"), emoji: "😊", gradient: "from-yellow-400 to-orange-400", color: "#fbbf24" },
@@ -151,12 +170,30 @@ const Timeline = () => {
     );
   }, []);
 
+  const getSupabaseSessionSafe = useCallback(async () => {
+    if (!SUPABASE_ENABLED) return null;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      return session;
+    } catch (error) {
+      console.warn("[Timeline] Failed to get Supabase session (disabled or unreachable):", error);
+      return null;
+    }
+  }, [SUPABASE_ENABLED]);
+
   // Get current session
   useEffect(() => {
+    if (!SUPABASE_ENABLED) {
+      setSession(null);
+      return;
+    }
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+    }).catch((error) => {
+      console.warn("[Timeline] Failed to init Supabase session:", error);
+      setSession(null);
     });
-  }, []);
+  }, [SUPABASE_ENABLED]);
 
   // 網路狀態檢測
   useEffect(() => {
@@ -217,6 +254,7 @@ const Timeline = () => {
     const loadRecords = async () => {
       setIsLoading(true);
       const allRecords: EmotionRecord[] = [];
+      let supabaseSession: any = null;
 
       try {
         // 检查是否已被取消（网络或账户已切换）
@@ -263,98 +301,106 @@ const Timeline = () => {
         }
 
         // 2. 嘗試從 API 載入記錄（無論是否有錢包）
-        try {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session) {
-            // 如果有 Supabase session，使用 Supabase function
-            try {
-              const response = await supabase.functions.invoke('get-emotions');
-              if (!response.error && response.data?.success) {
-                const convertedRecords: EmotionRecord[] = response.data.records.map((r: any) => {
-                  // 如果 blob_id 或 walrus_url 是 null/undefined，視為本地記錄
-                  const hasWalrusData = r.blob_id && r.walrus_url;
-                  const isLocal = !hasWalrusData || 
-                                r.walrus_url?.startsWith("local://") || 
-                                r.blob_id?.startsWith("local_");
-                  
-                  // 為沒有 Walrus 資料的記錄生成本地 ID
-                  const blobId = hasWalrusData 
-                    ? r.blob_id 
-                    : `local_${r.id.slice(0, 8)}`;
-                  
-                  const walrusUrl = hasWalrusData
-                    ? r.walrus_url
-                    : `local://${r.id}`;
-                  
-                  console.log(`[Timeline] Processing record ${r.id}:`, {
-                    hasWalrusData,
-                    isLocal,
-                    blob_id: blobId,
-                    walrus_url: walrusUrl
-                  });
-                  
-                  return {
-                    id: r.id,
-                    emotion: r.emotion || "encrypted",
-                    intensity: r.intensity || 50,
-                    description: r.description,
-                    blob_id: blobId,
-                    walrus_url: walrusUrl,
-                    payload_hash: r.payload_hash || "",
-                    is_public: r.is_public || false,
-                    proof_status: r.proof_status || "pending",
-                    sui_ref: r.sui_ref || null,
-                    created_at: r.created_at || r.timestamp,
-                    wallet_address: r.wallet_address || null,
-                    encrypted_data: r.encrypted_data || null,
-                    transaction_digest: r.transaction_digest || null,
-                  };
-                });
-                allRecords.push(...convertedRecords);
-              }
-            } catch (supabaseFuncError) {
-              console.log("[Timeline] Supabase function error:", supabaseFuncError);
-              // 如果 Supabase function 失敗，嘗試使用直接 API 呼叫
+        if (SUPABASE_ENABLED) {
+          try {
+            const session = await getSupabaseSessionSafe();
+            supabaseSession = session;
+            if (session) {
+              // 如果有 Supabase session，使用 Supabase function
               try {
-                const apiRecords = await getEmotions(session.access_token);
-                const convertedApiRecords: EmotionRecord[] = apiRecords.map((r: any) => {
-                  // 如果 blob_id 或 walrus_url 是 null/undefined，視為本地記錄
-                  const hasWalrusData = r.blob_id && r.walrus_url;
-                  const isLocal = !hasWalrusData || 
-                                r.walrus_url?.startsWith("local://") || 
-                                r.blob_id?.startsWith("local_");
-                  
-                  // 為沒有 Walrus 資料的記錄生成本地 ID
-                  const blobId = hasWalrusData 
-                    ? r.blob_id 
-                    : `local_${r.id.slice(0, 8)}`;
-                  
-                  const walrusUrl = hasWalrusData
-                    ? r.walrus_url
-                    : `local://${r.id}`;
-                  
-                  return {
-                    id: r.id,
-                    emotion: r.emotion || "encrypted",
-                    intensity: r.intensity || 50,
-                    description: r.description,
-                    blob_id: blobId,
-                    walrus_url: walrusUrl,
-                    payload_hash: r.payload_hash || "",
-                    is_public: r.is_public || false,
-                    proof_status: r.proof_status || "pending",
-                    sui_ref: r.sui_ref || null,
-                    created_at: r.created_at || r.timestamp,
-                    wallet_address: r.wallet_address || null,
-                    transaction_digest: r.transaction_digest || null,
-                  };
-                });
-                allRecords.push(...convertedApiRecords);
-              } catch (apiError) {
-                console.log("[Timeline] API error (expected if server not running):", apiError);
+                const response = await supabase.functions.invoke('get-emotions');
+                if (!response.error && response.data?.success) {
+                  const convertedRecords: EmotionRecord[] = response.data.records.map((r: any) => {
+                    // 如果 blob_id 或 walrus_url 是 null/undefined，視為本地記錄
+                    const hasWalrusData = r.blob_id && r.walrus_url;
+                    const isLocal = !hasWalrusData || 
+                                  r.walrus_url?.startsWith("local://") || 
+                                  r.blob_id?.startsWith("local_");
+                    
+                    // 為沒有 Walrus 資料的記錄生成本地 ID
+                    const blobId = hasWalrusData 
+                      ? r.blob_id 
+                      : `local_${r.id.slice(0, 8)}`;
+                    
+                    const walrusUrl = hasWalrusData
+                      ? r.walrus_url
+                      : `local://${r.id}`;
+                    
+                    console.log(`[Timeline] Processing record ${r.id}:`, {
+                      hasWalrusData,
+                      isLocal,
+                      blob_id: blobId,
+                      walrus_url: walrusUrl
+                    });
+                    
+                    return {
+                      id: r.id,
+                      emotion: r.emotion || "encrypted",
+                      intensity: r.intensity || 50,
+                      description: r.description,
+                      blob_id: blobId,
+                      walrus_url: walrusUrl,
+                      payload_hash: r.payload_hash || "",
+                      is_public: r.is_public || false,
+                      proof_status: r.proof_status || "pending",
+                      sui_ref: r.sui_ref || null,
+                      created_at: r.created_at || r.timestamp,
+                      wallet_address: r.wallet_address || null,
+                      encrypted_data: r.encrypted_data || null,
+                      transaction_digest: r.transaction_digest || null,
+                    };
+                  });
+                  allRecords.push(...convertedRecords);
+                }
+              } catch (supabaseFuncError) {
+                console.log("[Timeline] Supabase function error:", supabaseFuncError);
+                // 如果 Supabase function 失敗，嘗試使用直接 API 呼叫
+                try {
+                  const apiRecords = await getEmotions(session.access_token);
+                  const convertedApiRecords: EmotionRecord[] = apiRecords.map((r: any) => {
+                    // 如果 blob_id 或 walrus_url 是 null/undefined，視為本地記錄
+                    const hasWalrusData = r.blob_id && r.walrus_url;
+                    const isLocal = !hasWalrusData || 
+                                  r.walrus_url?.startsWith("local://") || 
+                                  r.blob_id?.startsWith("local_");
+                    
+                    // 為沒有 Walrus 資料的記錄生成本地 ID
+                    const blobId = hasWalrusData 
+                      ? r.blob_id 
+                      : `local_${r.id.slice(0, 8)}`;
+                    
+                    const walrusUrl = hasWalrusData
+                      ? r.walrus_url
+                      : `local://${r.id}`;
+                    
+                    return {
+                      id: r.id,
+                      emotion: r.emotion || "encrypted",
+                      intensity: r.intensity || 50,
+                      description: r.description,
+                      blob_id: blobId,
+                      walrus_url: walrusUrl,
+                      payload_hash: r.payload_hash || "",
+                      is_public: r.is_public || false,
+                      proof_status: r.proof_status || "pending",
+                      sui_ref: r.sui_ref || null,
+                      created_at: r.created_at || r.timestamp,
+                      wallet_address: r.wallet_address || null,
+                      transaction_digest: r.transaction_digest || null,
+                    };
+                  });
+                  allRecords.push(...convertedApiRecords);
+                } catch (apiError) {
+                  console.log("[Timeline] API error (expected if server not running):", apiError);
+                }
               }
             }
+          } catch (supabaseError) {
+            console.log("[Timeline] Supabase error:", supabaseError);
           }
+        } else {
+          console.log("[Timeline] Supabase disabled; skipping remote record load");
+        }
           
           // 如果有錢包連接，嘗試查詢鏈上的 Walrus blob 物件
           if (currentAccountSnapshot?.address) {
@@ -366,7 +412,7 @@ const Timeline = () => {
               setIsQueryingOnChain(true);
               console.log("[Timeline] Querying on-chain Walrus blobs for address:", currentAccountSnapshot.address);
               console.log("[Timeline] Environment check:", {
-                hasSession: !!session,
+                hasSession: !!supabaseSession,
                 hasWallet: !!currentAccountSnapshot,
                 walletAddress: currentAccountSnapshot.address,
                 network: currentNetworkSnapshot,
@@ -399,22 +445,31 @@ const Timeline = () => {
                 let addedCount = 0;
                 let updatedCount = 0;
                 for (const blob of onChainBlobs) {
-                  // 檢查是否已經存在（透過 blob_id + network 或 sui_ref）
-                  // 注意：相同 blob_id 在不同網絡上應該視為不同記錄
+                  // 檢查是否已經存在（透過 blob_id 或 sui_ref）
+                  // 優先通過 blob_id 匹配（最可靠），因為 blob_id 是唯一的
+                  // 注意：相同 blob_id 在不同網絡上應該視為不同記錄，但通常同一錢包在同一網絡查詢
                   const blobNetwork = extractNetworkFromWalrusUrl(getWalrusUrl(blob.blobId, currentNetworkSnapshot));
                   const existing = allRecords.find(r => {
+                    // 優先通過 blob_id 匹配（最可靠）
+                    if (r.blob_id === blob.blobId) {
+                      // 如果 blob_id 相同，檢查網絡是否匹配
+                      const recordNetwork = extractNetworkFromWalrusUrl(r.walrus_url);
+                      // 如果兩個網絡都明確且相同，則匹配
+                      if (blobNetwork && recordNetwork && blobNetwork === recordNetwork) {
+                        return true;
+                      }
+                      // 如果網絡不明確，但在當前查詢的網絡下，也視為匹配
+                      // 這處理了數據庫記錄可能沒有明確網絡信息的情況
+                      if (!blobNetwork || !recordNetwork) {
+                        return true; // blob_id 相同就視為同一記錄
+                      }
+                      // 如果網絡明確但不同，則不匹配（不同網絡的相同 blob_id 視為不同記錄）
+                      return false;
+                    }
                     // 通過 sui_ref 匹配（同一對象）
                     if (r.sui_ref === blob.objectId) return true;
-                    // 通過 blob_id + network 匹配（相同 blob 但需要確認網絡）
-                    if (r.blob_id === blob.blobId) {
-                      const recordNetwork = extractNetworkFromWalrusUrl(r.walrus_url);
-                      // 如果網絡信息都明確且相同，或者是同一個網絡，則視為同一記錄
-                      if (blobNetwork && recordNetwork) {
-                        return blobNetwork === recordNetwork;
-                      }
-                      // 如果網絡信息不明確，但當前查詢的網絡與記錄的網絡匹配，視為同一記錄
-                      return blobNetwork === currentNetworkSnapshot || recordNetwork === currentNetworkSnapshot;
-                    }
+                    // 通過 id 匹配（如果記錄的 id 就是 objectId）
+                    if (r.id === blob.objectId) return true;
                     return false;
                   });
 
@@ -442,9 +497,16 @@ const Timeline = () => {
                     console.log(`[Timeline] ✅ Added on-chain record:`, {
                       blobId: blob.blobId,
                       objectId: blob.objectId,
-                      walrusUrl: getWalrusUrl(blob.blobId, currentNetworkSnapshot)
+                      walrusUrl: getWalrusUrl(blob.blobId, currentNetworkSnapshot),
+                      existingBlobIds: allRecords.filter(r => r.blob_id === blob.blobId).map(r => ({ id: r.id, blob_id: r.blob_id, sui_ref: r.sui_ref }))
                     });
                   } else {
+                    console.log(`[Timeline] 🔄 Found existing record for blob ${blob.blobId}:`, {
+                      existingId: existing.id,
+                      existingBlobId: existing.blob_id,
+                      existingSuiRef: existing.sui_ref,
+                      chainObjectId: blob.objectId
+                    });
                     let updated = false;
                     if (!existing.sui_ref && blob.objectId) {
                       existing.sui_ref = blob.objectId;
@@ -501,39 +563,43 @@ const Timeline = () => {
                 let nftUpdatedCount = 0;
                 
                 for (const nft of entryNFTs) {
-                  // 從 Walrus URL 中提取 blob ID（如果 imageUrl 是完整的 Walrus URL）
-                  let blobIdFromNft: string | null = null;
-                  if (nft.imageUrl) {
-                    // 嘗試從 URL 中提取 blob ID
-                    // Walrus URL 格式: https://aggregator.testnet.walrus.space/v1/{blobId}
-                    const match = nft.imageUrl.match(/\/([^/]+)$/);
-                    if (match) {
-                      blobIdFromNft = match[1];
-                    } else {
-                      // 如果不是完整 URL，可能就是 blob ID
-                      blobIdFromNft = nft.imageUrl;
-                    }
-                  }
+                  // 從 NFT 中提取 blob_id（優先使用 mintContract 返回的 blobId，然後嘗試 image/audio URL）
+                  const blobIdFromNft =
+                    nft.blobId ||
+                    extractBlobIdFromUrl(nft.imageUrl) ||
+                    extractBlobIdFromUrl(nft.audioUrl);
                   
-                  // 檢查是否已經存在（優先通過 sui_ref 或 id 匹配 NFT ID，然後通過 blob_id + network 匹配）
+                  // 如果 imageUrl/audioUrl 不是標準的 Walrus URL，使用標準聚合器 URL 替換，確保網絡信息一致
+                  const nftNetwork = extractNetworkFromWalrusUrl(nft.imageUrl) ||
+                                     extractNetworkFromWalrusUrl(nft.audioUrl) ||
+                                     currentNetworkSnapshot;
+                  const walrusUrlFromNft = blobIdFromNft
+                    ? getWalrusUrl(blobIdFromNft, nftNetwork)
+                    : (nft.imageUrl || nft.audioUrl || "");
+                  
+                  console.log(`[Timeline] Processing EntryNFT ${nft.nftId}, blobIdFromNft: ${blobIdFromNft}, imageUrl: ${nft.imageUrl}, audioUrl: ${nft.audioUrl}, walrusUrlFromNft: ${walrusUrlFromNft}`);
+                  
+                  // 檢查是否已經存在（優先通過 sui_ref 或 id 匹配 NFT ID，然後通過 blob_id 匹配）
                   // 情況1：數據庫記錄的 sui_ref 指向這個 NFT（r.sui_ref === nft.nftId）
-                  // 情況2：數據庫記錄的 id 就是這個 NFT ID（r.id === nft.nftId，雖然不太可能）
-                  // 情況3：通過 blob_id + network 或 walrus_url 匹配（考慮網絡信息）
-                  const nftNetwork = extractNetworkFromWalrusUrl(nft.imageUrl) || currentNetworkSnapshot;
+                  // 情況2：數據庫記錄的 id 就是這個 NFT ID（r.id === nft.nftId）
+                  // 情況3：通過 blob_id 匹配（EntryNFT 和 Blob 引用同一個 blob_id，應該合併為一條記錄）
                   const existing = allRecords.find(r => {
                     // 通過 sui_ref 或 id 匹配（同一對象，不需要考慮網絡）
-                    if (r.id === nft.nftId || r.sui_ref === nft.nftId) return true;
+                    if (r.id === nft.nftId || r.sui_ref === nft.nftId) {
+                      console.log(`[Timeline] EntryNFT ${nft.nftId} matched by id/sui_ref: ${r.id}`);
+                      return true;
+                    }
                     // 通過 walrus_url 完全匹配
-                    if (nft.imageUrl && r.walrus_url === nft.imageUrl) return true;
-                    // 通過 blob_id + network 匹配（相同 blob 但需要確認網絡）
+                    if (walrusUrlFromNft && (r.walrus_url === walrusUrlFromNft || r.walrus_url === nft.imageUrl || r.walrus_url === nft.audioUrl)) {
+                      console.log(`[Timeline] EntryNFT ${nft.nftId} matched by walrus_url: ${r.walrus_url}`);
+                      return true;
+                    }
+                    // 通過 blob_id 匹配（最關鍵：EntryNFT 和 Blob 引用同一個 blob_id）
+                    // 如果 blob_id 相同，就視為同一記錄，不需要嚴格檢查網絡（因為同一錢包在同一網絡查詢）
                     if (blobIdFromNft && r.blob_id === blobIdFromNft) {
-                      const recordNetwork = extractNetworkFromWalrusUrl(r.walrus_url);
-                      // 如果網絡信息都明確且相同，或者是同一個網絡，則視為同一記錄
-                      if (nftNetwork && recordNetwork) {
-                        return nftNetwork === recordNetwork;
-                      }
-                      // 如果網絡信息不明確，但當前查詢的網絡與記錄的網絡匹配，視為同一記錄
-                      return nftNetwork === currentNetworkSnapshot || recordNetwork === currentNetworkSnapshot;
+                      console.log(`[Timeline] EntryNFT ${nft.nftId} matched by blob_id: ${blobIdFromNft}, existing record: ${r.id} (blob_id: ${r.blob_id}, sui_ref: ${r.sui_ref})`);
+                      // blob_id 相同就視為同一記錄，優先使用 EntryNFT（因為有更多信息）
+                      return true;
                     }
                     return false;
                   });
@@ -555,7 +621,7 @@ const Timeline = () => {
                       intensity: intensity,
                       description: nft.moodText || "", // NFT 中存儲的 mood_text（這是描述，不是 emotion 類型）
                       blob_id: blobIdFromNft || `nft_${nft.nftId.slice(0, 8)}`, // 使用從 URL 提取的 blob ID，或生成 NFT 前綴的 ID
-                      walrus_url: nft.imageUrl || "", // 使用 imageUrl（通常是 Walrus URL）
+                      walrus_url: walrusUrlFromNft, // 使用標準化後的 Walrus URL，確保與 blob 對象一致
                       payload_hash: "",
                       is_public: false,
                       proof_status: "confirmed", // NFT 肯定是已確認的
@@ -576,51 +642,105 @@ const Timeline = () => {
                     });
                   } else {
                     // 更新現有記錄的 NFT 信息
-                    let updated = false;
+                    // 如果現有記錄是 Blob 記錄（通過 blob_id 匹配，且 id === sui_ref），
+                    // 應該刪除 Blob 記錄，用 EntryNFT 記錄替換（因為 EntryNFT 有更多信息）
+                    // 判斷是否為 Blob 記錄：id === sui_ref 且 id 是 objectId（以 0x 開頭），且通過 blob_id 匹配
+                    const isBlobRecord = existing.id === existing.sui_ref && 
+                                        existing.id.startsWith("0x") && 
+                                        blobIdFromNft && 
+                                        existing.blob_id === blobIdFromNft;
                     
-                    // 更新 sui_ref：如果沒有 sui_ref，或現有的 sui_ref 不是 NFT ID，則更新為 NFT ID
-                    // NFT 是比 Walrus blob 更高級的證明，所以應該優先使用 NFT ID
-                    // 判斷現有 sui_ref 是否是 NFT ID：如果 sui_ref === id，說明是鏈上 NFT 記錄；否則可能是 Walrus blob object ID
-                    const isCurrentSuiRefNFT = existing.sui_ref && existing.sui_ref === existing.id;
-                    if (nft.nftId && (!existing.sui_ref || (!isCurrentSuiRefNFT && existing.sui_ref !== nft.nftId))) {
-                      existing.sui_ref = nft.nftId;
-                      updated = true;
-                    }
+                    console.log(`[Timeline] EntryNFT ${nft.nftId} matched existing record:`, {
+                      existingId: existing.id,
+                      existingSuiRef: existing.sui_ref,
+                      existingBlobId: existing.blob_id,
+                      blobIdFromNft,
+                      isBlobRecord,
+                      shouldReplace: isBlobRecord
+                    });
                     
-                    // 更新 transaction_digest：優先保留數據庫中的（如果存在），否則使用鏈上的
-                    if (nft.transactionDigest && !existing.transaction_digest) {
-                      existing.transaction_digest = nft.transactionDigest;
-                      updated = true;
-                    }
-                    
-                    // 如果現有記錄沒有描述，使用 NFT 的描述
-                    if (!existing.description && nft.moodText) {
-                      existing.description = nft.moodText;
-                      updated = true;
-                    }
-                    
-                    // 更新強度（如果 NFT 中有）
-                    if (nft.moodScore > 0) {
+                    if (isBlobRecord) {
+                      // 刪除 Blob 記錄，用 EntryNFT 記錄替換
+                      console.log(`[Timeline] 🔄 Replacing Blob record ${existing.id} with EntryNFT ${nft.nftId} (same blob_id: ${blobIdFromNft})`);
+                      const indexToRemove = allRecords.indexOf(existing);
+                      if (indexToRemove >= 0) {
+                        allRecords.splice(indexToRemove, 1);
+                        console.log(`[Timeline] Removed Blob record at index ${indexToRemove}, remaining records: ${allRecords.length}`);
+                      } else {
+                        console.warn(`[Timeline] ⚠️ Could not find Blob record ${existing.id} in allRecords to remove`);
+                      }
+                      
+                      // 創建 EntryNFT 記錄
                       const intensity = Math.min(100, Math.max(0, (nft.moodScore / 10) * 100));
-                      if (existing.intensity !== intensity) {
-                        existing.intensity = intensity;
-                        updated = true;
-                      }
-                    }
-                    
-                    // 更新標籤
-                    if (nft.tagsCsv) {
-                      const tags = nft.tagsCsv.split(",").map(t => t.trim()).filter(Boolean);
-                      if (tags.length > 0) {
-                        existing.tags = tags;
-                        updated = true;
-                      }
-                    }
-                    
-                    if (updated) {
-                      existing.proof_status = "confirmed";
+                      const tags = nft.tagsCsv ? nft.tagsCsv.split(",").map(t => t.trim()).filter(Boolean) : [];
+                      
+                      const nftRecord: EmotionRecord = {
+                        id: nft.nftId,
+                        emotion: "encrypted",
+                        intensity: intensity,
+                        description: nft.moodText || "",
+                        blob_id: blobIdFromNft,
+                        walrus_url: walrusUrlFromNft,
+                        payload_hash: "",
+                        is_public: false,
+                        proof_status: "confirmed",
+                        sui_ref: nft.nftId,
+                        created_at: nft.timestamp,
+                        wallet_address: currentAccountSnapshot?.address || null,
+                        tags: tags.length > 0 ? tags : undefined,
+                        transaction_digest: nft.transactionDigest || null,
+                      };
+                      
+                      allRecords.push(nftRecord);
                       nftUpdatedCount++;
-                      console.log(`[Timeline] ✅ Updated record with NFT data:`, existing.id);
+                      console.log(`[Timeline] ✅ Replaced Blob record with EntryNFT: ${nft.nftId}, total records now: ${allRecords.length}`);
+                    } else {
+                      // 更新現有記錄的 NFT 信息（現有記錄可能是數據庫記錄或其他類型）
+                      let updated = false;
+                      
+                      // 更新 sui_ref：如果沒有 sui_ref，或現有的 sui_ref 不是 NFT ID，則更新為 NFT ID
+                      // NFT 是比 Walrus blob 更高級的證明，所以應該優先使用 NFT ID
+                      const isCurrentSuiRefNFT = existing.sui_ref && existing.sui_ref === existing.id;
+                      if (nft.nftId && (!existing.sui_ref || (!isCurrentSuiRefNFT && existing.sui_ref !== nft.nftId))) {
+                        existing.sui_ref = nft.nftId;
+                        updated = true;
+                      }
+                      
+                      // 更新 transaction_digest：優先保留數據庫中的（如果存在），否則使用鏈上的
+                      if (nft.transactionDigest && !existing.transaction_digest) {
+                        existing.transaction_digest = nft.transactionDigest;
+                        updated = true;
+                      }
+                      
+                      // 如果現有記錄沒有描述，使用 NFT 的描述
+                      if (!existing.description && nft.moodText) {
+                        existing.description = nft.moodText;
+                        updated = true;
+                      }
+                      
+                      // 更新強度（如果 NFT 中有）
+                      if (nft.moodScore > 0) {
+                        const intensity = Math.min(100, Math.max(0, (nft.moodScore / 10) * 100));
+                        if (existing.intensity !== intensity) {
+                          existing.intensity = intensity;
+                          updated = true;
+                        }
+                      }
+                      
+                      // 更新標籤
+                      if (nft.tagsCsv) {
+                        const tags = nft.tagsCsv.split(",").map(t => t.trim()).filter(Boolean);
+                        if (tags.length > 0) {
+                          existing.tags = tags;
+                          updated = true;
+                        }
+                      }
+                      
+                      if (updated) {
+                        existing.proof_status = "confirmed";
+                        nftUpdatedCount++;
+                        console.log(`[Timeline] ✅ Updated record with NFT data:`, existing.id);
+                      }
                     }
                   }
                 }
@@ -638,9 +758,6 @@ const Timeline = () => {
                 // NFT 查詢失敗不影響其他記錄的載入
               }
             }
-          } catch (supabaseError) {
-          console.log("[Timeline] Supabase error:", supabaseError);
-        }
 
         // 3. 去重并排序（按时间倒序）
         console.log(`[Timeline] Starting deduplication with ${allRecords.length} total records`);
@@ -711,13 +828,92 @@ const Timeline = () => {
             }
           }
           
+          // 在添加到 deduplicationMap 之前，先檢查 blob_id 衝突
+          // 注意：相同 blob_id 在不同網絡上應該視為不同記錄
+          // 需要檢查所有已處理的記錄，不僅僅是 blobIdToRecordMap 中的
+          if (record.blob_id) {
+            const recordNetwork = extractNetworkFromWalrusUrl(record.walrus_url);
+            // 使用 blob_id + network 作為鍵，確保不同網絡的相同 blob_id 不會衝突
+            const blobIdKey = recordNetwork 
+              ? `${record.blob_id}:${recordNetwork}` 
+              : `${record.blob_id}:unknown`;
+            
+            // 先檢查輔助映射
+            let existingByBlobId = blobIdToRecordMap.get(blobIdKey);
+            
+            // 如果輔助映射中沒有，檢查所有已處理的記錄（包括 blob_id === id 的情況）
+            if (!existingByBlobId) {
+              for (const [existingId, existingRecord] of deduplicationMap.entries()) {
+                if (existingRecord.blob_id === record.blob_id && existingId !== record.id) {
+                  const existingNetwork = extractNetworkFromWalrusUrl(existingRecord.walrus_url);
+                  const existingBlobIdKey = existingNetwork 
+                    ? `${existingRecord.blob_id}:${existingNetwork}` 
+                    : `${existingRecord.blob_id}:unknown`;
+                  
+                  // 檢查網絡是否匹配
+                  if (blobIdKey === existingBlobIdKey || 
+                      (!recordNetwork && !existingNetwork) ||
+                      (recordNetwork === existingNetwork)) {
+                    existingByBlobId = existingRecord;
+                    break;
+                  }
+                }
+              }
+            }
+            
+            if (existingByBlobId && existingByBlobId.id !== record.id) {
+              // 發現 blob_id 衝突：兩個不同的記錄有相同的 blob_id 和網絡
+              // 優先保留數據庫記錄（id 是 UUID，有完整的 emotion、description 等）
+              // 跳過鏈上記錄（id 是 objectId，只有 blob_id）
+              const existingInMainMap = deduplicationMap.get(existingByBlobId.id);
+              const recordInMainMap = deduplicationMap.get(record.id);
+              
+              // 判斷記錄類型：數據庫記錄通常 id !== sui_ref，鏈上記錄 id === sui_ref 或 id === blob.objectId
+              const existingIsDatabaseRecord = existingByBlobId.id !== existingByBlobId.sui_ref && existingByBlobId.sui_ref;
+              const currentIsDatabaseRecord = record.id !== record.sui_ref && record.sui_ref;
+              
+              if (existingInMainMap) {
+                // 衝突記錄已在主映射中
+                if (existingIsDatabaseRecord && !currentIsDatabaseRecord) {
+                  // 保留數據庫記錄，跳過鏈上記錄
+                  console.log(`[Timeline] Dedup: blob_id conflict - keeping database record ${existingByBlobId.id}, skipping chain record ${record.id} (same blob_id: ${record.blob_id})`);
+                  continue;
+                } else if (!existingIsDatabaseRecord && currentIsDatabaseRecord) {
+                  // 替換鏈上記錄為數據庫記錄
+                  console.log(`[Timeline] Dedup: blob_id conflict - replacing chain record ${existingByBlobId.id} with database record ${record.id} (same blob_id: ${record.blob_id})`);
+                  deduplicationMap.delete(existingByBlobId.id);
+                  // 繼續處理，讓後續邏輯添加新記錄
+                } else {
+                  // 兩個都是同一類型，保留已在主映射中的
+                  console.log(`[Timeline] Dedup: blob_id conflict - keeping ${existingByBlobId.id}, skipping ${record.id} (same blob_id: ${record.blob_id})`);
+                  continue;
+                }
+              } else if (recordInMainMap) {
+                // 當前記錄已在主映射中，但衝突記錄不在
+                // 更新輔助映射
+                blobIdToRecordMap.set(blobIdKey, record);
+              } else {
+                // 兩個都不在主映射中，優先保留數據庫記錄
+                if (existingIsDatabaseRecord && !currentIsDatabaseRecord) {
+                  console.log(`[Timeline] Dedup: blob_id conflict - will keep database record ${existingByBlobId.id}, skipping chain record ${record.id} (same blob_id: ${record.blob_id})`);
+                  continue;
+                }
+                // 否則繼續處理，讓後續邏輯添加新記錄
+              }
+            }
+          }
+          
           if (!existingById) {
             // 新記錄，添加到主映射
             deduplicationMap.set(primaryKey, record);
             
             // 如果 blob_id 存在且不同於 id，也建立輔助映射（用於查找）
             if (record.blob_id && record.blob_id !== primaryKey) {
-              blobIdToRecordMap.set(record.blob_id, record);
+              const recordNetwork = extractNetworkFromWalrusUrl(record.walrus_url);
+              const blobIdKey = recordNetwork 
+                ? `${record.blob_id}:${recordNetwork}` 
+                : `${record.blob_id}:unknown`;
+              blobIdToRecordMap.set(blobIdKey, record);
             }
             
             // 如果 sui_ref 存在且不同於 id，建立輔助映射（用於 NFT 去重）
@@ -735,42 +931,17 @@ const Timeline = () => {
               
               // 更新輔助映射
               if (record.blob_id && record.blob_id !== primaryKey) {
-                blobIdToRecordMap.set(record.blob_id, record);
+                const recordNetwork = extractNetworkFromWalrusUrl(record.walrus_url);
+                const blobIdKey = recordNetwork 
+                  ? `${record.blob_id}:${recordNetwork}` 
+                  : `${record.blob_id}:unknown`;
+                blobIdToRecordMap.set(blobIdKey, record);
               }
               if (record.sui_ref && record.sui_ref !== primaryKey) {
                 suiRefToRecordMap.set(record.sui_ref, record);
               }
             } else {
               console.log(`[Timeline] Dedup: keeping ${existingById.id} (same id, older or equal timestamp), skipping ${record.id}`);
-            }
-          }
-          
-          // 檢查 blob_id 衝突（不同 id 但相同 blob_id）
-          // 注意：相同 blob_id 在不同網絡上應該視為不同記錄
-          if (record.blob_id && record.blob_id !== record.id) {
-            const recordNetwork = extractNetworkFromWalrusUrl(record.walrus_url);
-            // 使用 blob_id + network 作為鍵，確保不同網絡的相同 blob_id 不會衝突
-            const blobIdKey = recordNetwork 
-              ? `${record.blob_id}:${recordNetwork}` 
-              : `${record.blob_id}:unknown`;
-            
-            const existingByBlobId = blobIdToRecordMap.get(blobIdKey);
-            if (existingByBlobId && existingByBlobId.id !== record.id) {
-              // 發現 blob_id 衝突：兩個不同的記錄有相同的 blob_id 和網絡
-              // 保留 id 在 deduplicationMap 中的記錄（主映射優先）
-              const recordInMainMap = deduplicationMap.get(record.id);
-              const existingInMainMap = deduplicationMap.get(existingByBlobId.id);
-              
-              if (recordInMainMap && !existingInMainMap) {
-                // 當前記錄在主映射中，但衝突記錄不在，更新輔助映射
-                blobIdToRecordMap.set(blobIdKey, record);
-              } else if (!recordInMainMap && existingInMainMap) {
-                // 衝突記錄在主映射中，當前記錄不在，不更新輔助映射
-                console.log(`[Timeline] Dedup: blob_id conflict - keeping ${existingByBlobId.id}, skipping ${record.id} (same blob_id and network)`);
-              }
-            } else if (!existingByBlobId) {
-              // 沒有衝突，添加輔助映射（使用 blob_id + network 作為鍵）
-              blobIdToRecordMap.set(blobIdKey, record);
             }
           }
         }
@@ -803,26 +974,108 @@ const Timeline = () => {
         }
         
         // 最後只保留以 id 為鍵的記錄（確保唯一性）
+        // deduplicationMap 已經以 id 為鍵，所以 values() 已經保證唯一性，不需要額外過濾
         const uniqueRecords = sortRecordsByDate(
-          Array.from(deduplicationMap.values()).filter((record, index, self) => 
-            index === self.findIndex(r => r.id === record.id)
-          )
+          Array.from(deduplicationMap.values())
         );
         
-        console.log(`[Timeline] After deduplication: ${uniqueRecords.length} unique records (removed ${allRecords.length - uniqueRecords.length} duplicates)`);
+        // 最終檢查：確保沒有重複的 id 或 blob_id（在同一網絡下）
+        const finalRecords: EmotionRecord[] = [];
+        const seenIds = new Set<string>();
+        const seenBlobIds = new Map<string, string>(); // blob_id:network -> record_id
+        
+        for (const record of uniqueRecords) {
+          // 檢查 id 重複
+          if (seenIds.has(record.id)) {
+            console.warn(`[Timeline] ⚠️ Duplicate id found after deduplication: ${record.id}`);
+            continue;
+          }
+          seenIds.add(record.id);
+          
+          // 檢查 blob_id 重複（在同一網絡下）
+          // 注意：即使 blob_id === record.id，也要檢查是否有其他記錄有相同的 blob_id
+          if (record.blob_id) {
+            const recordNetwork = extractNetworkFromWalrusUrl(record.walrus_url);
+            const blobIdKey = recordNetwork 
+              ? `${record.blob_id}:${recordNetwork}` 
+              : `${record.blob_id}:unknown`;
+            
+            const existingRecordId = seenBlobIds.get(blobIdKey);
+            if (existingRecordId && existingRecordId !== record.id) {
+              console.warn(`[Timeline] ⚠️ Duplicate blob_id found after deduplication: ${record.blob_id} (network: ${recordNetwork}), existing record: ${existingRecordId}, current record: ${record.id}`);
+              // 找到已存在的記錄
+              const existingRecord = finalRecords.find(r => r.id === existingRecordId);
+              if (existingRecord) {
+                // 優先保留數據庫記錄（id !== sui_ref）
+                const existingIsDatabaseRecord = existingRecord.id !== existingRecord.sui_ref && existingRecord.sui_ref;
+                const currentIsDatabaseRecord = record.id !== record.sui_ref && record.sui_ref;
+                
+                if (existingIsDatabaseRecord && !currentIsDatabaseRecord) {
+                  // 已存在的記錄是數據庫記錄，跳過當前鏈上記錄
+                  console.log(`[Timeline] Keeping database record ${existingRecordId}, skipping chain record ${record.id} (same blob_id: ${record.blob_id})`);
+                  continue;
+                } else if (!existingIsDatabaseRecord && currentIsDatabaseRecord) {
+                  // 當前記錄是數據庫記錄，替換已存在的鏈上記錄
+                  console.log(`[Timeline] Replacing chain record ${existingRecordId} with database record ${record.id} (same blob_id: ${record.blob_id})`);
+                  const indexToRemove = finalRecords.findIndex(r => r.id === existingRecordId);
+                  if (indexToRemove >= 0) {
+                    finalRecords.splice(indexToRemove, 1);
+                    seenIds.delete(existingRecordId);
+                  }
+                  seenBlobIds.set(blobIdKey, record.id);
+                  finalRecords.push(record);
+                } else {
+                  // 兩個都是同一類型（都是鏈上記錄或都是數據庫記錄），保留已存在的（第一個）
+                  console.log(`[Timeline] Keeping existing record ${existingRecordId}, skipping ${record.id} (same blob_id: ${record.blob_id}, both are ${existingIsDatabaseRecord ? 'database' : 'chain'} records)`);
+                  continue;
+                }
+              } else {
+                // 找不到已存在的記錄，更新映射並添加當前記錄
+                seenBlobIds.set(blobIdKey, record.id);
+                finalRecords.push(record);
+              }
+            } else {
+              // 沒有衝突，添加記錄
+              seenBlobIds.set(blobIdKey, record.id);
+              finalRecords.push(record);
+            }
+          } else {
+            // 沒有 blob_id，直接添加
+            finalRecords.push(record);
+          }
+        }
+        
+        // 統計 blob_id 分布
+        const blobIdStats = new Map<string, number>();
+        finalRecords.forEach(r => {
+          if (r.blob_id) {
+            blobIdStats.set(r.blob_id, (blobIdStats.get(r.blob_id) || 0) + 1);
+          }
+        });
+        const finalDuplicateBlobIds = Array.from(blobIdStats.entries()).filter(([_, count]) => count > 1);
+        
+        console.log(`[Timeline] After deduplication: ${uniqueRecords.length} records before final check, ${finalRecords.length} records after final check (removed ${allRecords.length - finalRecords.length} duplicates total)`);
+        if (finalDuplicateBlobIds.length > 0) {
+          console.warn(`[Timeline] ⚠️ Still found ${finalDuplicateBlobIds.length} duplicate blob_ids after final check:`, finalDuplicateBlobIds);
+        } else {
+          console.log(`[Timeline] ✅ All blob_ids are unique (${blobIdStats.size} unique blob_ids)`);
+        }
         console.log(`[Timeline] Note: Multiple Sui objects can reference the same Walrus blob (same blob_id, different id)`);
+        
+        // 使用最終檢查後的記錄
+        const finalUniqueRecords = sortRecordsByDate(finalRecords);
 
         // 統計資訊
-        const localCount = uniqueRecords.filter(r => 
+        const localCount = finalUniqueRecords.filter(r => 
           r.blob_id?.startsWith("local_") || r.walrus_url?.startsWith("local://")
         ).length;
-        const walrusCount = uniqueRecords.length - localCount;
+        const walrusCount = finalUniqueRecords.length - localCount;
         
-        console.log(`[Timeline] Loaded ${uniqueRecords.length} total records:`, {
-          total: uniqueRecords.length,
+        console.log(`[Timeline] Loaded ${finalUniqueRecords.length} total records:`, {
+          total: finalUniqueRecords.length,
           local: localCount,
           walrus: walrusCount,
-          records: uniqueRecords.map(r => {
+          records: finalUniqueRecords.map(r => {
             const isLocal = r.blob_id?.startsWith("local_") || r.walrus_url?.startsWith("local://");
             return {
               id: r.id,
@@ -837,7 +1090,7 @@ const Timeline = () => {
         });
         
         // 特別檢查 Walrus 記錄
-        const walrusRecords = uniqueRecords.filter(r => {
+        const walrusRecords = finalUniqueRecords.filter(r => {
           const isLocal = r.blob_id?.startsWith("local_") || r.walrus_url?.startsWith("local://");
           return !isLocal;
         });
@@ -851,11 +1104,11 @@ const Timeline = () => {
 
         // 最后检查是否已被取消，只有在未被取消时才更新状态
         if (!isCancelled) {
-          setRecords(uniqueRecords);
+          setRecords(finalUniqueRecords);
         } else {
           console.log("[Timeline] Skipping state update - load was cancelled");
         }
-      } catch (error) {
+      } catch (error: any) {
         if (!isCancelled) {
           console.error("Error loading records:", error);
         }
@@ -930,18 +1183,6 @@ const Timeline = () => {
     // 只有當明確是本地格式時，才返回 true
     // 其他情況（包括 walrus_url 是 https://aggregator.testnet.walrus.space 開頭，或 blob_id 是正常的 Walrus ID）都是 Walrus 記錄
     const isLocal = isLocalBlob || isLocalUrl;
-    
-    // 除錯日誌
-    if (!isLocal && (blobId || walrusUrl)) {
-      console.log(`[Timeline] Walrus record detected:`, {
-        id: record.id,
-        blob_id: blobId,
-        walrus_url: walrusUrl,
-        isLocalBlob,
-        isLocalUrl,
-        isLocal
-      });
-    }
     
     return isLocal;
   }, []);
@@ -1048,10 +1289,12 @@ const Timeline = () => {
         }
         
         // 1. 優先嘗試 Supabase 使用者 ID（如果有登錄）
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user?.id) {
-          const supabaseKey = await generateUserKeyFromId(session.user.id);
-          possibleKeys.push({ key: supabaseKey, type: 'Supabase User' });
+        if (SUPABASE_ENABLED) {
+          const session = await getSupabaseSessionSafe();
+          if (session?.user?.id) {
+            const supabaseKey = await generateUserKeyFromId(session.user.id);
+            possibleKeys.push({ key: supabaseKey, type: 'Supabase User' });
+          }
         }
         
         // 2. 嘗試匿名金鑰（如果存在）
@@ -1363,6 +1606,28 @@ const Timeline = () => {
       filtered = filtered.filter(isLocalRecord);
     } else if (filter === "walrus") {
       filtered = filtered.filter(r => !isLocalRecord(r));
+    } else if (filter === "sealPolicies") {
+      // 只显示有 Seal Access Policies 的记录（NFT 记录且已检查有访问策略）
+      filtered = filtered.filter(r => {
+        // 必须是 NFT 记录（sui_ref === id）
+        const isNFT = r.sui_ref && r.id === r.sui_ref;
+        if (!isNFT) return false;
+        // 必须在已检查的记录列表中
+        const hasPolicy = recordsWithSealPolicies.has(r.id);
+        if (!hasPolicy && !checkingSealPolicies) {
+          // 如果检查已完成但记录不在列表中，说明没有访问策略
+          return false;
+        }
+        return hasPolicy;
+      });
+      
+      // 如果正在检查中，记录筛选结果用于调试
+      if (checkingSealPolicies) {
+        console.log(`[Timeline] 🔄 正在检查 Seal Access Policies，当前筛选出 ${filtered.length} 个记录`);
+      } else {
+        console.log(`[Timeline] ✅ Seal Access Policies 筛选完成，显示 ${filtered.length} 个记录`);
+        console.log(`[Timeline] 有访问策略的记录数: ${recordsWithSealPolicies.size}`);
+      }
     }
     
     // 2. 日期範圍過濾
@@ -1420,7 +1685,126 @@ const Timeline = () => {
     });
     
     return sorted;
-  }, [records, filter, searchQuery, selectedTags, sortBy, sortOrder, decryptedDescriptions, i18n.language, dateRange, isLocalRecord]);
+  }, [records, filter, searchQuery, selectedTags, sortBy, sortOrder, decryptedDescriptions, i18n.language, dateRange, isLocalRecord, recordsWithSealPolicies]);
+
+  // 检查哪些记录有 Seal Access Policies（异步检查，使用缓存）
+  useEffect(() => {
+    const checkSealPolicies = async () => {
+      // 检查所有有 sui_ref 的记录（包括 NFT 和 Walrus Blob）
+      // 之前的过滤条件 r.id === r.sui_ref 会排除掉来自 Supabase 的记录（id 为 UUID），导致无法检查
+      const nftRecords = records.filter(r => r.sui_ref);
+      console.log(`[Timeline] 🔍 开始检查 Seal Access Policies，找到 ${nftRecords.length} 个潜在的 NFT 记录`);
+      
+      if (nftRecords.length === 0) {
+        console.log("[Timeline] 没有 NFT 记录，清空 Seal Access Policies 列表");
+        setRecordsWithSealPolicies(new Set());
+        return;
+      }
+
+      // 如果已经在检查中，跳过
+      if (checkingSealPoliciesRef.current) {
+        console.log("[Timeline] 检查正在进行中，跳过重复检查");
+        return;
+      }
+      
+      checkingSealPoliciesRef.current = true;
+      setCheckingSealPolicies(true);
+      
+      try {
+        // 获取 PolicyRegistry ID
+        const suiClient = getClientForNetwork(network);
+        console.log(`[Timeline] 正在获取 PolicyRegistry ID (网络: ${network})...`);
+        const registryId = await getOrQueryPolicyRegistry(network, suiClient);
+        
+        if (!registryId) {
+          console.warn("[Timeline] ⚠️ PolicyRegistry not found, cannot check Seal Access Policies");
+          setRecordsWithSealPolicies(new Set());
+          setCheckingSealPolicies(false);
+          checkingSealPoliciesRef.current = false;
+          return;
+        }
+        
+        console.log(`[Timeline] ✅ PolicyRegistry ID: ${registryId}`);
+
+        // 批量检查记录是否有访问策略（使用 Promise.all，但限制并发）
+        const batchSize = 5; // 每次检查 5 个记录
+        const recordsWithPolicies = new Set<string>();
+        let checkedCount = 0;
+        
+        for (let i = 0; i < nftRecords.length; i += batchSize) {
+          const batch = nftRecords.slice(i, i + batchSize);
+          console.log(`[Timeline] 检查批次 ${Math.floor(i / batchSize) + 1}/${Math.ceil(nftRecords.length / batchSize)} (${batch.length} 个记录)`);
+          
+          const checks = await Promise.allSettled(
+            batch.map(async (record) => {
+              try {
+                // 尝试检查是否有访问策略（不关心是公开还是私有）
+                // 如果 isPublicSeal 成功返回（无论 true/false），说明记录有访问策略
+                await isPublicSeal(record.sui_ref!, registryId, network, suiClient);
+                console.log(`[Timeline] ✅ 记录 ${record.id} 有 Seal Access Policies`);
+                return record.id;
+              } catch (error: any) {
+                // 如果检查失败，尝试使用交易回溯的诊断方法进一步确认
+                const errorMessage = error?.message || "";
+                if (!errorMessage.includes("没有访问策略") &&
+                    !errorMessage.includes("malformed utf8") &&
+                    !errorMessage.includes("Deserialization error")) {
+                  console.warn(`[Timeline] ⚠️ 检查记录 ${record.id} 时出现意外错误 (devInspect):`, error);
+                } else {
+                  console.log(`[Timeline] ❌ isPublicSeal 提示记录 ${record.id} 没有 Seal Access Policies，尝试使用交易诊断...`);
+                }
+
+                try {
+                  const diagnosis = await checkIfMintedWithSealPolicies(record.sui_ref!, network, suiClient);
+                  if (diagnosis?.mintedWithPolicies) {
+                    console.log(`[Timeline] ✅ 交易诊断确认记录 ${record.id} 使用了 Seal Access Policies (tx: ${diagnosis.transactionDigest})`);
+                    return record.id;
+                  }
+                  console.log(`[Timeline] ❌ 交易诊断也未找到策略：`, {
+                    recordId: record.id,
+                    transactionDigest: diagnosis?.transactionDigest,
+                    error: diagnosis?.error,
+                  });
+                } catch (diagnosisError) {
+                  console.warn(`[Timeline] ⚠️ 交易诊断失败 (record ${record.id}):`, diagnosisError);
+                }
+
+                return null;
+              }
+            })
+          );
+          
+          checks.forEach((result) => {
+            if (result.status === 'fulfilled' && result.value) {
+              recordsWithPolicies.add(result.value);
+              checkedCount++;
+            } else if (result.status === 'rejected') {
+              // Promise.allSettled 不会抛出错误，但我们可以在这里处理 rejected 的情况
+              console.warn("[Timeline] Promise rejected (不应该发生):", result.reason);
+            }
+          });
+        }
+        
+        console.log(`[Timeline] ✅ 检查完成！找到 ${recordsWithPolicies.size} 个有 Seal Access Policies 的记录 (共检查 ${checkedCount} 个)`);
+        console.log(`[Timeline] 有 Seal Access Policies 的记录 ID:`, Array.from(recordsWithPolicies));
+        setRecordsWithSealPolicies(recordsWithPolicies);
+      } catch (error) {
+        console.error("[Timeline] ❌ 检查 Seal Access Policies 时出错:", error);
+        setRecordsWithSealPolicies(new Set());
+      } finally {
+        checkingSealPoliciesRef.current = false;
+        setCheckingSealPolicies(false);
+      }
+    };
+
+    // 只在有 sui_ref 记录时检查
+    const nftRecords = records.filter(r => r.sui_ref);
+    if (nftRecords.length > 0) {
+      checkSealPolicies();
+    } else {
+      setRecordsWithSealPolicies(new Set());
+    }
+  }, [records, network]);
 
   // 虛擬滾動器配置
   // 使用動態高度估計以提升滾動準確性
@@ -1458,6 +1842,141 @@ const Timeline = () => {
   });
 
   // 批量解密所有記錄
+  // 从链上同步所有 NFT 记录到 Supabase
+  const syncNFTsFromChain = async () => {
+    if (!currentAccount?.address) {
+      toast({
+        title: t("timeline.syncNFTs.needWallet"),
+        description: t("timeline.syncNFTs.needWalletDesc"),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!SUPABASE_ENABLED) {
+      toast({
+        title: t("timeline.syncNFTs.disabledTitle") || "Supabase disabled",
+        description: t("timeline.syncNFTs.disabledDesc") || "On-chain NFTs are already shown locally; no database sync will be performed.",
+      });
+      return;
+    }
+
+    setIsQueryingOnChain(true);
+    try {
+      console.log("[Timeline] 🔄 开始从链上同步 NFT 记录...");
+      
+      // 查询链上的所有 EntryNFTs
+      const entryNFTs = await queryEntryNFTsByOwner(currentAccount.address, network);
+      console.log(`[Timeline] 找到 ${entryNFTs.length} 个链上 NFT`);
+      
+      if (entryNFTs.length === 0) {
+        toast({
+          title: t("timeline.syncNFTs.noNFTs"),
+          description: t("timeline.syncNFTs.noNFTsDesc"),
+        });
+        setIsQueryingOnChain(false);
+        return;
+      }
+      
+      // 检查 Supabase session
+      const session = await getSupabaseSessionSafe();
+      if (!session?.user?.id) {
+        toast({
+          title: t("timeline.syncNFTs.needLogin"),
+          description: t("timeline.syncNFTs.needLoginDesc"),
+          variant: "destructive",
+        });
+        setIsQueryingOnChain(false);
+        return;
+      }
+      
+      let syncedCount = 0;
+      let skippedCount = 0;
+      
+      for (const nft of entryNFTs) {
+        try {
+          // 检查记录是否已存在（通过 sui_ref）
+          const { data: existing } = await supabase
+            .from('emotion_records')
+            .select('id')
+            .eq('user_id', session.user.id)
+            .eq('sui_ref', nft.nftId)
+            .single();
+          
+          if (existing) {
+            console.log(`[Timeline] 跳过已存在的 NFT: ${nft.nftId}`);
+            skippedCount++;
+            continue;
+          }
+          
+          // 从 NFT 元数据提取 blob_id（image/audio URL 或直接的 blob_id）
+          const blobId =
+            nft.blobId ||
+            extractBlobIdFromUrl(nft.imageUrl) ||
+            extractBlobIdFromUrl(nft.audioUrl) ||
+            `nft_${nft.nftId.slice(0, 8)}`;
+          const walrusUrlForDb = blobId
+            ? (isValidBlobId(blobId) ? getWalrusUrl(blobId, network) : (nft.imageUrl || nft.audioUrl || ""))
+            : (nft.imageUrl || nft.audioUrl || "");
+          
+          // 将强度从 1-10 转换为 0-100
+          const intensity = Math.min(100, Math.max(0, (nft.moodScore / 10) * 100));
+          
+          // 插入新记录
+          const recordData: any = {
+            user_id: session.user.id,
+            emotion: 'encrypted', // NFT 中没有存储 emotion 类型
+            intensity: intensity,
+            blob_id: blobId,
+            walrus_url: walrusUrlForDb,
+            payload_hash: '',
+            is_public: false,
+            proof_status: 'confirmed',
+            sui_ref: nft.nftId,
+            wallet_address: currentAccount.address,
+            created_at: nft.timestamp,
+          };
+          
+          if (nft.transactionDigest) {
+            recordData.transaction_digest = nft.transactionDigest;
+          }
+          
+          const { error } = await supabase
+            .from('emotion_records')
+            .insert([recordData]);
+          
+          if (error) {
+            console.error(`[Timeline] 保存 NFT ${nft.nftId} 失败:`, error);
+          } else {
+            console.log(`[Timeline] ✅ 同步 NFT: ${nft.nftId}`);
+            syncedCount++;
+          }
+        } catch (error) {
+          console.error(`[Timeline] 处理 NFT ${nft.nftId} 时出错:`, error);
+        }
+      }
+      
+      toast({
+        title: t("timeline.syncNFTs.success"),
+        description: t("timeline.syncNFTs.successDesc", { synced: syncedCount, skipped: skippedCount }),
+      });
+      
+      // 重新加载记录
+      console.log("[Timeline] 重新加载记录...");
+      window.location.reload();
+      
+    } catch (error: any) {
+      console.error("[Timeline] 同步 NFT 失败:", error);
+      toast({
+        title: t("timeline.syncNFTs.failed"),
+        description: t("timeline.syncNFTs.failedDesc", { error: error?.message || t("common.unknownError") }),
+        variant: "destructive",
+      });
+    } finally {
+      setIsQueryingOnChain(false);
+    }
+  };
+
   const decryptAllRecords = useCallback(async () => {
     if (isDecryptingAll) return;
     
@@ -2209,14 +2728,18 @@ const Timeline = () => {
         await deleteEmotionRecord(recordToDelete.id, currentAccount?.address || null);
       } else {
         // Walrus 記錄：從 Supabase 刪除（鏈上資料無法真正刪除，只能標記）
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session && recordToDelete.id) {
-          const { error } = await supabase
-            .from('emotion_records')
-            .delete()
-            .eq('id', recordToDelete.id);
-          
-          if (error) throw error;
+        if (SUPABASE_ENABLED) {
+          const session = await getSupabaseSessionSafe();
+          if (session && recordToDelete.id) {
+            const { error } = await supabase
+              .from('emotion_records')
+              .delete()
+              .eq('id', recordToDelete.id);
+            
+            if (error) throw error;
+          }
+        } else {
+          console.log("[Timeline] Supabase disabled; removing remote record locally only");
         }
       }
       
@@ -2253,7 +2776,7 @@ const Timeline = () => {
     } finally {
       setIsDeleting(false);
     }
-  }, [recordToDelete, currentAccount, toast, t, isLocalRecord]);
+  }, [recordToDelete, currentAccount, toast, t, isLocalRecord, SUPABASE_ENABLED, getSupabaseSessionSafe]);
 
   // 批量操作
   const toggleSelection = useCallback((recordId: string) => {
@@ -2298,12 +2821,16 @@ const Timeline = () => {
         if (isLocal) {
           await deleteEmotionRecord(id, currentAccount?.address || null);
         } else {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session) {
-            const { error } = await supabase.from('emotion_records').delete().eq('id', id);
-            if (error) throw error;
+          if (SUPABASE_ENABLED) {
+            const session = await getSupabaseSessionSafe();
+            if (session) {
+              const { error } = await supabase.from('emotion_records').delete().eq('id', id);
+              if (error) throw error;
+            } else {
+              throw new Error('No session for deleting remote record');
+            }
           } else {
-            throw new Error('No session for deleting remote record');
+            console.log("[Timeline] Supabase disabled; removing remote record locally only (batch)");
           }
         }
         return { id, status: 'fulfilled' as const };
@@ -2375,7 +2902,7 @@ const Timeline = () => {
         variant: "destructive",
       });
     }
-  }, [selectedIds, records, currentAccount, toast, t, isLocalRecord]);
+  }, [selectedIds, records, currentAccount, toast, t, isLocalRecord, SUPABASE_ENABLED, getSupabaseSessionSafe]);
 
   const handleBatchExport = useCallback(() => {
     const recordsToExport = filteredRecords.filter(r => selectedIds.has(r.id));
@@ -2610,17 +3137,49 @@ const Timeline = () => {
               <div className="flex items-center gap-3 flex-wrap">
                 <Filter className="w-4 h-4 text-muted-foreground" />
                 <div className="flex gap-2">
-                  {(["all", "local", "walrus"] as FilterType[]).map((filterType) => (
-                    <Button
-                      key={filterType}
-                      variant={filter === filterType ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setFilter(filterType)}
-                      className={filter === filterType ? "gradient-emotion" : ""}
-                    >
-                      {t(`timeline.filter.${filterType}`)}
-                    </Button>
-                  ))}
+                  {(["all", "local", "walrus", "sealPolicies"] as FilterType[]).map((filterType) => {
+                    const isSealPolicies = filterType === "sealPolicies";
+                    const showCount = isSealPolicies && !checkingSealPolicies && filter === filterType;
+                    const count = isSealPolicies ? recordsWithSealPolicies.size : 0;
+                    
+                    return (
+                      <Button
+                        key={filterType}
+                        variant={filter === filterType ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => {
+                          setFilter(filterType);
+                          if (isSealPolicies) {
+                            console.log(`[Timeline] 🔍 切换到 Seal Access Policies 筛选器，当前有 ${count} 个记录`);
+                          }
+                        }}
+                        className={filter === filterType ? "gradient-emotion" : ""}
+                        disabled={isSealPolicies && checkingSealPolicies}
+                        title={isSealPolicies && !checkingSealPolicies 
+                          ? `找到 ${count} 个使用 Seal Access Policies 的记录`
+                          : isSealPolicies && checkingSealPolicies
+                          ? "正在检查 Seal Access Policies..."
+                          : undefined
+                        }
+                      >
+                        {isSealPolicies && checkingSealPolicies ? (
+                          <>
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            {t(`timeline.filter.${filterType}`)}
+                          </>
+                        ) : (
+                          <>
+                            {t(`timeline.filter.${filterType}`)}
+                            {showCount && count > 0 && (
+                              <span className="ml-1 px-1.5 py-0.5 text-xs bg-background/50 rounded">
+                                {count}
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </Button>
+                    );
+                  })}
                 </div>
                 
                 {/* Date Range */}
@@ -2776,6 +3335,29 @@ const Timeline = () => {
                   >
                     <Download className="h-4 w-4" />
                     {t("timeline.export") || "匯出"}
+                  </Button>
+                )}
+                
+                {/* 同步链上 NFT 按钮 */}
+                {currentAccount && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={syncNFTsFromChain}
+                    disabled={isQueryingOnChain}
+                    title={t("timeline.syncNFTs.tooltip")}
+                  >
+                    {isQueryingOnChain ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        {t("timeline.syncNFTs.syncing")}
+                      </>
+                    ) : (
+                      <>
+                        <Link2 className="w-4 h-4 mr-2" />
+                        {t("timeline.syncNFTs.button")}
+                      </>
+                    )}
                   </Button>
                 )}
                 
@@ -3334,6 +3916,24 @@ const Timeline = () => {
                                 {isLocal ? "💾 " + t("timeline.filter.local") : "☁️ " + t("timeline.filter.walrus")}
                               </span>
                             </div>
+                            {/* 訪問權限管理按鈕 - 僅當記錄是 NFT 時顯示 */}
+                            {!selectionMode && record.sui_ref && record.id === record.sui_ref && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedRecordForAccessControl(record);
+                                  setAccessControlDialogOpen(true);
+                                }}
+                                className="h-8 px-2 gap-1.5"
+                                title={t("timeline.accessControl") || "訪問權限管理"}
+                              >
+                                <Users className="h-4 w-4" />
+                                <span className="hidden sm:inline text-xs">
+                                  {t("timeline.accessControl") || "訪問權限管理"}
+                                </span>
+                              </Button>
+                            )}
                             {/* Actions Menu */}
                             {!selectionMode && (
                               <DropdownMenu>
@@ -3347,6 +3947,21 @@ const Timeline = () => {
                                     <Eye className="mr-2 h-4 w-4" />
                                     {t("timeline.viewDetails") || "查看詳情"}
                                   </DropdownMenuItem>
+                                  {/* 訪問權限管理 - 僅當記錄是 NFT 時顯示 */}
+                                  {record.sui_ref && record.id === record.sui_ref && (
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem 
+                                        onClick={() => {
+                                          setSelectedRecordForAccessControl(record);
+                                          setAccessControlDialogOpen(true);
+                                        }}
+                                      >
+                                        <Users className="mr-2 h-4 w-4" />
+                                        {t("timeline.accessControl") || "訪問權限管理"}
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem 
                                     onClick={() => handleDeleteClick(record)}
@@ -4090,6 +4705,41 @@ const Timeline = () => {
           </DialogContent>
         </Dialog>
       )}
+      
+      {/* 訪問權限管理對話框 */}
+      <Dialog open={accessControlDialogOpen} onOpenChange={setAccessControlDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {t("timeline.accessControl") || "訪問權限管理"}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedRecordForAccessControl && (
+                <>
+                  {t("timeline.accessControlDesc") || "管理此記錄的訪問權限，授權他人訪問或撤銷訪問權限"}
+                  {selectedRecordForAccessControl.sui_ref && (
+                    <span className="block mt-2 text-xs font-mono text-muted-foreground">
+                      NFT ID: {selectedRecordForAccessControl.sui_ref.slice(0, 10)}...{selectedRecordForAccessControl.sui_ref.slice(-8)}
+                    </span>
+                  )}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedRecordForAccessControl && selectedRecordForAccessControl.sui_ref && (
+            <AccessControlManager
+              entryNftId={selectedRecordForAccessControl.sui_ref}
+              network={selectedRecordNetwork}
+              onAccessChanged={() => {
+                toast({
+                  title: t("timeline.accessControlUpdated") || "訪問權限已更新",
+                  description: t("timeline.accessControlUpdatedDesc") || "訪問權限變更已成功",
+                });
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
       
       {/* Export Format Dialog */}
       <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>

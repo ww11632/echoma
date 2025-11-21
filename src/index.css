@@ -136,6 +136,14 @@ All colors MUST be HSL.
     box-shadow: 0 1px 3px hsl(30 15% 40% / 0.05);
   }
 
+  .dark .glass-input {
+    background: hsl(var(--card) / 0.9);
+    backdrop-filter: blur(8px);
+    border: 1px solid hsl(var(--glass-border));
+    box-shadow: 0 1px 3px hsl(30 15% 60% / 0.15);
+    color: hsl(var(--foreground));
+  }
+
   .gradient-emotion {
     background: var(--gradient-emotion);
   }

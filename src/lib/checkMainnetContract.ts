@@ -52,3 +52,8 @@ if (typeof window !== "undefined") {
   console.log("💡 提示: 可以在控制台中使用 window.checkMainnetContract() 來檢查 Mainnet 合約");
 }
 
+
+
+
+
+

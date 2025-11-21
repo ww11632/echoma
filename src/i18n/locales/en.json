@@ -52,7 +52,55 @@
     "toggleTheme": "Toggle theme",
     "light": "Light",
     "dark": "Dark",
-    "system": "System"
+    "system": "System",
+    "unknownError": "Unknown error"
+  },
+  "share": {
+    "title": "Share Record",
+    "description": "Select who to share with, or enter a custom address",
+    "address": "Wallet Address",
+    "enterAddress": "Enter {{label}}'s wallet address",
+    "selectOption": "Please select who to share with",
+    "share": "Share",
+    "presets": {
+      "therapist": "Therapist",
+      "therapistDesc": "Share with your therapist",
+      "partner": "Partner",
+      "partnerDesc": "Share with your partner",
+      "family": "Family",
+      "familyDesc": "Share with your family",
+      "doctor": "Doctor",
+      "doctorDesc": "Share with your doctor",
+      "friend": "Friend",
+      "friendDesc": "Share with your friend",
+      "custom": "Custom Address",
+      "customDesc": "Enter wallet address"
+    },
+    "checkingPolicy": "Checking access policy...",
+    "policyNotFound": "Cannot verify access policy. This NFT may not have been minted with Seal Access Policies.",
+    "policyNotFoundHint": "If the NFT was indeed minted with Seal Access Policies, it may be an indexing delay. Please wait 10-30 seconds and try again by closing and reopening this dialog.",
+    "publicRecord": "This is a public record. Anyone can access it, no need to share.",
+    "publicRecordTooltip": "Public records do not need to be shared",
+    "success": {
+      "shared": "Share Successful",
+      "sharedDesc": "The address has been granted access to this record"
+    },
+    "errors": {
+      "registryNotFound": "PolicyRegistry Not Found",
+      "policyCheckFailed": "Policy Check Failed",
+      "policyCheckFailedDesc": "Unable to verify access policy, possibly due to network issues or indexing delays. If the NFT was indeed minted with Seal Access Policies, you can try again later.",
+      "registryNotFoundDesc": "Please deploy Seal Access Policies contract first",
+      "walletRequired": "Wallet Required",
+      "addressRequired": "Please enter an address",
+      "invalidAddress": "Invalid address format",
+      "shareFailed": "Share Failed",
+      "publicRecord": "Cannot Share Public Record",
+      "publicRecordDesc": "Public records are accessible to anyone, no need to grant access to specific addresses.",
+      "cannotGrantToSelf": "Cannot Grant to Self",
+      "cannotGrantToSelfDesc": "You as the NFT owner already have access permission, no need to grant access to yourself.",
+      "alreadyAuthorized": "Address Already Authorized",
+      "alreadyAuthorizedDesc": "This address already has access permission, no need to grant again."
+    }
   },
   "disclaimer": {
     "title": "Important Notice",
@@ -198,6 +246,7 @@
       "recordedLocalServer": "Walrus service temporarily unavailable, data saved to local server.",
       "recordedSDK": "Saved to Walrus via SDK: {{blobId}}...",
       "recordedWithNFT": "Record saved and minted as NFT! NFT ID: {{nftId}}...",
+      "recordedWithSealPolicies": "Record saved and minted as NFT (Seal Access Policies enabled)! NFT ID: {{nftId}}...\n\n💡 You can now click the \"Share Record\" button below the \"Storage Settings\" area on the right to authorize specific addresses to access this record.",
       "recordedButNFTFailed": "Record saved to Walrus, but NFT minting failed. You can view the record in Timeline and retry minting later.",
       "uploading": "Uploading...",
       "uploadingDesc": "Encrypting and saving your emotion snapshot"
@@ -214,7 +263,36 @@
       "mint": "Mint as NFT",
       "mintDisabled": "Don't Mint NFT",
       "mintDesc": "Mint this record as an NFT on Sui blockchain, permanently saved and verifiable",
-      "mintDisabledDesc": "Only save to Walrus, don't mint NFT"
+      "mintDisabledDesc": "Only save to Walrus, don't mint NFT",
+      "sealPoliciesHint": "💡 Seal Access Policies can only be used when minting NFTs"
+    },
+    "sealPolicies": {
+      "enable": "Enable Seal Access Policies",
+      "enabledDesc": "Enable on-chain access policies, can authorize others to access",
+      "disabledDesc": "Use traditional method, don't record access policies",
+      "loading": "Loading PolicyRegistry...",
+      "ready": "✅ Seal Access Policies ready",
+      "registryNotFound": "PolicyRegistry Not Found",
+      "registryNotFoundDesc": "Please deploy Seal Access Policies contract first",
+      "loadingTooltip": "Loading PolicyRegistry, please wait...",
+      "registryNotFoundTooltip": "PolicyRegistry not found. Cannot use Seal Access Policies. Please deploy the contract first or uncheck Seal Access Policies.",
+      "requiresNFT": "NFT Minting Required",
+      "requiresNFTDesc": "Seal Access Policies can only be used when minting NFTs. Please enable \"Mint as NFT\" first."
+    },
+    "share": {
+      "shareRecord": "Share Record",
+      "success": "Share Successful",
+      "successDesc": "The address has been granted access to this record"
+    },
+    "nftMinted": {
+      "title": "✅ NFT Successfully Minted! You can now:",
+      "shareOption": "Click the \"Share Record\" button below to authorize specific addresses to access",
+      "timelineOption": "Or directly return to Timeline to view records"
+    },
+    "backToTimeline": "← Back to Timeline",
+    "policyVerification": {
+      "pending": "Policy verification in progress, please wait... Share feature may be temporarily unavailable",
+      "pendingTooltip": "Policy verification in progress, please wait..."
     }
   },
   "timeline": {
@@ -224,6 +302,8 @@
     "logout": "Logout",
     "loggedOut": "Logged Out",
     "loggedOutDesc": "You have successfully logged out",
+    "testnetWarning": "Testnet data will be deleted after epochs expire",
+    "testnetWarningDesc": "It is recommended to enable 'Backup to Database' for permanent storage",
     "noRecords": "No emotions recorded yet",
     "noRecordsDesc": "Start recording your emotion journey",
     "recordFirst": "Record First Emotion",
@@ -356,6 +436,10 @@
     "noSelection": "No Selection",
     "noSelectionDesc": "Please select records to export first",
     "viewDetails": "View Details",
+    "accessControl": "Access Control",
+    "accessControlDesc": "Manage access permissions for this record, grant or revoke access to others",
+    "accessControlUpdated": "Access Control Updated",
+    "accessControlUpdatedDesc": "Access permissions have been successfully updated",
     "delete": "Delete",
     "deleteConfirmTitle": "Confirm Delete",
     "deleteConfirmDesc": "Are you sure you want to delete this record? This action cannot be undone.",
@@ -381,7 +465,8 @@
       "all": "All",
       "local": "Local Storage",
       "database": "Database",
-      "walrus": "Walrus Upload"
+      "walrus": "Walrus Upload",
+      "sealPolicies": "Seal Access Policies"
     },
     "stats": {
       "total": "Total Records",
@@ -421,7 +506,7 @@
       "avgIntensity": "Avg Intensity"
     },
     "decryptAll": {
-      "button": "🔓 Decrypt All",
+      "button": "Decrypt All",
       "decrypting": "Decrypting...",
       "noRecords": "No Records to Decrypt",
       "noRecordsDesc": "All records are already decrypted or do not need decryption",
@@ -429,6 +514,21 @@
       "successDesc": "Successfully decrypted {{count}} records",
       "partialSuccess": "Partial Success",
       "partialSuccessDesc": "Successfully decrypted {{success}} records, {{fail}} failed"
+    },
+    "syncNFTs": {
+      "button": "Sync NFTs",
+      "syncing": "Syncing...",
+      "tooltip": "Sync all NFT records from blockchain to database",
+      "needWallet": "Wallet Required",
+      "needWalletDesc": "Please connect your wallet to sync on-chain records",
+      "needLogin": "Login Required",
+      "needLoginDesc": "Please login to Supabase to save records",
+      "noNFTs": "Sync Complete",
+      "noNFTsDesc": "No on-chain NFT records found",
+      "success": "Sync Complete",
+      "successDesc": "Synced {{synced}} new NFTs, skipped {{skipped}} existing records",
+      "failed": "Sync Failed",
+      "failedDesc": "{{error}}"
     },
     "localStorage": {
       "keyMismatchTitle": "⚠️ Local Records May Be Inaccessible",
@@ -538,5 +638,66 @@
       "recorded": "Success!",
       "recordedDesc": "Your emotion has been recorded securely."
     }
+  },
+  "accessControl": {
+    "labels": {
+      "partner": "Partner",
+      "family": "Family",
+      "therapist": "Therapist",
+      "doctor": "Doctor",
+      "agent": "AI Agent",
+      "friend": "Friend",
+      "other": "Other"
+    },
+    "errors": {
+      "registryNotFound": "PolicyRegistry Not Found",
+      "registryNotFoundDesc": "Please deploy Seal Access Policies contract first",
+      "loadFailed": "Load Failed",
+      "walletRequired": "Wallet Connection Required",
+      "addressRequired": "Please Enter Address",
+      "invalidAddress": "Invalid Address Format",
+      "grantFailed": "Grant Failed",
+      "revokeFailed": "Revoke Failed",
+      "alreadyAuthorized": "Address Already Authorized",
+      "alreadyAuthorizedDesc": "This address already has access permission, no need to grant again.",
+      "notAuthorized": "Address Not Authorized",
+      "notAuthorizedDesc": "This address does not have access permission, no need to revoke.",
+      "publicRecord": "Cannot Grant Access to Public Record",
+      "publicRecordDesc": "Public records are accessible to anyone, no need to grant access to specific addresses.",
+      "cannotGrantToSelf": "Cannot Grant to Self",
+      "cannotGrantToSelfDesc": "You as the NFT owner already have access permission, no need to grant access to yourself."
+    },
+    "success": {
+      "granted": "Access Granted",
+      "grantedDesc": "The address has been granted access to this record",
+      "revoked": "Access Revoked",
+      "revokedDesc": "The address access has been revoked"
+    },
+    "registryNotAvailable": "PolicyRegistry not available, please deploy contract first",
+    "publicRecord": "Public Record",
+    "publicRecordDesc": "This record is public and accessible to anyone",
+    "authorizedAccess": "Authorized Access",
+    "history": "History",
+    "grantAccess": "Grant Access",
+    "grantAccessDesc": "Grant an address access to this private record",
+    "role": "Role (Optional)",
+    "selectRole": "Select Role",
+    "roleHint": "Select a role for the authorized person to help identify and manage",
+    "address": "Wallet Address",
+    "addressHint": "Enter the Sui wallet address to authorize (66 characters)",
+    "grant": "Grant",
+    "accessHistory": "Access History",
+    "noAuthorizedAddresses": "No Authorized Addresses",
+    "noAuthorizedHint": "Click the button above to authorize others to access this record",
+    "grantedAt": "Granted At",
+    "revokeAccess": "Revoke Access",
+    "info": {
+      "title": "On-Chain Verification & Audit",
+      "verifiable": "All authorization operations are recorded on Sui blockchain and publicly verifiable",
+      "auditable": "Complete authorization history is auditable, ensuring transparency of access permissions",
+      "revocable": "Authorization can be revoked at any time and takes effect immediately"
+    },
+    "retry": "Retry",
+    "retrying": "Retrying..."
   }
 }
