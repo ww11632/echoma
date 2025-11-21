@@ -82,6 +82,18 @@ export const AccessControlManager: React.FC<AccessControlManagerProps> = ({
   const [showHistory, setShowHistory] = useState(false);
   const [granteeAddress, setGranteeAddress] = useState("");
   const [granteeLabel, setGranteeLabel] = useState("");
+  const [policyVerificationPending, setPolicyVerificationPending] = useState(false); // 链上策略已创建但索引未完成
+  const [pendingTxDigest, setPendingTxDigest] = useState<string | null>(null);
+  const retryTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 清理重试定时器
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // 预设角色标签选项
   const presetLabels = [
@@ -132,6 +144,14 @@ export const AccessControlManager: React.FC<AccessControlManagerProps> = ({
   const loadAccessInfo = async () => {
     if (!policyRegistryId || !entryNftId) return;
 
+    // 清理自动重试定时器
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
+
+    setPolicyVerificationPending(false);
+    setPendingTxDigest(null);
     setIsLoading(true);
     try {
       // 检查是否为公开记录（添加重试机制，因为链上索引可能需要时间）
@@ -143,11 +163,11 @@ export const AccessControlManager: React.FC<AccessControlManagerProps> = ({
         try {
           publicStatus = await isPublicSeal(entryNftId, policyRegistryId, effectiveNetwork, suiClient);
           // 如果检查成功（无论 true/false），说明策略存在
-          console.log(`[AccessControlManager] ✅ 访问策略检查成功，isPublic: ${publicStatus}`);
-          break;
-        } catch (error: any) {
-          lastError = error;
-          const errorMessage = error?.message || "";
+        console.log(`[AccessControlManager] ✅ 访问策略检查成功，isPublic: ${publicStatus}`);
+        break;
+      } catch (error: any) {
+        lastError = error;
+        const errorMessage = error?.message || "";
           
           if (errorMessage.includes("没有访问策略")) {
             retries--;
@@ -219,6 +239,12 @@ export const AccessControlManager: React.FC<AccessControlManagerProps> = ({
             // 确实使用了 Seal Access Policies，可能是索引延迟
             errorDescription = `此 NFT 已確認使用 Seal Access Policies 鑄造，但訪問策略可能尚未索引完成。\n\n請稍等 10-30 秒後刷新頁面重試。\n\n交易: ${diagnosis.transactionDigest?.slice(0, 16)}...`;
             console.log(`[AccessControlManager] ✅ 诊断结果：确实使用了 Seal Access Policies，交易: ${diagnosis.transactionDigest}`);
+            setPolicyVerificationPending(true);
+            setPendingTxDigest(diagnosis.transactionDigest || null);
+            // 自动重试一次，减少用户手动刷新
+            retryTimeoutRef.current = setTimeout(() => {
+              loadAccessInfo();
+            }, 8000);
           } else {
             // 确实没有使用 Seal Access Policies
             errorDescription = `此 NFT 未使用 Seal Access Policies 鑄造。\n\n${diagnosis.error || "請使用「啟用 Seal Access Policies」選項重新鑄造 NFT。"}\n\nNFT ID: ${entryNftId.slice(0, 16)}...`;
@@ -247,6 +273,8 @@ export const AccessControlManager: React.FC<AccessControlManagerProps> = ({
   // 重试加载
   const handleRetry = () => {
     setLoadError(null);
+    setPolicyVerificationPending(false);
+    setPendingTxDigest(null);
     loadAccessInfo();
   };
 
@@ -501,6 +529,46 @@ export const AccessControlManager: React.FC<AccessControlManagerProps> = ({
 
   // 如果有加载错误，显示错误信息和重试按钮
   if (loadError && !isLoading) {
+    // 如果是索引延迟，显示更温和的提示和自动重试状态
+    if (policyVerificationPending) {
+      return (
+        <Card className="p-4">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-300">
+              <Clock className="h-5 w-5" />
+              <span className="font-medium">{t("accessControl.errors.pendingIndex") || "訪問策略索引中"}</span>
+            </div>
+            <p className="text-sm text-muted-foreground whitespace-pre-line">
+              {loadError.description}
+            </p>
+            {pendingTxDigest && (
+              <p className="text-xs text-muted-foreground">
+                Tx: {pendingTxDigest.slice(0, 16)}...
+              </p>
+            )}
+            <div className="flex gap-2">
+              <Button onClick={handleRetry} variant="outline" size="sm" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    {t("accessControl.retrying") || "重試中..."}
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    {t("accessControl.retry") || "重試"}
+                  </>
+                )}
+              </Button>
+              <Button variant="ghost" size="sm" disabled>
+                {t("accessControl.autoRetryHint") || "系統將自動重試"}
+              </Button>
+            </div>
+          </div>
+        </Card>
+      );
+    }
+
     return (
       <Card className="p-4">
         <div className="space-y-3">
