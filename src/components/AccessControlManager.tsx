@@ -169,7 +169,36 @@ export const AccessControlManager: React.FC<AccessControlManagerProps> = ({
         lastError = error;
         const errorMessage = error?.message || "";
           
-          if (errorMessage.includes("没有访问策略")) {
+          // 检查是否是 RPC 序列化错误
+          if (errorMessage.includes("RPC_SERIALIZATION_ERROR") || 
+              errorMessage.includes("malformed utf8") ||
+              errorMessage.includes("Deserialization error")) {
+            retries--;
+            if (retries > 0) {
+              console.warn(`[AccessControlManager] ⚠️ RPC 序列化错误，尝试重试（剩余重试: ${retries}）`);
+              // 等待后重试
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+            } else {
+              // 所有重试都失败了，尝试使用交易事件作为备选方案
+              console.warn(`[AccessControlManager] ⚠️ RPC 序列化错误持续，尝试备选方案...`);
+              try {
+                const diagnosis = await checkIfMintedWithSealPolicies(entryNftId, effectiveNetwork, suiClient);
+                if (diagnosis.mintedWithPolicies && diagnosis.policyCreatedEvent) {
+                  // 从事件中获取策略类型
+                  const isPublicFromEvent = diagnosis.policyCreatedEvent.is_public || false;
+                  console.log(`[AccessControlManager] ✅ 通过交易事件验证成功，isPublic: ${isPublicFromEvent}`);
+                  publicStatus = isPublicFromEvent;
+                  break; // 跳出重试循环
+                } else {
+                  console.error(`[AccessControlManager] ❌ 备选方案失败：策略未找到`);
+                  throw error;
+                }
+              } catch (fallbackError) {
+                console.error(`[AccessControlManager] ❌ 备选方案失败:`, fallbackError);
+                throw error;
+              }
+            }
+          } else if (errorMessage.includes("没有访问策略")) {
             retries--;
             if (retries > 0) {
               console.warn(`[AccessControlManager] ⚠️ 访问策略检查失败，可能是索引延迟（剩余重试: ${retries}）`);
@@ -226,8 +255,16 @@ export const AccessControlManager: React.FC<AccessControlManagerProps> = ({
       let errorTitle = t("accessControl.errors.loadFailed") || "載入失敗";
       let errorDescription = error instanceof Error ? error.message : String(error);
       
+      // 检查是否是 RPC 序列化错误
+      if (errorDescription.includes("RPC_SERIALIZATION_ERROR") ||
+          errorDescription.includes("malformed utf8") ||
+          errorDescription.includes("Deserialization error")) {
+        errorTitle = "RPC 序列化錯誤";
+        errorDescription = `遇到 RPC 序列化錯誤，這通常是臨時性問題。\n\n建議操作：\n1. 點擊「Retry」按鈕重試\n2. 刷新頁面\n3. 如果問題持續，稍後再試\n\n技術細節: ${errorDescription.split(':').pop()?.trim() || '未知錯誤'}`;
+        console.error(`[AccessControlManager] ❌ RPC 序列化錯誤:`, errorDescription);
+      } 
       // 如果是"没有访问策略"错误，进行诊断
-      if (errorDescription.includes("没有访问策略")) {
+      else if (errorDescription.includes("没有访问策略")) {
         errorTitle = "訪問策略未找到";
         
         // 诊断：检查是否真的使用了 Seal Access Policies 铸造
