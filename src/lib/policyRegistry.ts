@@ -12,7 +12,7 @@ const getPolicyRegistryStorageKey = (network: SuiNetwork) =>
 // 预设的 PolicyRegistry ID（部署后需要更新）
 const PRESET_POLICY_REGISTRY_IDS: Record<SuiNetwork, string | null> = {
   testnet: "0x7b9993416d4658b186acbb62dfead9582510aa726c2a3a73d2f3335d05adcc69", // 2025-11-21 部署
-  mainnet: null, // 部署后更新
+  mainnet: "0xdbeb691b5d310d83646b101b72123ad2ed170c7ca834faa90fbda3be01c403e3", // 2025-11-22 部署
 };
 
 /**

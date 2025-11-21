@@ -16,14 +16,17 @@ Each user owns a `Journal` object, and every day’s record becomes a unique `En
 | **Deployer** | `0x439bfbeeeecd537d47d4f09f63f53ea318962611ce4e26cbf140503728e4691d` |
 | **Network** | Testnet |
 
-### Mainnet
+### Mainnet (with Seal Access Policies)
 | Item | Value |
 |------|-------|
-| **Package ID** | `0x6ec7914c755708fd77ed3fe0dc8aed25ec5ccae2ff781267da3a5ca3549535b9` |
-| **Module Name** | `diary` |
+| **Package ID** | `0x45f9ba755acaf2306525b4a5b67d32bd4905f56108499306449da7312b76330d` |
+| **PolicyRegistry ID** | `0xdbeb691b5d310d83646b101b72123ad2ed170c7ca834faa90fbda3be01c403e3` |
+| **UpgradeCap ID** | `0x58e532becf176f5122fb84a06fabc0f8cbc612c5fa506a4483adaee7dd7e40f0` |
+| **Module Names** | `diary`, `diary_with_policy`, `seal_access_policies` |
 | **Network** | Mainnet |
-| **Transaction** | `BSFreoSf5M38J8QkNgNhLJ6cnYpfAGNTroU5ULFCpLSS` |
-| **Explorer** | [View on Sui Explorer](https://suiexplorer.com/?network=mainnet&object=0x6ec7914c755708fd77ed3fe0dc8aed25ec5ccae2ff781267da3a5ca3549535b9) |
+| **Transaction** | `9qGWR9K5fnreGFrp9R2yrLEe67na3UCam6DMPR2eccAQ` |
+| **Deployed** | 2025-11-22 |
+| **Explorer** | [View on Sui Explorer](https://suiexplorer.com/?network=mainnet&object=0x45f9ba755acaf2306525b4a5b67d32bd4905f56108499306449da7312b76330d) |
 
 ---
 
@@ -65,7 +68,7 @@ sui client call \
 ### Mainnet
 ```bash
 sui client call \
-  --package 0x6ec7914c755708fd77ed3fe0dc8aed25ec5ccae2ff781267da3a5ca3549535b9 \
+  --package 0x45f9ba755acaf2306525b4a5b67d32bd4905f56108499306449da7312b76330d \
   --module diary \
   --function create_journal \
   --gas-budget 10000000
@@ -97,7 +100,7 @@ sui client call \
 ### Mainnet
 ```bash
 sui client call \
-  --package 0x6ec7914c755708fd77ed3fe0dc8aed25ec5ccae2ff781267da3a5ca3549535b9 \
+  --package 0x45f9ba755acaf2306525b4a5b67d32bd4905f56108499306449da7312b76330d \
   --module diary \
   --function mint_entry \
   --args \

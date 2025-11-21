@@ -9,12 +9,12 @@ import { extractBlobIdFromUrl } from "./walrus";
 // Testnet Package ID
 const TESTNET_PACKAGE_ID =
   "0x555c509131e6e41a12ff3cca245ba5ef762ed2cf0da0e3342c10d34dc416dc47";
-// Mainnet Package ID
+// Mainnet Package ID (with Seal Access Policies support - deployed 2025-11-22)
 // 可以通過環境變數 MAINNET_PACKAGE_ID 覆蓋
 const MAINNET_PACKAGE_ID =
   typeof window !== "undefined" && (window as any).MAINNET_PACKAGE_ID
     ? (window as any).MAINNET_PACKAGE_ID
-    : "0x6ec7914c755708fd77ed3fe0dc8aed25ec5ccae2ff781267da3a5ca3549535b9";
+    : "0x45f9ba755acaf2306525b4a5b67d32bd4905f56108499306449da7312b76330d";
 
 const MODULE = "diary";
 const POLICY_MODULE = "seal_access_policies";

@@ -280,6 +280,13 @@ Echoma now supports user-defined encryption passwords for enhanced security.
 ## 🚧 Roadmap
 
 ### ✅ Recently Completed
+- **🔒 Mainnet Seal Access Policies (2025-11-22)** – Full on-chain access control
+  - ✅ Deployed to **Mainnet** with complete Seal Access Policies support
+  - ✅ **New Mainnet Package ID**: `0x45f9ba755acaf2306525b4a5b67d32bd4905f56108499306449da7312b76330d`
+  - ✅ **PolicyRegistry ID**: `0xdbeb691b5d310d83646b101b72123ad2ed170c7ca834faa90fbda3be01c403e3`
+  - ✅ 3 modules deployed: diary, diary_with_policy, seal_access_policies
+  - ✅ Testnet and Mainnet feature parity achieved
+  - 📖 See [MAINNET_DEPLOYMENT_SUMMARY.md](./MAINNET_DEPLOYMENT_SUMMARY.md) for details
 - **🔒 Argon2id Integration (v3.0)** – Production-ready memory-hard KDF
   - ✅ Full WASM integration with `hash-wasm` library
   - ✅ Memory-hard parameters: 3 iterations × 64 MB × 4 threads
@@ -290,7 +297,7 @@ Echoma now supports user-defined encryption passwords for enhanced security.
 - **NFT Minting on Sui** – Deployed to testnet and mainnet
   - Daily mint limit: **Testnet** - one NFT per day per journal; **Mainnet** - unlimited mints per day
   - **Testnet Package ID**: `0x55f1c575f979ad2b16c264191627ca6716c9b0b397ab041280da1ad6bce37e71`
-  - **Mainnet Package ID**: `0x6ec7914c755708fd77ed3fe0dc8aed25ec5ccae2ff781267da3a5ca3549535b9`
+  - **Mainnet Package ID** (with Seal Policies): `0x45f9ba755acaf2306525b4a5b67d32bd4905f56108499306449da7312b76330d`
   - Auto-migration from old package IDs, CORS fixes
   - See [nft_mint_test/README.md](./nft_mint_test/README.md) for contract details
 
