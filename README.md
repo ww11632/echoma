@@ -225,6 +225,53 @@ Sui NFT(blob_id, timestamp) → On-Chain Proof
   - Self-host the entire stack
 ```
 
+### Protocol Architecture: Inspired by Lens, Built for Privacy
+
+Echoma borrows the structural DNA from Lens Protocol while adding the missing layer for sensitive emotional data governance.
+
+#### What We Borrow from Lens (Structural DNA)
+
+**Object-based protocol architecture**
+- **Lens:** Profile, Publication, Follow, Collect
+- **Echoma:** EmotionEntry, EmotionAnchor(NFT), EncryptedBlobRef, SharePolicy, AccessPolicy
+
+**Module-based governance**
+- **Lens:** Follow/Collect/Reference modules
+- **Echoma:** View/Decrypt/Share/AI-Access/Revoke/Time-Lock modules
+
+**Protocol > App**
+- **Lens:** Graph layer, apps are clients
+- **Echoma:** Emotional data governance layer, app is reference client
+
+**Metadata on-chain, content off-chain**
+- **Lens:** On-chain metadata + IPFS
+- **Echoma:** On-chain metadata (Sui) + encrypted blobs (Walrus)
+
+**Sign once, use everywhere (interoperability)**
+- **Lens:** User-owned social identity
+- **Echoma:** User-owned emotional identity & redacted views per app
+
+#### What We Must NOT Borrow (Would Break Emotional Safety)
+
+- ❌ **Public graph defaults** → Echoma requires private-by-default emotional graphs
+- ❌ **Composable visibility** → Echoma is composable only with explicit consent
+- ❌ **Permanent public history** → Echoma supports revoke / delete metadata / key-revocation
+- ❌ **Gas-per-action usage** → Echoma uses batching + anchors, not per-entry L1 writes
+- ❌ **Social-network incentives** → No follows/likes/public feeds; self-governance > social attention
+
+#### Core Contrast: Why Echoma is a New Privacy Primitive
+
+| Dimension | Lens | Echoma |
+|-----------|------|--------|
+| **Data Type** | Public social content | Private encrypted emotional data |
+| **Graph** | Social graph | Inner emotional graph |
+| **Storage** | IPFS plaintext + on-chain metadata | Walrus encrypted blobs + Sui metadata |
+| **Access** | Modules for public rules | Modules for revocable privacy rules |
+| **Composability** | Default open | Consent-gated open |
+| **Permanence** | Immutable public history | Revocable governance + key disappearance |
+
+**One-line takeaway:** Lens gives us the architecture for composable data objects; Echoma adds the missing layer: consent-based, revocable, zero-knowledge governance for the most sensitive human data.
+
 ---
 
 ## 📱 iOS App Support
