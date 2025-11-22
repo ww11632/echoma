@@ -570,7 +570,7 @@ async function deriveKeyArgon2id(
     // Import derived key into Web Crypto API for AES-GCM
     return await crypto.subtle.importKey(
       "raw",
-      hashArray,
+      new Uint8Array(hashArray),
       { name: "AES-GCM", length: 256 },
       false,
       ["encrypt", "decrypt"]
@@ -1149,7 +1149,7 @@ async function deriveBitsWithPBKDF2(
   return await crypto.subtle.deriveBits(
     {
       name: "PBKDF2",
-      salt: salt,
+      salt: new Uint8Array(salt),
       iterations: iterations,
       hash: "SHA-256",
     },

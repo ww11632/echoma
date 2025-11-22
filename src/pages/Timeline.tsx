@@ -1407,7 +1407,8 @@ const Timeline = () => {
       });
       
       // 紀錄解密後的情緒，避免重新載入後又顯示鎖頭
-      if (resolvedEmotion) {
+      // 修正：只有當 resolvedEmotion 不是 "encrypted" 時才記錄
+      if (resolvedEmotion && resolvedEmotion !== "encrypted") {
         setDecryptedEmotions(prev => ({
           ...prev,
           [record.id]: resolvedEmotion,
