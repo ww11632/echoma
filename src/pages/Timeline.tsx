@@ -3845,15 +3845,17 @@ const Timeline = () => {
                   const fromConfig = emotionLabels[correlation.from as keyof typeof emotionLabels];
                   const toConfig = emotionLabels[correlation.to as keyof typeof emotionLabels];
                   if (!fromConfig || !toConfig) return null;
+                  const fromLabel = fromConfig.label.replace(fromConfig.emoji, "").trim();
+                  const toLabel = toConfig.label.replace(toConfig.emoji, "").trim();
                   
                   return (
                     <div key={index} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
                       <div className="flex items-center gap-2 flex-1">
                         <span className="text-lg">{fromConfig.emoji}</span>
-                        <span className="font-medium">{fromConfig.label}</span>
+                        <span className="font-medium">{fromLabel}</span>
                       </div>
                       <div className="flex items-center gap-2 flex-1 justify-end">
-                        <span className="font-medium">{toConfig.label}</span>
+                        <span className="font-medium">{toLabel}</span>
                         <span className="text-lg">{toConfig.emoji}</span>
                       </div>
                       <div className="flex items-center gap-2 min-w-[120px] justify-end">
