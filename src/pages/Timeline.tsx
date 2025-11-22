@@ -54,6 +54,7 @@ interface EmotionRecord {
   encrypted_data?: string | null;
   tags?: string[];
   transaction_digest?: string | null; // NFT 鑄造交易的 digest
+  is_local_storage?: boolean; // 標記是否為純本地儲存記錄（不在雲端）
 }
 
 type FilterType = "all" | "local" | "walrus" | "sealPolicies";
@@ -295,6 +296,7 @@ const Timeline = () => {
             sui_ref: null,
             created_at: r.timestamp,
             wallet_address: null,
+            is_local_storage: true, // 標記為真正的本地儲存記錄
           }));
           allRecords.push(...convertedLocalRecords);
         } catch (localError) {
@@ -312,26 +314,23 @@ const Timeline = () => {
                 const response = await supabase.functions.invoke('get-emotions');
                 if (!response.error && response.data?.success) {
                   const convertedRecords: EmotionRecord[] = response.data.records.map((r: any) => {
-                    // 判斷是否為 Walrus 記錄：有 blob_id 且不是 local_ 開頭
+                    // 判斷記錄類型：
+                    // - Walrus 記錄：有 blob_id 或 walrus_url
+                    // - 數據庫記錄：blob_id 和 walrus_url 都是 null，encrypted_data 存儲在數據庫
+                    // - 本地記錄：只存在於瀏覽器本地儲存（不會從 API 返回）
                     const hasValidBlobId = r.blob_id && !r.blob_id.startsWith("local_");
                     const hasValidWalrusUrl = r.walrus_url && !r.walrus_url.startsWith("local://");
-                    const isLocal = !hasValidBlobId && !hasValidWalrusUrl;
                     
-                    // 使用實際的 blob_id 和 walrus_url，或生成本地 ID
-                    const blobId = hasValidBlobId 
-                      ? r.blob_id 
-                      : (hasValidWalrusUrl ? extractBlobIdFromUrl(r.walrus_url) : null) || `local_${r.id.slice(0, 8)}`;
-                    
-                    const walrusUrl = hasValidWalrusUrl
-                      ? r.walrus_url
-                      : (hasValidBlobId ? getWalrusUrl(r.blob_id, currentNetworkSnapshot) : `local://${r.id}`);
+                    // 使用實際的 blob_id 和 walrus_url（如果有的話）
+                    const blobId = hasValidBlobId ? r.blob_id : null;
+                    const walrusUrl = hasValidWalrusUrl ? r.walrus_url : (hasValidBlobId ? getWalrusUrl(r.blob_id, currentNetworkSnapshot) : null);
                     
                     console.log(`[Timeline] Processing Supabase record ${r.id}:`, {
                       hasValidBlobId,
                       hasValidWalrusUrl,
-                      isLocal,
                       blob_id: blobId,
                       walrus_url: walrusUrl,
+                      encrypted_data_present: !!r.encrypted_data,
                       originalEmotion: r.emotion,
                       isValidEmotion: r.emotion && ['joy', 'sadness', 'anger', 'anxiety', 'confusion', 'peace'].includes(r.emotion),
                     });
@@ -365,19 +364,13 @@ const Timeline = () => {
                 try {
                   const apiRecords = await getEmotions(session.access_token);
                   const convertedApiRecords: EmotionRecord[] = apiRecords.map((r: any) => {
-                    // 判斷是否為 Walrus 記錄：有 blob_id 且不是 local_ 開頭
+                    // 判斷記錄類型：同上
                     const hasValidBlobId = r.blob_id && !r.blob_id.startsWith("local_");
                     const hasValidWalrusUrl = r.walrus_url && !r.walrus_url.startsWith("local://");
-                    const isLocal = !hasValidBlobId && !hasValidWalrusUrl;
                     
-                    // 使用實際的 blob_id 和 walrus_url，或生成本地 ID
-                    const blobId = hasValidBlobId 
-                      ? r.blob_id 
-                      : (hasValidWalrusUrl ? extractBlobIdFromUrl(r.walrus_url) : null) || `local_${r.id.slice(0, 8)}`;
-                    
-                    const walrusUrl = hasValidWalrusUrl
-                      ? r.walrus_url
-                      : (hasValidBlobId ? getWalrusUrl(r.blob_id, currentNetworkSnapshot) : `local://${r.id}`);
+                    // 使用實際的 blob_id 和 walrus_url（如果有的話）
+                    const blobId = hasValidBlobId ? r.blob_id : null;
+                    const walrusUrl = hasValidWalrusUrl ? r.walrus_url : (hasValidBlobId ? getWalrusUrl(r.blob_id, currentNetworkSnapshot) : null);
                     
                     return {
                       id: r.id,
@@ -1159,9 +1152,7 @@ const Timeline = () => {
         const finalUniqueRecords = sortRecordsByDate(finalRecords);
 
         // 統計資訊
-        const localCount = finalUniqueRecords.filter(r => 
-          r.blob_id?.startsWith("local_") || r.walrus_url?.startsWith("local://")
-        ).length;
+        const localCount = finalUniqueRecords.filter(r => isLocalRecord(r)).length;
         const walrusCount = finalUniqueRecords.length - localCount;
         
         console.log(`[Timeline] Loaded ${finalUniqueRecords.length} total records:`, {
@@ -1169,7 +1160,7 @@ const Timeline = () => {
           local: localCount,
           walrus: walrusCount,
           records: finalUniqueRecords.map(r => {
-            const isLocal = r.blob_id?.startsWith("local_") || r.walrus_url?.startsWith("local://");
+            const isLocal = isLocalRecord(r);
             return {
               id: r.id,
               blob_id: r.blob_id,
@@ -1183,10 +1174,7 @@ const Timeline = () => {
         });
         
         // 特別檢查 Walrus 記錄
-        const walrusRecords = finalUniqueRecords.filter(r => {
-          const isLocal = r.blob_id?.startsWith("local_") || r.walrus_url?.startsWith("local://");
-          return !isLocal;
-        });
+        const walrusRecords = finalUniqueRecords.filter(r => !isLocalRecord(r));
         console.log(`[Timeline] Walrus records details:`, walrusRecords.map(r => ({
           id: r.id,
           blob_id: r.blob_id,
@@ -1265,19 +1253,20 @@ const Timeline = () => {
   // 判斷記錄是否為本地儲存
   // 使用 useCallback 缓存 isLocalRecord 函数，避免每次渲染时重新创建
   const isLocalRecord = useCallback((record: EmotionRecord) => {
-    // 檢查 blob_id 和 walrus_url 來判斷是否為本地記錄
-    // 如果 blob_id 以 "local_" 開頭，或 walrus_url 以 "local://" 開頭，則為本地記錄
+    // 檢查是否有 is_local_storage 標記（只有從 localIndex 載入的記錄才有此標記）
+    if ('is_local_storage' in record && record.is_local_storage === true) {
+      return true;
+    }
+    
+    // 否則檢查 blob_id 和 walrus_url
+    // 只有當明確是 local_ 或 local:// 格式時，才是本地記錄
     const blobId = record.blob_id || "";
     const walrusUrl = record.walrus_url || "";
     
     const isLocalBlob = blobId.startsWith("local_");
     const isLocalUrl = walrusUrl.startsWith("local://");
     
-    // 只有當明確是本地格式時，才返回 true
-    // 其他情況（包括 walrus_url 是 https://aggregator.testnet.walrus.space 開頭，或 blob_id 是正常的 Walrus ID）都是 Walrus 記錄
-    const isLocal = isLocalBlob || isLocalUrl;
-    
-    return isLocal;
+    return isLocalBlob || isLocalUrl;
   }, []);
 
   // 取得解密後的情緒（如果有），避免 UI 繼續顯示鎖頭圖示
