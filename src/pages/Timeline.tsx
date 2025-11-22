@@ -689,10 +689,15 @@ const Timeline = () => {
                       console.log(`[Timeline] ✅ Updated Supabase record ${matchingSupabaseRecord.id} with NFT info`);
                     }
                     
-                    // 創建 NFT 記錄
+                    // 創建 NFT 記錄 - 如果沒有匹配的Supabase記錄，跳過這個NFT（因為無法確定emotion）
+                    if (!matchingSupabaseRecord) {
+                      console.log(`[Timeline] ⚠️ Skipping NFT ${nft.nftId} - no matching Supabase record with valid emotion`);
+                      continue;
+                    }
+                    
                     const nftRecord: EmotionRecord = {
                       id: nft.nftId, // 使用 NFT ID 作為唯一標識
-                      emotion: matchingSupabaseRecord?.emotion || "encrypted", // 優先使用有效的 Supabase emotion
+                      emotion: matchingSupabaseRecord.emotion, // 使用匹配的 Supabase emotion
                       intensity: intensity,
                       description: nft.moodText || "", // NFT 中存儲的 mood_text（這是描述，不是 emotion 類型）
                       blob_id: blobIdFromNft || `nft_${nft.nftId.slice(0, 8)}`, // 使用從 URL 提取的 blob ID，或生成 NFT 前綴的 ID
@@ -1278,15 +1283,11 @@ const Timeline = () => {
   const getEmotionValue = useCallback((record: EmotionRecord) => {
     // 優先使用解密後的情緒
     const decrypted = decryptedEmotions[record.id];
-    if (decrypted && decrypted !== "encrypted") {
+    if (decrypted) {
       return decrypted;
     }
-    // 如果數據庫中的 emotion 是有效值，直接使用
-    if (record.emotion && record.emotion !== "encrypted") {
-      return record.emotion;
-    }
-    // 否則返回 "encrypted"
-    return "encrypted";
+    // 數據庫中的 emotion 應該總是有效值（enum中的一個）
+    return record.emotion;
   }, [decryptedEmotions]);
 
   // 解密記錄描述
