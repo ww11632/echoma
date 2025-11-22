@@ -130,6 +130,7 @@ const AuthTimeline = () => {
   const [decryptingRecords, setDecryptingRecords] = useState<Set<string>>(new Set());
   const [decryptedDescriptions, setDecryptedDescriptions] = useState<Record<string, string>>({});
   const [decryptedAiResponses, setDecryptedAiResponses] = useState<Record<string, string>>({});
+  const [decryptedEmotions, setDecryptedEmotions] = useState<Record<string, string>>({});
   const [decryptErrors, setDecryptErrors] = useState<Record<string, string>>({});
   // Track failed auto-decrypt attempts to avoid infinite retries
   const [failedAutoDecrypts, setFailedAutoDecrypts] = useState<Set<string>>(new Set());
@@ -463,6 +464,11 @@ const AuthTimeline = () => {
                   delete next[updatedRecord.id];
                   return next;
                 });
+                setDecryptedEmotions(prev => {
+                  const next = { ...prev };
+                  delete next[updatedRecord.id];
+                  return next;
+                });
                 setDecryptErrors(prev => {
                   const next = { ...prev };
                   delete next[updatedRecord.id];
@@ -489,6 +495,11 @@ const AuthTimeline = () => {
                 return next;
               });
               setDecryptedAiResponses(prev => {
+                const next = { ...prev };
+                delete next[deletedId];
+                return next;
+              });
+              setDecryptedEmotions(prev => {
                 const next = { ...prev };
                 delete next[deletedId];
                 return next;
@@ -612,6 +623,11 @@ const AuthTimeline = () => {
       ? t("timeline.filter.database")
       : t("timeline.filter.walrus");
   }, [t]);
+
+  // Return decrypted emotion when available so UI doesn't fall back to the lock icon
+  const getEmotionValue = useCallback((record: EmotionRecord) => {
+    return decryptedEmotions[record.id] || record.emotion;
+  }, [decryptedEmotions]);
 
   // 解密記錄描述
   const decryptDescription = useCallback(async (record: EmotionRecord) => {
@@ -806,6 +822,14 @@ const AuthTimeline = () => {
         return sortRecordsByDate(updated);
       });
       
+      // 紀錄解密後的情緒，避免重新載入後又顯示鎖頭
+      if (snapshot.emotion) {
+        setDecryptedEmotions(prev => ({
+          ...prev,
+          [record.id]: snapshot.emotion,
+        }));
+      }
+
       // 儲存解密後的描述
       setDecryptedDescriptions(prev => ({
         ...prev,
@@ -1015,7 +1039,7 @@ const AuthTimeline = () => {
       }
     });
     return Array.from(tagSet).sort();
-  }, [records]);
+  }, [records, getEmotionValue, isLocalRecord]);
 
   // 篩選、搜尋和排序後的記錄（需要在 decryptAllRecords 之前定義）
   const filteredRecords = useMemo(() => {
@@ -1060,7 +1084,7 @@ const AuthTimeline = () => {
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(record => {
-        const emotionMatch = record.emotion.toLowerCase().includes(query);
+        const emotionMatch = getEmotionValue(record).toLowerCase().includes(query);
         const descriptionMatch = decryptedDescriptions[record.id]?.toLowerCase().includes(query);
         const dateMatch = new Date(record.created_at).toLocaleDateString(i18n.language === 'zh-TW' ? 'zh-TW' : 'en-US').includes(query);
         const tagsMatch = record.tags?.some(tag => tag.toLowerCase().includes(query));
@@ -1080,7 +1104,7 @@ const AuthTimeline = () => {
           comparison = a.intensity - b.intensity;
           break;
         case "emotion":
-          comparison = a.emotion.localeCompare(b.emotion, i18n.language);
+          comparison = getEmotionValue(a).localeCompare(getEmotionValue(b), i18n.language);
           break;
       }
       
@@ -1088,7 +1112,7 @@ const AuthTimeline = () => {
     });
     
     return sorted;
-  }, [records, filter, searchQuery, selectedTags, sortBy, sortOrder, decryptedDescriptions, i18n.language, dateRange]);
+  }, [records, filter, searchQuery, selectedTags, sortBy, sortOrder, decryptedDescriptions, i18n.language, dateRange, getEmotionValue]);
 
   // 虛擬滾動器配置
   // 使用動態高度估計以提升滾動準確性
@@ -1240,7 +1264,8 @@ const AuthTimeline = () => {
     
     const emotionCounts: Record<string, number> = {};
     records.forEach(r => {
-      emotionCounts[r.emotion] = (emotionCounts[r.emotion] || 0) + 1;
+      const emotion = getEmotionValue(r);
+      emotionCounts[emotion] = (emotionCounts[emotion] || 0) + 1;
     });
 
     const totalIntensity = records.reduce((sum, r) => sum + r.intensity, 0);
@@ -1378,10 +1403,11 @@ const AuthTimeline = () => {
       });
       
       periodRecords.forEach(r => {
-        if (!emotionCounts[r.emotion]) {
-          emotionCounts[r.emotion] = new Array(days).fill(0);
+        const emotion = getEmotionValue(r);
+        if (!emotionCounts[emotion]) {
+          emotionCounts[emotion] = new Array(days).fill(0);
         }
-        emotionCounts[r.emotion][days - 1 - i] = (emotionCounts[r.emotion][days - 1 - i] || 0) + 1;
+        emotionCounts[emotion][days - 1 - i] = (emotionCounts[emotion][days - 1 - i] || 0) + 1;
       });
     }
     
@@ -1427,7 +1453,7 @@ const AuthTimeline = () => {
     });
     
     return result;
-  }, [records, viewPeriod]);
+  }, [records, viewPeriod, getEmotionValue]);
 
   // 情緒關聯分析
   const emotionCorrelationData = useMemo(() => {
@@ -1442,8 +1468,8 @@ const AuthTimeline = () => {
     
     // 計算情緒轉換
     for (let i = 0; i < sortedRecords.length - 1; i++) {
-      const from = sortedRecords[i].emotion;
-      const to = sortedRecords[i + 1].emotion;
+      const from = getEmotionValue(sortedRecords[i]);
+      const to = getEmotionValue(sortedRecords[i + 1]);
       
       if (!transitions[from]) {
         transitions[from] = {};
@@ -1474,13 +1500,14 @@ const AuthTimeline = () => {
     return correlations
       .sort((a, b) => b.strength - a.strength)
       .slice(0, 10);
-  }, [records]);
+  }, [records, getEmotionValue]);
 
   // 情緒日曆熱力圖數據
   const emotionCalendarData = useMemo(() => {
     const data: Record<string, { count: number; avgIntensity: number; dominantEmotion: string }> = {};
     
     records.forEach(record => {
+      const emotion = getEmotionValue(record);
       const date = new Date(record.created_at);
       const dateKey = format(date, 'yyyy-MM-dd');
       
@@ -1488,7 +1515,7 @@ const AuthTimeline = () => {
         data[dateKey] = {
           count: 0,
           avgIntensity: 0,
-          dominantEmotion: record.emotion,
+          dominantEmotion: emotion,
         };
       }
       
@@ -1499,7 +1526,7 @@ const AuthTimeline = () => {
     });
     
     return data;
-  }, [records]);
+  }, [records, getEmotionValue]);
 
   const chartConfig = {
     count: {
@@ -1558,13 +1585,14 @@ const AuthTimeline = () => {
 
       const rows = records.map(record => {
         const isLocal = isLocalRecord(record);
+        const emotionValue = getEmotionValue(record);
         const row: string[] = [];
         
         if (customExportFields.date) {
           row.push(formatDate(record.created_at));
         }
         if (customExportFields.emotion) {
-          row.push(emotionLabels[record.emotion as keyof typeof emotionLabels]?.label || record.emotion);
+          row.push(emotionLabels[emotionValue as keyof typeof emotionLabels]?.label || emotionValue);
         }
         if (customExportFields.intensity) {
           row.push(record.intensity.toString());
@@ -1611,14 +1639,15 @@ const AuthTimeline = () => {
       // 匯出為 JSON - 支持自定義字段
       const jsonData = records.map(record => {
         const isLocal = isLocalRecord(record);
+        const emotionValue = getEmotionValue(record);
         const data: any = {};
         
         if (customExportFields.date) {
           data.date = formatDate(record.created_at);
         }
         if (customExportFields.emotion) {
-          data.emotion = record.emotion;
-          data.emotionLabel = emotionLabels[record.emotion as keyof typeof emotionLabels]?.label || record.emotion;
+          data.emotion = emotionValue;
+          data.emotionLabel = emotionLabels[emotionValue as keyof typeof emotionLabels]?.label || emotionValue;
         }
         if (customExportFields.intensity) {
           data.intensity = record.intensity;
@@ -1686,8 +1715,9 @@ const AuthTimeline = () => {
         }
         
         const isLocal = isLocalRecord(record);
-        const emotionLabel = emotionLabels[record.emotion as keyof typeof emotionLabels]?.label || record.emotion;
-        const emotionEmoji = emotionLabels[record.emotion as keyof typeof emotionLabels]?.emoji || "😊";
+        const emotionValue = getEmotionValue(record);
+        const emotionLabel = emotionLabels[emotionValue as keyof typeof emotionLabels]?.label || emotionValue;
+        const emotionEmoji = emotionLabels[emotionValue as keyof typeof emotionLabels]?.emoji || "😊";
         const dateStr = formatDate(record.created_at);
         const description = descriptions[record.id] || record.description || (isZh ? "無描述" : "No description");
         
@@ -1763,8 +1793,9 @@ const AuthTimeline = () => {
       // 記錄列表
       records.forEach((record, index) => {
         const isLocal = isLocalRecord(record);
-        const emotionLabel = emotionLabels[record.emotion as keyof typeof emotionLabels]?.label || record.emotion;
-        const emotionEmoji = emotionLabels[record.emotion as keyof typeof emotionLabels]?.emoji || "😊";
+        const emotionValue = getEmotionValue(record);
+        const emotionLabel = emotionLabels[emotionValue as keyof typeof emotionLabels]?.label || emotionValue;
+        const emotionEmoji = emotionLabels[emotionValue as keyof typeof emotionLabels]?.emoji || "😊";
         const dateStr = formatDate(record.created_at);
         const description = descriptions[record.id] || record.description || (isZh ? "無描述" : "No description");
         
@@ -1816,7 +1847,7 @@ const AuthTimeline = () => {
         description: (t("timeline.exportSuccessMarkdown", { count: records.length }) || `已匯出 ${records.length} 條記錄為 Markdown 格式`).replace("{{count}}", records.length.toString()),
       });
     }
-  }, [t, i18n.language, emotionLabels, isLocalRecord, recordsToExport, descriptionsToExport, customExportFields, dateFormat, formatDate]);
+  }, [t, i18n.language, emotionLabels, isLocalRecord, recordsToExport, descriptionsToExport, customExportFields, dateFormat, formatDate, getEmotionValue]);
 
   // 舊的導出函數（保持向後兼容）
   const exportData = useCallback((recordsToExport: EmotionRecord[], descriptions: Record<string, string>) => {
@@ -1855,6 +1886,11 @@ const AuthTimeline = () => {
         return next;
       });
       setDecryptedAiResponses(prev => {
+        const next = { ...prev };
+        delete next[recordToDelete.id];
+        return next;
+      });
+      setDecryptedEmotions(prev => {
         const next = { ...prev };
         delete next[recordToDelete.id];
         return next;
@@ -1959,6 +1995,11 @@ const AuthTimeline = () => {
         return next;
       });
       setDecryptedAiResponses(prev => {
+        const next = { ...prev };
+        successfulIds.forEach(id => delete next[id]);
+        return next;
+      });
+      setDecryptedEmotions(prev => {
         const next = { ...prev };
         successfulIds.forEach(id => delete next[id]);
         return next;
@@ -2892,9 +2933,10 @@ const AuthTimeline = () => {
                 // 安全檢查：確保記錄存在
                 if (!record) return null;
                 
-                const emotionKey = record.emotion as keyof typeof emotionLabels;
+                const displayEmotion = getEmotionValue(record);
+                const emotionKey = displayEmotion as keyof typeof emotionLabels;
                 const emotionConfig = emotionLabels[emotionKey] || {
-                  label: record.emotion.charAt(0).toUpperCase() + record.emotion.slice(1),
+                  label: displayEmotion.charAt(0).toUpperCase() + displayEmotion.slice(1),
                   emoji: "😊",
                   gradient: "from-gray-400 to-slate-400",
                   color: "#94a3b8",
@@ -3228,6 +3270,11 @@ const AuthTimeline = () => {
                                     onClick={() => {
                                       // 隱藏解密內容
                                       setDecryptedDescriptions(prev => {
+                                        const next = { ...prev };
+                                        delete next[record.id];
+                                        return next;
+                                      });
+                                      setDecryptedEmotions(prev => {
                                         const next = { ...prev };
                                         delete next[record.id];
                                         return next;
