@@ -1,40 +1,40 @@
-# 功能测试指南
+# Functional Test Guide
 
-## 🎯 测试目标
+## 🎯 Test Objectives
 
-验证已修复的 7 个高优先级逻辑问题在实际使用场景中的表现。
+Verify the performance of 7 high-priority logic fixes in actual usage scenarios.
 
 ---
 
-## 🚀 启动测试环境
+## 🚀 Start Test Environment
 
-### 1. 启动开发服务器
+### 1. Start Development Server
 
 ```bash
-# 终端 1: 启动前端开发服务器
+# Terminal 1: Start frontend development server
 npm run dev
 
-# 终端 2: 启动后端 API 服务器（如果需要）
+# Terminal 2: Start backend API server (if needed)
 npm run server
 ```
 
-前端将在 `http://localhost:5173` 启动。
+Frontend will start at `http://localhost:5173`.
 
 ---
 
-## 📋 测试清单
+## 📋 Test Checklist
 
-### ✅ 测试 1: 时间戳格式一致性
+### ✅ Test 1: Timestamp Format Consistency
 
-**目标**: 验证所有记录的时间戳都使用 ISO 字符串格式
+**Objective**: Verify all records use ISO string format for timestamps
 
-**步骤**:
-1. 打开浏览器开发者工具（F12）
-2. 进入 Console 标签
-3. 创建一个新记录（选择情绪、输入描述、保存）
-4. 在 Console 中执行：
+**Steps**:
+1. Open browser developer tools (F12)
+2. Go to Console tab
+3. Create a new record (select emotion, enter description, save)
+4. Execute in Console:
    ```javascript
-   // 检查本地存储中的记录
+   // Check records in local storage
    const localData = localStorage.getItem('echoma_encrypted_mvp_records') || 
                      localStorage.getItem('echoma_mvp_records');
    if (localData) {
@@ -45,245 +45,245 @@ npm run server
    }
    ```
 
-**预期结果**:
-- ✅ 时间戳格式为 ISO 字符串（如 `2025-01-15T10:30:00.000Z`）
-- ✅ 不是数字时间戳
+**Expected Results**:
+- ✅ Timestamp format is ISO string (e.g., `2025-01-15T10:30:00.000Z`)
+- ✅ Not a numeric timestamp
 
 ---
 
-### ✅ 测试 2: 组件卸载安全（setTimeout 导航）
+### ✅ Test 2: Component Unmount Safety (setTimeout Navigation)
 
-**目标**: 验证组件卸载后不会尝试导航，避免内存泄漏
+**Objective**: Verify component does not attempt navigation after unmount, avoiding memory leaks
 
-**步骤**:
-1. 打开浏览器开发者工具（F12）
-2. 进入 Console 标签
-3. 创建一个新记录
-4. **在保存成功后、导航发生前（约 1-1.5 秒内）**，快速点击浏览器的返回按钮或关闭标签页
-5. 检查 Console 是否有 React 警告
+**Steps**:
+1. Open browser developer tools (F12)
+2. Go to Console tab
+3. Create a new record
+4. **After save succeeds, before navigation occurs (within ~1-1.5 seconds)**, quickly click browser back button or close tab
+5. Check Console for React warnings
 
-**预期结果**:
-- ✅ 无 React 警告（如 "Can't perform a React state update on an unmounted component"）
-- ✅ 无内存泄漏警告
-- ✅ 导航不会在组件卸载后执行
+**Expected Results**:
+- ✅ No React warnings (e.g., "Can't perform a React state update on an unmounted component")
+- ✅ No memory leak warnings
+- ✅ Navigation does not execute after component unmounts
 
-**验证代码**:
+**Verification Code**:
 ```javascript
-// 在 Console 中检查是否有警告
-console.log('检查完成：应该没有 React 警告')
+// Check Console for warnings
+console.log('Check complete: Should have no React warnings')
 ```
 
 ---
 
-### ✅ 测试 3: localStorage 并发保存（锁机制）
+### ✅ Test 3: localStorage Concurrent Save (Lock Mechanism)
 
-**目标**: 验证快速连续保存多个记录时不会丢失数据
+**Objective**: Verify no data loss when rapidly saving multiple records consecutively
 
-**步骤**:
-1. 打开浏览器开发者工具（F12）
-2. 进入 Console 标签
-3. 快速连续创建 5-10 个记录（每次保存后立即创建下一个）
-4. 等待所有保存完成
-5. 检查 Timeline 页面，验证所有记录都存在
+**Steps**:
+1. Open browser developer tools (F12)
+2. Go to Console tab
+3. Rapidly create 5-10 records consecutively (create next immediately after each save)
+4. Wait for all saves to complete
+5. Check Timeline page, verify all records exist
 
-**预期结果**:
-- ✅ 所有记录都成功保存
-- ✅ 无数据丢失
-- ✅ 记录按时间正确排序
-- ✅ Console 中无错误信息
+**Expected Results**:
+- ✅ All records saved successfully
+- ✅ No data loss
+- ✅ Records sorted correctly by time
+- ✅ No error messages in Console
 
-**验证代码**:
+**Verification Code**:
 ```javascript
-// 在 Console 中检查记录数量
+// Check record count in Console
 const localData = localStorage.getItem('echoma_encrypted_mvp_records') || 
                   localStorage.getItem('echoma_mvp_records');
 if (localData) {
   const records = JSON.parse(localData);
-  console.log('保存的记录数量:', records.length);
-  console.log('所有记录 ID:', records.map(r => r.id));
+  console.log('Saved record count:', records.length);
+  console.log('All record IDs:', records.map(r => r.id));
 }
 ```
 
 ---
 
-### ✅ 测试 4: 去重逻辑（优先使用 id）
+### ✅ Test 4: Deduplication Logic (Prioritize id)
 
-**目标**: 验证 Timeline 正确去重，优先使用 `id` 作为主键
+**Objective**: Verify Timeline correctly deduplicates, prioritizing `id` as primary key
 
-**步骤**:
-1. 创建一个记录（记录其 ID）
-2. 在本地存储中手动复制该记录，修改 `created_at` 为更早的时间
-3. 刷新 Timeline 页面
-4. 检查是否只显示一个记录（最新的）
+**Steps**:
+1. Create a record (note its ID)
+2. Manually duplicate the record in local storage, modify `created_at` to earlier time
+3. Refresh Timeline page
+4. Check if only one record is displayed (the latest)
 
-**预期结果**:
-- ✅ 只显示一个记录（保留最新的）
-- ✅ Console 中显示去重日志（如 "Dedup: keeping..." 或 "Dedup: replacing..."）
+**Expected Results**:
+- ✅ Only one record displayed (keeps the latest)
+- ✅ Console shows deduplication logs (e.g., "Dedup: keeping..." or "Dedup: replacing...")
 
-**验证代码**:
+**Verification Code**:
 ```javascript
-// 在 Console 中检查去重逻辑
-// 应该看到类似这样的日志：
+// Check deduplication logic in Console
+// Should see logs like:
 // "[Timeline] Dedup: keeping ... (same id, older or equal timestamp)"
-// 或
+// or
 // "[Timeline] Dedup: replacing ... with ... (same id, newer timestamp)"
 ```
 
 ---
 
-### ✅ 测试 5: 强度值保存
+### ✅ Test 5: Intensity Value Save
 
-**目标**: 验证情绪强度值正确保存和显示
+**Objective**: Verify emotion intensity value is correctly saved and displayed
 
-**步骤**:
-1. 创建一个记录，设置强度值为 80
-2. 保存记录
-3. 进入 Timeline 页面
-4. 检查记录的强度值是否显示为 80
+**Steps**:
+1. Create a record, set intensity value to 80
+2. Save record
+3. Go to Timeline page
+4. Check if record's intensity value displays as 80
 
-**预期结果**:
-- ✅ 强度值正确保存（80）
-- ✅ Timeline 中正确显示强度值
-- ✅ 强度值不为 undefined 或 null
+**Expected Results**:
+- ✅ Intensity value correctly saved (80)
+- ✅ Timeline correctly displays intensity value
+- ✅ Intensity value is not undefined or null
 
-**验证代码**:
+**Verification Code**:
 ```javascript
-// 在 Console 中检查强度值
+// Check intensity value in Console
 const localData = localStorage.getItem('echoma_encrypted_mvp_records') || 
                   localStorage.getItem('echoma_mvp_records');
 if (localData) {
   const records = JSON.parse(localData);
   const lastRecord = records[records.length - 1];
-  console.log('强度值:', lastRecord?.intensity);
-  console.log('强度值类型:', typeof lastRecord?.intensity);
+  console.log('Intensity value:', lastRecord?.intensity);
+  console.log('Intensity value type:', typeof lastRecord?.intensity);
 }
 ```
 
 ---
 
-### ✅ 测试 6: 加密密钥选择一致性
+### ✅ Test 6: Encryption Key Selection Consistency
 
-**目标**: 验证公开记录和私密记录使用正确的加密密钥
+**Objective**: Verify public and private records use correct encryption keys
 
-**步骤**:
-1. 创建一个**公开记录**（isPublic = true）
-2. 创建一个**私密记录**（isPublic = false）
-3. 检查本地存储中的密钥使用情况
+**Steps**:
+1. Create a **public record** (isPublic = true)
+2. Create a **private record** (isPublic = false)
+3. Check key usage in local storage
 
-**预期结果**:
-- ✅ 公开记录存储在 `echoma_encrypted_public_records`
-- ✅ 私密记录存储在 `echoma_encrypted_mvp_records`
-- ✅ 两者使用不同的加密密钥
+**Expected Results**:
+- ✅ Public records stored in `echoma_encrypted_public_records`
+- ✅ Private records stored in `echoma_encrypted_mvp_records`
+- ✅ Both use different encryption keys
 
-**验证代码**:
+**Verification Code**:
 ```javascript
-// 在 Console 中检查存储位置
+// Check storage locations in Console
 const publicData = localStorage.getItem('echoma_encrypted_public_records');
 const privateData = localStorage.getItem('echoma_encrypted_mvp_records');
 
-console.log('公开记录存在?', !!publicData);
-console.log('私密记录存在?', !!privateData);
-console.log('存储分离正确?', publicData && privateData);
+console.log('Public records exist?', !!publicData);
+console.log('Private records exist?', !!privateData);
+console.log('Storage separation correct?', publicData && privateData);
 ```
 
 ---
 
-### ✅ 测试 7: 钱包连接检查
+### ✅ Test 7: Wallet Connection Check
 
-**目标**: 验证在保存过程中断开钱包时，错误处理正确
+**Objective**: Verify error handling is correct when wallet disconnects during save
 
-**步骤**:
-1. 连接钱包
-2. 开始创建记录（选择情绪、输入描述）
-3. **在点击保存后、上传完成前**，断开钱包连接
-4. 检查错误消息
+**Steps**:
+1. Connect wallet
+2. Start creating record (select emotion, enter description)
+3. **After clicking save, before upload completes**, disconnect wallet
+4. Check error message
 
-**预期结果**:
-- ✅ 显示友好的错误消息（如 "Wallet disconnected during operation..."）
-- ✅ 不会导致应用崩溃
-- ✅ 用户可以重新连接钱包后重试
+**Expected Results**:
+- ✅ Shows friendly error message (e.g., "Wallet disconnected during operation...")
+- ✅ Does not cause app crash
+- ✅ User can reconnect wallet and retry
 
-**注意**: 此测试需要精确的时机控制，可能需要多次尝试。
-
----
-
-### ✅ 测试 8: 存储模式初始化
-
-**目标**: 验证切换用户账户时，加密存储正确初始化
-
-**步骤**:
-1. 使用钱包 A 创建记录
-2. 断开钱包 A，连接钱包 B
-3. 尝试创建新记录
-4. 检查是否提示需要清除旧数据或正确初始化新存储
-
-**预期结果**:
-- ✅ 如果检测到加密数据但无法解密，显示友好错误
-- ✅ 如果无加密数据，正确初始化新存储
-- ✅ 不会导致数据混合存储
+**Note**: This test requires precise timing control, may need multiple attempts.
 
 ---
 
-### ✅ 测试 9: 删除操作状态一致性
+### ✅ Test 8: Storage Mode Initialization
 
-**目标**: 验证删除操作失败时，记录仍然可见
+**Objective**: Verify encryption storage correctly initializes when switching user accounts
 
-**步骤**:
-1. 创建一个记录
-2. 进入 Timeline 页面
-3. 尝试删除记录
-4. **模拟删除失败**（可以临时断开网络或修改代码）
-5. 检查记录是否仍然可见
+**Steps**:
+1. Create records using wallet A
+2. Disconnect wallet A, connect wallet B
+3. Try to create new record
+4. Check if prompts to clear old data or correctly initializes new storage
 
-**预期结果**:
-- ✅ 如果删除失败，记录仍然在 Timeline 中显示
-- ✅ 显示错误消息
-- ✅ UI 状态与后端状态一致
-
----
-
-### ✅ 测试 10: 批量删除错误处理
-
-**目标**: 验证批量删除时，部分失败的处理
-
-**步骤**:
-1. 创建 5 个记录
-2. 进入 Timeline 页面
-3. 选择所有记录进行批量删除
-4. **模拟部分删除失败**（可以临时断开网络）
-5. 检查成功和失败的记录处理
-
-**预期结果**:
-- ✅ 成功删除的记录从 UI 中移除
-- ✅ 失败删除的记录仍然可见
-- ✅ 显示成功和失败的数量
-- ✅ 失败的记录保持选中状态（可重试）
+**Expected Results**:
+- ✅ If encrypted data detected but cannot decrypt, shows friendly error
+- ✅ If no encrypted data, correctly initializes new storage
+- ✅ Does not cause mixed data storage
 
 ---
 
-## 🔍 调试技巧
+### ✅ Test 9: Delete Operation State Consistency
 
-### 查看 Console 日志
+**Objective**: Verify record remains visible when delete operation fails
 
-所有关键操作都会在 Console 中输出日志，格式如下：
-- `[Record]` - 记录创建相关
-- `[Timeline]` - Timeline 相关
-- `[LocalIndex]` - 本地存储相关
-- `[StorageService]` - 存储服务相关
+**Steps**:
+1. Create a record
+2. Go to Timeline page
+3. Try to delete record
+4. **Simulate delete failure** (can temporarily disconnect network or modify code)
+5. Check if record is still visible
 
-### 检查本地存储
+**Expected Results**:
+- ✅ If delete fails, record still displayed in Timeline
+- ✅ Shows error message
+- ✅ UI state consistent with backend state
+
+---
+
+### ✅ Test 10: Batch Delete Error Handling
+
+**Objective**: Verify handling of partial failures during batch delete
+
+**Steps**:
+1. Create 5 records
+2. Go to Timeline page
+3. Select all records for batch delete
+4. **Simulate partial delete failure** (can temporarily disconnect network)
+5. Check handling of successful and failed records
+
+**Expected Results**:
+- ✅ Successfully deleted records removed from UI
+- ✅ Failed delete records still visible
+- ✅ Shows count of successful and failed
+- ✅ Failed records remain selected (can retry)
+
+---
+
+## 🔍 Debugging Tips
+
+### View Console Logs
+
+All key operations output logs in Console, format as follows:
+- `[Record]` - Record creation related
+- `[Timeline]` - Timeline related
+- `[LocalIndex]` - Local storage related
+- `[StorageService]` - Storage service related
+
+### Check Local Storage
 
 ```javascript
-// 在 Console 中执行
-console.log('公开记录:', localStorage.getItem('echoma_encrypted_public_records'));
-console.log('私密记录:', localStorage.getItem('echoma_encrypted_mvp_records'));
-console.log('明文记录:', localStorage.getItem('echoma_mvp_records'));
+// Execute in Console
+console.log('Public records:', localStorage.getItem('echoma_encrypted_public_records'));
+console.log('Private records:', localStorage.getItem('echoma_encrypted_mvp_records'));
+console.log('Plaintext records:', localStorage.getItem('echoma_mvp_records'));
 ```
 
-### 清除测试数据
+### Clear Test Data
 
 ```javascript
-// 在 Console 中执行（谨慎使用）
+// Execute in Console (use with caution)
 localStorage.removeItem('echoma_encrypted_public_records');
 localStorage.removeItem('echoma_encrypted_mvp_records');
 localStorage.removeItem('echoma_mvp_records');
@@ -291,52 +291,49 @@ localStorage.removeItem('echoma_mvp_records');
 
 ---
 
-## 📊 测试结果记录
+## 📊 Test Results Record
 
-| 测试项 | 状态 | 备注 |
-|--------|------|------|
-| 时间戳格式一致性 | ⬜ | |
-| 组件卸载安全 | ⬜ | |
-| localStorage 并发保存 | ⬜ | |
-| 去重逻辑 | ⬜ | |
-| 强度值保存 | ⬜ | |
-| 加密密钥选择 | ⬜ | |
-| 钱包连接检查 | ⬜ | |
-| 存储模式初始化 | ⬜ | |
-| 删除操作状态一致性 | ⬜ | |
-| 批量删除错误处理 | ⬜ | |
-
----
-
-## 🐛 发现问题时的处理
-
-如果发现任何问题：
-
-1. **记录问题**:
-   - 截图或录屏
-   - 复制 Console 错误信息
-   - 记录复现步骤
-
-2. **检查修复**:
-   - 确认问题是否在修复范围内
-   - 检查相关代码文件
-
-3. **报告问题**:
-   - 在 `进一步改进建议.md` 中添加新问题
-   - 标记优先级和影响范围
+| Test Item | Status | Notes |
+|-----------|--------|-------|
+| Timestamp Format Consistency | ⬜ | |
+| Component Unmount Safety | ⬜ | |
+| localStorage Concurrent Save | ⬜ | |
+| Deduplication Logic | ⬜ | |
+| Intensity Value Save | ⬜ | |
+| Encryption Key Selection | ⬜ | |
+| Wallet Connection Check | ⬜ | |
+| Storage Mode Initialization | ⬜ | |
+| Delete Operation State Consistency | ⬜ | |
+| Batch Delete Error Handling | ⬜ | |
 
 ---
 
-## ✅ 测试完成标准
+## 🐛 Handling Discovered Issues
 
-所有测试项通过后：
-- ✅ 无数据丢失
-- ✅ 无 React 警告
-- ✅ 无控制台错误
-- ✅ 用户体验流畅
-- ✅ 错误处理友好
+If any issues are discovered:
+
+1. **Record Issue**:
+   - Screenshot or screen recording
+   - Copy Console error messages
+   - Record reproduction steps
+
+2. **Check Fix**:
+   - Confirm if issue is within fix scope
+   - Check related code files
+
+3. **Report Issue**:
+   - Add new issue to `Further Improvement Suggestions.md`
+   - Mark priority and impact scope
 
 ---
 
+## ✅ Test Completion Criteria
 
+After all test items pass:
+- ✅ No data loss
+- ✅ No React warnings
+- ✅ No console errors
+- ✅ Smooth user experience
+- ✅ Friendly error handling
 
+---

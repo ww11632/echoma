@@ -1,190 +1,190 @@
-# Argon2id 升級總結
+# Argon2id Upgrade Summary
 
-## 🎉 升級完成
+## 🎉 Upgrade Complete
 
-本次升級成功將 PBKDF2 密鑰派生函數遷移到 Argon2id（含 WASM 整合與 fallback 設計），大幅提升了系統的抗暴力破解能力，達到現代產品安全標準。
+This upgrade successfully migrated the PBKDF2 key derivation function to Argon2id (including WASM integration and fallback design), significantly improving the system's brute-force resistance and achieving modern product security standards.
 
 ---
 
-## 📊 升級內容
+## 📊 Upgrade Content
 
-### 1. 核心實現
+### 1. Core Implementation
 
-#### 新增功能
-- ✅ **Argon2id WASM 整合**：使用 `hash-wasm` 庫實現高性能 Argon2id
-- ✅ **智能 Fallback 機制**：自動檢測 WASM 可用性，失敗時使用增強 PBKDF2
-- ✅ **向後兼容**：完整支持舊版 PBKDF2 加密數據的解密
-- ✅ **生產就緒**：包含完整的錯誤處理、性能優化和日誌記錄
+#### New Features
+- ✅ **Argon2id WASM Integration**: Uses `hash-wasm` library for high-performance Argon2id
+- ✅ **Smart Fallback Mechanism**: Automatically detects WASM availability, uses enhanced PBKDF2 on failure
+- ✅ **Backward Compatibility**: Full support for decrypting old PBKDF2 encrypted data
+- ✅ **Production-Ready**: Includes complete error handling, performance optimization, and logging
 
-#### 技術參數
+#### Technical Parameters
 
-**Argon2id 參數（OWASP 建議）**
+**Argon2id Parameters (OWASP Recommendations)**
 ```typescript
 {
-  time: 3,           // 3 次迭代（時間成本）
-  mem: 65536,        // 64 MB 記憶體（記憶體成本，以 KB 為單位）
-  parallelism: 4,    // 4 執行緒（並行度）
+  time: 3,           // 3 iterations (time cost)
+  mem: 65536,        // 64 MB memory (memory cost, in KB)
+  parallelism: 4,    // 4 threads (parallelism)
   hashLength: 32     // 256 bits = 32 bytes
 }
 ```
 
-**增強 PBKDF2 Fallback 參數**
+**Enhanced PBKDF2 Fallback Parameters**
 ```typescript
 {
-  iterations: 300000+,  // 300,000+ 次迭代（根據設備性能調整）
-  hash: "SHA-256"      // SHA-256 哈希算法
+  iterations: 300000+,  // 300,000+ iterations (adjusted based on device performance)
+  hash: "SHA-256"      // SHA-256 hash algorithm
 }
 ```
 
-### 2. 修改文件
+### 2. Modified Files
 
-#### 核心實現文件
-- `src/lib/encryption.ts` - 完整重構密鑰派生邏輯
-  - 新增 `testArgon2Availability()` - WASM 可用性檢測
-  - 更新 `deriveKeyArgon2id()` - 實現真正的 Argon2id WASM 派生
-  - 更新 `generateKeyId()` - 支持 Argon2id 的 keyId 生成
-  - 更新 `generateUserKey()` - 支持 Argon2id 密鑰生成
-  - 更新 `generateUserKeyFromId()` - 支持 Argon2id 密鑰生成
-  - 新增 `deriveBitsWithPBKDF2()` - 輔助函數
-  - 更新 `encryptData()` - 默認使用 Argon2id
+#### Core Implementation Files
+- `src/lib/encryption.ts` - Complete refactoring of key derivation logic
+  - Added `testArgon2Availability()` - WASM availability detection
+  - Updated `deriveKeyArgon2id()` - Implements true Argon2id WASM derivation
+  - Updated `generateKeyId()` - Supports Argon2id keyId generation
+  - Updated `generateUserKey()` - Supports Argon2id key generation
+  - Updated `generateUserKeyFromId()` - Supports Argon2id key generation
+  - Added `deriveBitsWithPBKDF2()` - Helper function
+  - Updated `encryptData()` - Default uses Argon2id
 
-#### 文檔文件
-- `Encryption_Mechanism_Guide.md` - 更新加密機制說明
-- `SECURITY_BEST_PRACTICES.md` - 更新安全最佳實務
-- `ARGON2ID_UPGRADE_SUMMARY.md` - 本文檔（升級總結）
+#### Documentation Files
+- `Encryption_Mechanism_Guide.md` - Updated encryption mechanism documentation
+- `SECURITY_BEST_PRACTICES.md` - Updated security best practices
+- `ARGON2ID_UPGRADE_SUMMARY.md` - This document (upgrade summary)
 
-#### 依賴文件
-- `package.json` / `package-lock.json` - 新增 `hash-wasm` 依賴
-
----
-
-## 🔒 安全提升
-
-### 抗攻擊能力對比
-
-| 攻擊類型 | 舊版 PBKDF2 | 新版 Argon2id | 提升幅度 |
-|---------|------------|--------------|---------|
-| CPU 暴力破解 | 高抗性 | 極高抗性 | **+50%** |
-| GPU 加速攻擊 | 中抗性 | 極高抗性 | **+300%** |
-| ASIC 專用硬體攻擊 | 低抗性 | 極高抗性 | **+500%** |
-| 記憶體權衡攻擊 | 無防護 | 高抗性 | **∞** |
-
-### 為什麼 Argon2id 更安全？
-
-1. **記憶體困難（Memory-Hard）**
-   - 需要 64 MB 記憶體才能計算
-   - 無法用少量記憶體加快計算（記憶體權衡攻擊無效）
-   - GPU/ASIC 攻擊成本大幅增加
-
-2. **混合模式（Hybrid）**
-   - 結合 Argon2i（抗 side-channel）和 Argon2d（抗時間權衡）
-   - 提供最佳的整體安全性
-
-3. **可配置性**
-   - 時間成本、記憶體成本、並行度可獨立調整
-   - 未來可根據硬體進步調整參數
-
-4. **業界認可**
-   - 2015 年密碼哈希競賽優勝者
-   - OWASP、NIST 推薦使用
-   - 現代產品標準配置
+#### Dependency Files
+- `package.json` / `package-lock.json` - Added `hash-wasm` dependency
 
 ---
 
-## ⚡ 性能表現
+## 🔒 Security Improvements
 
-### 測試結果（在 Node.js 環境下）
+### Attack Resistance Comparison
 
-**Argon2id 性能**
-- 加密時間：~346ms
-- 解密時間：~174ms
-- 總時間：~520ms
+| Attack Type | Old PBKDF2 | New Argon2id | Improvement |
+|------------|-----------|--------------|-------------|
+| CPU Brute-Force | High Resistance | Very High Resistance | **+50%** |
+| GPU Accelerated Attack | Medium Resistance | Very High Resistance | **+300%** |
+| ASIC Hardware Attack | Low Resistance | Very High Resistance | **+500%** |
+| Memory Trade-Off Attack | No Protection | High Resistance | **∞** |
 
-**PBKDF2 性能（Fallback）**
-- 加密時間：~281ms
-- 解密時間：~140ms
-- 總時間：~421ms
+### Why is Argon2id More Secure?
 
-**性能比較**
-- Argon2id 相對於 PBKDF2：**1.23x**
-- 性能差異在合理範圍內（記憶體困難的安全收益遠大於性能損失）
+1. **Memory-Hard**
+   - Requires 64 MB memory to compute
+   - Cannot speed up computation with less memory (memory trade-off attacks ineffective)
+   - GPU/ASIC attack costs significantly increased
 
-### 性能優化策略
+2. **Hybrid Mode**
+   - Combines Argon2i (resistant to side-channel) and Argon2d (resistant to time trade-offs)
+   - Provides optimal overall security
 
-1. **WASM 可用性緩存**
-   - 首次檢測後緩存結果
-   - 避免重複測試
+3. **Configurability**
+   - Time cost, memory cost, parallelism can be independently adjusted
+   - Can adjust parameters based on hardware advances in the future
 
-2. **智能 Fallback**
-   - WASM 失敗時自動切換到增強 PBKDF2
-   - 無需用戶干預
-
-3. **參數調整建議**
-   - 移動設備：可考慮降低 `mem` 到 32 MB
-   - 高性能服務器：可考慮提升到 128 MB 或更高
+4. **Industry Recognition**
+   - Winner of 2015 Password Hashing Competition
+   - Recommended by OWASP and NIST
+   - Modern product standard configuration
 
 ---
 
-## 🧪 測試驗證
+## ⚡ Performance
 
-### 測試套件
+### Test Results (in Node.js environment)
 
-所有測試通過（5/5）：
+**Argon2id Performance**
+- Encryption time: ~346ms
+- Decryption time: ~174ms
+- Total time: ~520ms
 
-1. ✅ **Argon2id 加密/解密測試**
-   - 正確加密和解密
-   - 正確拒絕錯誤密碼
-   - 驗證 Argon2id 參數
+**PBKDF2 Performance (Fallback)**
+- Encryption time: ~281ms
+- Decryption time: ~140ms
+- Total time: ~421ms
 
-2. ✅ **PBKDF2 Fallback 測試**
-   - Fallback 機制正常工作
-   - PBKDF2 加密/解密正常
+**Performance Comparison**
+- Argon2id relative to PBKDF2: **1.23x**
+- Performance difference is within reasonable range (memory-hard security benefits far outweigh performance cost)
 
-3. ✅ **向後兼容性測試**
-   - 新代碼可解密舊版 PBKDF2 數據
-   - 版本遷移正常
+### Performance Optimization Strategies
 
-4. ✅ **用戶密鑰生成測試**
-   - Argon2id 密鑰生成正常
-   - 確定性生成正確（相同輸入產生相同密鑰）
-   - 從錢包地址和用戶 ID 生成密鑰均正常
+1. **WASM Availability Caching**
+   - Cache result after first detection
+   - Avoid repeated testing
 
-5. ✅ **性能基準測試**
-   - 性能在可接受範圍內
-   - Argon2id 和 PBKDF2 性能對比合理
+2. **Smart Fallback**
+   - Automatically switch to enhanced PBKDF2 when WASM fails
+   - No user intervention required
 
-### 測試日誌
+3. **Parameter Adjustment Recommendations**
+   - Mobile devices: Consider reducing `mem` to 32 MB
+   - High-performance servers: Consider increasing to 128 MB or higher
+
+---
+
+## 🧪 Test Verification
+
+### Test Suite
+
+All tests passed (5/5):
+
+1. ✅ **Argon2id Encryption/Decryption Test**
+   - Correctly encrypts and decrypts
+   - Correctly rejects wrong passwords
+   - Validates Argon2id parameters
+
+2. ✅ **PBKDF2 Fallback Test**
+   - Fallback mechanism works correctly
+   - PBKDF2 encryption/decryption works correctly
+
+3. ✅ **Backward Compatibility Test**
+   - New code can decrypt old PBKDF2 data
+   - Version migration works correctly
+
+4. ✅ **User Key Generation Test**
+   - Argon2id key generation works correctly
+   - Deterministic generation correct (same input produces same key)
+   - Key generation from wallet address and user ID both work correctly
+
+5. ✅ **Performance Benchmark Test**
+   - Performance within acceptable range
+   - Argon2id and PBKDF2 performance comparison reasonable
+
+### Test Logs
 
 ```bash
 ✅ Argon2id WASM initialized successfully
-✅ 加密成功
+✅ Encryption successful
   - KDF: argon2id
-  - 版本: 2
-  - 密文長度: 94
-  - Argon2id 參數: { time: 3, mem: 65536, parallelism: 4 }
-✅ 解密成功，數據一致
-✅ 正確拒絕錯誤密碼
-✅ Argon2id 集成成功，可用於生產環境
+  - Version: 2
+  - Ciphertext length: 94
+  - Argon2id parameters: { time: 3, mem: 65536, parallelism: 4 }
+✅ Decryption successful, data consistent
+✅ Correctly rejects wrong password
+✅ Argon2id integration successful, ready for production
 ```
 
 ---
 
-## 📝 使用指南
+## 📝 Usage Guide
 
-### 基本使用
+### Basic Usage
 
-#### 1. 加密數據（自動使用 Argon2id）
+#### 1. Encrypt Data (Auto-uses Argon2id)
 
 ```typescript
 import { encryptData } from './src/lib/encryption';
 
 const password = 'user_password';
-const data = '敏感數據';
+const data = 'sensitive data';
 
-// 默認使用 Argon2id（自動 fallback 到 PBKDF2）
+// Default uses Argon2id (auto fallback to PBKDF2)
 const encrypted = await encryptData(data, password);
 
-console.log('加密頭:', encrypted.header);
+console.log('Encryption header:', encrypted.header);
 // {
 //   v: 2,
 //   kdf: "argon2id",
@@ -194,136 +194,136 @@ console.log('加密頭:', encrypted.header);
 // }
 ```
 
-#### 2. 解密數據（自動識別 KDF）
+#### 2. Decrypt Data (Auto-detects KDF)
 
 ```typescript
 import { decryptData } from './src/lib/encryption';
 
 const decrypted = await decryptData(encrypted, password);
-console.log('解密數據:', decrypted);
+console.log('Decrypted data:', decrypted);
 ```
 
-#### 3. 生成用戶密鑰（使用 Argon2id）
+#### 3. Generate User Key (Using Argon2id)
 
 ```typescript
 import { generateUserKey, generateUserKeyFromId } from './src/lib/encryption';
 
-// 從錢包地址生成（使用 Argon2id）
+// Generate from wallet address (using Argon2id)
 const key1 = await generateUserKey(
   walletAddress,
   signature,
   userPassword,
-  true  // 使用 Argon2id
+  true  // Use Argon2id
 );
 
-// 從用戶 ID 生成（使用 Argon2id）
+// Generate from user ID (using Argon2id)
 const key2 = await generateUserKeyFromId(
   userId,
   userPassword,
-  true  // 使用 Argon2id
+  true  // Use Argon2id
 );
 ```
 
-#### 4. 向後兼容（使用 PBKDF2）
+#### 4. Backward Compatibility (Using PBKDF2)
 
 ```typescript
-// 顯式使用 PBKDF2（向後兼容或需要更快性能時）
+// Explicitly use PBKDF2 (for backward compatibility or when faster performance needed)
 const encrypted = await encryptData(data, password, 'pbkdf2');
 
-// 或在密鑰生成時使用 PBKDF2
+// Or use PBKDF2 in key generation
 const key = await generateUserKey(
   walletAddress,
   signature,
   userPassword,
-  false  // 使用 PBKDF2
+  false  // Use PBKDF2
 );
 ```
 
-### 自定義參數
+### Custom Parameters
 
 ```typescript
-// 自定義 Argon2id 參數（進階用戶）
+// Custom Argon2id parameters (advanced users)
 const encrypted = await encryptData(
   data,
   password,
   'argon2id',
   {
-    time: 5,        // 增加時間成本
-    mem: 131072,    // 128 MB 記憶體
-    parallelism: 8  // 8 執行緒
+    time: 5,        // Increase time cost
+    mem: 131072,    // 128 MB memory
+    parallelism: 8  // 8 threads
   }
 );
 ```
 
 ---
 
-## 🔄 遷移指南
+## 🔄 Migration Guide
 
-### 現有數據無需遷移
+### Existing Data Requires No Migration
 
-- ✅ 舊版 PBKDF2 加密的數據**無需遷移**
-- ✅ 新代碼**自動識別**並正確解密舊數據
-- ✅ 新加密操作**自動使用** Argon2id
+- ✅ Old PBKDF2 encrypted data **requires no migration**
+- ✅ New code **automatically identifies** and correctly decrypts old data
+- ✅ New encryption operations **automatically use** Argon2id
 
-### 版本識別
+### Version Identification
 
-系統通過加密頭自動識別版本：
+System automatically identifies version through encryption header:
 
 ```typescript
 interface EncryptionHeader {
-  v: number;                  // 版本號
-  kdf: "argon2id" | "pbkdf2"; // KDF 類型
-  kdfParams: KDFParams;       // KDF 參數
+  v: number;                  // Version number
+  kdf: "argon2id" | "pbkdf2"; // KDF type
+  kdfParams: KDFParams;       // KDF parameters
   // ...
 }
 ```
 
-- **v: 1** - 舊版 PBKDF2（自動遷移）
-- **v: 2** - 新版（支持 Argon2id 和 PBKDF2）
+- **v: 1** - Old PBKDF2 (auto-migrated)
+- **v: 2** - New version (supports Argon2id and PBKDF2)
 
 ---
 
-## 🚀 生產環境建議
+## 🚀 Production Environment Recommendations
 
-### 部署前檢查
+### Pre-Deployment Checklist
 
-1. ✅ 確認 `hash-wasm` 依賴已安裝
-2. ✅ 測試 WASM 在目標環境中可正常加載
-3. ✅ 驗證 fallback 機制工作正常
-4. ✅ 進行性能測試（確保符合預期）
+1. ✅ Confirm `hash-wasm` dependency is installed
+2. ✅ Test WASM can load normally in target environment
+3. ✅ Verify fallback mechanism works correctly
+4. ✅ Perform performance testing (ensure meets expectations)
 
-### 監控建議
+### Monitoring Recommendations
 
-1. **記錄 KDF 使用情況**
-   - 監控 Argon2id 使用率
-   - 監控 WASM 失敗率
-   - 追蹤性能指標
+1. **Log KDF Usage**
+   - Monitor Argon2id usage rate
+   - Monitor WASM failure rate
+   - Track performance metrics
 
-2. **用戶反饋**
-   - 收集用戶反饋（性能感知）
-   - 監控錯誤率
-   - 調整參數（如需要）
+2. **User Feedback**
+   - Collect user feedback (performance perception)
+   - Monitor error rates
+   - Adjust parameters (if needed)
 
-### 性能調優
+### Performance Tuning
 
-根據設備類型調整參數：
+Adjust parameters based on device type:
 
 ```typescript
-// 移動設備（記憶體受限）
+// Mobile devices (memory constrained)
 const mobileParams = {
   time: 2,
   mem: 32768,      // 32 MB
   parallelism: 2
 };
 
-// 桌面設備（標準）
+// Desktop devices (standard)
 const desktopParams = {
   time: 3,
   mem: 65536,      // 64 MB
   parallelism: 4
 };
 
-// 服務器（高安全）
+// Servers (high security)
 const serverParams = {
   time: 4,
   mem: 131072,     // 128 MB
@@ -333,67 +333,66 @@ const serverParams = {
 
 ---
 
-## 📚 技術參考
+## 📚 Technical References
 
-### 相關標準和文檔
+### Related Standards and Documentation
 
-- **Argon2id 規範**：[RFC 9106](https://datatracker.ietf.org/doc/html/rfc9106)
-- **OWASP 密碼存儲建議**：[Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)
-- **NIST 數字身份指南**：[SP 800-63B](https://pages.nist.gov/800-63-3/sp800-63b.html)
-- **hash-wasm 文檔**：[GitHub](https://github.com/Daninet/hash-wasm)
+- **Argon2id Specification**: [RFC 9106](https://datatracker.ietf.org/doc/html/rfc9106)
+- **OWASP Password Storage Recommendations**: [Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)
+- **NIST Digital Identity Guidelines**: [SP 800-63B](https://pages.nist.gov/800-63-3/sp800-63b.html)
+- **hash-wasm Documentation**: [GitHub](https://github.com/Daninet/hash-wasm)
 
-### 代碼文件位置
+### Code File Locations
 
-- 核心實現：`src/lib/encryption.ts`
-- 加密機制說明：`Encryption_Mechanism_Guide.md`
-- 安全最佳實務：`SECURITY_BEST_PRACTICES.md`
+- Core implementation: `src/lib/encryption.ts`
+- Encryption mechanism guide: `Encryption_Mechanism_Guide.md`
+- Security best practices: `SECURITY_BEST_PRACTICES.md`
 
 ---
 
-## ✅ 總結
+## ✅ Summary
 
-### 成就解鎖
+### Achievements Unlocked
 
-- ✅ Argon2id WASM 完整集成
-- ✅ 智能 Fallback 機制
-- ✅ 向後兼容保證
-- ✅ 生產就緒（測試全部通過）
-- ✅ 文檔完整更新
+- ✅ Argon2id WASM fully integrated
+- ✅ Smart fallback mechanism
+- ✅ Backward compatibility guarantee
+- ✅ Production-ready (all tests passed)
+- ✅ Documentation fully updated
 
-### 安全等級提升
+### Security Level Improvement
 
 ```
-舊版 PBKDF2    →    新版 Argon2id + Fallback
+Old PBKDF2    →    New Argon2id + Fallback
 -------------------------------------------
-⭐⭐⭐ (良好)   →    ⭐⭐⭐⭐⭐ (卓越)
+⭐⭐⭐ (Good)   →    ⭐⭐⭐⭐⭐ (Excellent)
 
-抗 GPU 攻擊：中  →  極高 (+300%)
-抗 ASIC 攻擊：低 →  極高 (+500%)
-記憶體困難：無  →  是 (64 MB)
+GPU Attack Resistance: Medium → Very High (+300%)
+ASIC Attack Resistance: Low → Very High (+500%)
+Memory-Hard: No → Yes (64 MB)
 ```
 
-### 下一步建議
+### Next Steps Recommendations
 
-1. **用戶體驗增強**
-   - 添加密碼強度檢查
-   - 實現用戶友好的密碼輸入界面
-   - 提供密碼恢復機制
+1. **User Experience Enhancement**
+   - Add password strength checks
+   - Implement user-friendly password input interface
+   - Provide password recovery mechanism
 
-2. **性能優化**
-   - 根據設備類型動態調整 Argon2id 參數
-   - 實現密鑰緩存（安全前提下）
-   - 優化 WASM 加載時機
+2. **Performance Optimization**
+   - Dynamically adjust Argon2id parameters based on device type
+   - Implement key caching (under secure conditions)
+   - Optimize WASM loading timing
 
-3. **監控和分析**
-   - 收集 KDF 使用統計
-   - 監控性能指標
-   - 分析 WASM 可用性
+3. **Monitoring and Analysis**
+   - Collect KDF usage statistics
+   - Monitor performance metrics
+   - Analyze WASM availability
 
 ---
 
-**升級完成時間**：2025-11-21  
-**版本**：v3.0 (Argon2id Integration)  
-**狀態**：✅ 生產就緒
+**Upgrade Completion Time**: 2025-11-21  
+**Version**: v3.0 (Argon2id Integration)  
+**Status**: ✅ Production-Ready
 
-🎉 **恭喜！您的系統現在擁有業界領先的密碼安全保護！**
-
+🎉 **Congratulations! Your system now has industry-leading password security protection!**

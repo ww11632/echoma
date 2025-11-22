@@ -1,45 +1,45 @@
-# Walrus 使用指南
+# Walrus Setup Guide
 
-## 问题诊断
+## Problem Diagnosis
 
-当前项目尝试直接使用 HTTP API 调用 Walrus 服务，但端点 `https://upload-relay.testnet.walrus.space` 返回 404 错误。
+The current project attempts to directly use HTTP API calls to Walrus service, but the endpoint `https://upload-relay.testnet.walrus.space` returns 404 error.
 
-## 解决方案：使用 @mysten/walrus SDK
+## Solution: Use @mysten/walrus SDK
 
-项目已经安装了 `@mysten/walrus` SDK，但代码中并未使用它。应该使用 SDK 而不是直接调用 HTTP API。
+The project has installed the `@mysten/walrus` SDK, but it's not being used in the code. Should use SDK instead of directly calling HTTP API.
 
-## 使用步骤
+## Usage Steps
 
-### 1. 检查 Walrus 服务状态
+### 1. Check Walrus Service Status
 
-首先，确认 Walrus testnet 服务是否可用：
+First, confirm if Walrus testnet service is available:
 
 ```bash
-# 检查 upload relay 端点
+# Check upload relay endpoint
 curl https://upload-relay.testnet.walrus.space/v1/tip-config
 
-# 检查 aggregator 端点
+# Check aggregator endpoint
 curl https://aggregator.testnet.walrus.space/v1/health
 ```
 
-如果这些端点都返回 404，说明：
-- Walrus testnet 服务可能暂时不可用
-- 或者端点地址已更改
-- 或者需要使用不同的网络（mainnet）
+If these endpoints return 404, it means:
+- Walrus testnet service may be temporarily unavailable
+- Or endpoint address has changed
+- Or need to use different network (mainnet)
 
-### 2. 使用 @mysten/walrus SDK（推荐方式）
+### 2. Use @mysten/walrus SDK (Recommended)
 
-SDK 提供了两种方式：
+The SDK provides two methods:
 
-#### 方式 A：使用 Upload Relay（推荐，更简单）
+#### Method A: Use Upload Relay (Recommended, Simpler)
 
-Upload Relay 会处理大部分上传工作，减少客户端请求数量。
+Upload Relay handles most upload work, reducing client requests.
 
 ```typescript
 import { getFullnodeUrl, SuiJsonRpcClient } from '@mysten/sui/jsonRpc';
 import { walrus } from '@mysten/walrus';
 
-// 创建客户端并扩展 Walrus 功能
+// Create client and extend with Walrus functionality
 const client = new SuiJsonRpcClient({
   url: getFullnodeUrl('testnet'),
   network: 'testnet',
@@ -48,24 +48,24 @@ const client = new SuiJsonRpcClient({
     uploadRelay: {
       host: 'https://upload-relay.testnet.walrus.space',
       sendTip: {
-        max: 1_000, // 最大 tip（MIST）
+        max: 1_000, // Maximum tip (MIST)
       },
     },
   }),
 );
 
-// 上传数据
+// Upload data
 const { blobId } = await client.walrus.writeBlob({
   blob: new TextEncoder().encode(encryptedData),
   deletable: false,
   epochs: 5,
-  signer: keypair, // 需要 Sui 钱包签名
+  signer: keypair, // Requires Sui wallet signature
 });
 ```
 
-#### 方式 B：直接写入（需要很多请求，约 2200 个）
+#### Method B: Direct Write (Requires many requests, ~2200)
 
-如果 upload relay 不可用，可以直接写入，但需要更多请求：
+If upload relay is unavailable, can write directly, but requires more requests:
 
 ```typescript
 const client = new SuiJsonRpcClient({
@@ -81,40 +81,40 @@ const { blobId } = await client.walrus.writeBlob({
 });
 ```
 
-### 3. 当前项目的限制
+### 3. Current Project Limitations
 
-**重要**：使用 Walrus SDK 需要：
-1. **Sui 钱包签名**：上传需要钱包签名和支付 gas 费用
-2. **WAL 代币**：需要 WAL 代币来支付存储费用
-3. **SUI 代币**：需要 SUI 来支付交易费用
+**Important**: Using Walrus SDK requires:
+1. **Sui Wallet Signature**: Upload requires wallet signature and gas fee payment
+2. **WAL Tokens**: Need WAL tokens to pay storage fees
+3. **SUI Tokens**: Need SUI to pay transaction fees
 
-### 4. 临时解决方案
+### 4. Temporary Solution
 
-如果 Walrus 服务不可用，当前代码已经实现了备用方案：
-- 数据会保存到本地文件 (`server/data/emotions.json`)
-- 应用功能不受影响
-- 当 Walrus 服务恢复后，可以重新上传数据
+If Walrus service is unavailable, current code has implemented a fallback:
+- Data will be saved to local file (`server/data/emotions.json`)
+- Application functionality is unaffected
+- When Walrus service recovers, can re-upload data
 
-### 5. 检查服务状态
+### 5. Check Service Status
 
-运行以下命令检查服务：
+Run the following commands to check service:
 
 ```bash
-# 检查 upload relay
+# Check upload relay
 curl -v https://upload-relay.testnet.walrus.space/v1/tip-config
 
-# 检查 aggregator
+# Check aggregator
 curl -v https://aggregator.testnet.walrus.space/v1/health
 
-# 如果都返回 404，可能需要：
-# 1. 等待服务恢复
-# 2. 使用 mainnet 而不是 testnet
-# 3. 检查是否有新的端点地址
+# If both return 404, may need to:
+# 1. Wait for service recovery
+# 2. Use mainnet instead of testnet
+# 3. Check if there are new endpoint addresses
 ```
 
-### 6. 使用 Mainnet（如果 testnet 不可用）
+### 6. Use Mainnet (If testnet unavailable)
 
-如果 testnet 不可用，可以切换到 mainnet：
+If testnet is unavailable, can switch to mainnet:
 
 ```typescript
 const client = new SuiJsonRpcClient({
@@ -123,7 +123,7 @@ const client = new SuiJsonRpcClient({
 }).$extend(
   walrus({
     uploadRelay: {
-      host: 'https://upload-relay.mainnet.walrus.space', // 如果存在
+      host: 'https://upload-relay.mainnet.walrus.space', // If exists
       sendTip: {
         max: 1_000,
       },
@@ -132,16 +132,15 @@ const client = new SuiJsonRpcClient({
 );
 ```
 
-## 下一步行动
+## Next Steps
 
-1. **检查服务状态**：运行上面的 curl 命令检查端点
-2. **如果服务可用**：更新代码使用 @mysten/walrus SDK
-3. **如果服务不可用**：继续使用当前的本地存储备用方案
-4. **监控服务状态**：关注 Walrus 官方文档或 Discord 获取服务状态更新
+1. **Check Service Status**: Run the curl commands above to check endpoints
+2. **If Service Available**: Update code to use @mysten/walrus SDK
+3. **If Service Unavailable**: Continue using current local storage fallback
+4. **Monitor Service Status**: Follow Walrus official documentation or Discord for service status updates
 
-## 相关资源
+## Related Resources
 
-- [@mysten/walrus 文档](https://github.com/MystenLabs/ts-sdks/tree/main/packages/walrus)
-- [Walrus 官方文档](https://docs.walrus.space/)
-- [Sui 网络配置](https://docs.sui.io/guides/developer/getting-started/get-coins)
-
+- [@mysten/walrus Documentation](https://github.com/MystenLabs/ts-sdks/tree/main/packages/walrus)
+- [Walrus Official Documentation](https://docs.walrus.space/)
+- [Sui Network Configuration](https://docs.sui.io/guides/developer/getting-started/get-coins)

@@ -1,88 +1,87 @@
-# Argon2id 快速入門
+# Argon2id Quick Start
 
-## 🚀 立即開始使用
+## 🚀 Get Started Immediately
 
-### 基本使用（自動使用 Argon2id）
+### Basic Usage (Auto-uses Argon2id)
 
 ```typescript
 import { encryptData, decryptData } from './src/lib/encryption';
 
-// 加密（自動使用 Argon2id，失敗時 fallback 到增強 PBKDF2）
-const encrypted = await encryptData('敏感數據', 'password');
+// Encrypt (auto-uses Argon2id, falls back to enhanced PBKDF2 on failure)
+const encrypted = await encryptData('sensitive data', 'password');
 
-// 解密（自動識別 KDF 類型）
+// Decrypt (auto-detects KDF type)
 const decrypted = await decryptData(encrypted, 'password');
 ```
 
-就這麼簡單！✨
+That's it! ✨
 
 ---
 
-## 🔒 安全特性
+## 🔒 Security Features
 
-- ✅ **記憶體困難**：64 MB 記憶體需求，抗 GPU/ASIC 攻擊
-- ✅ **智能 Fallback**：WASM 不可用時自動使用增強 PBKDF2
-- ✅ **向後兼容**：自動支持舊版 PBKDF2 數據解密
-- ✅ **生產就緒**：所有測試通過 ✅✅✅✅✅
+- ✅ **Memory-Hard**: 64 MB memory requirement, resistant to GPU/ASIC attacks
+- ✅ **Smart Fallback**: Auto-uses enhanced PBKDF2 when WASM unavailable
+- ✅ **Backward Compatible**: Automatically supports decryption of old PBKDF2 data
+- ✅ **Production-Ready**: All tests passed ✅✅✅✅✅
 
 ---
 
-## 📊 與舊版對比
+## 📊 Comparison with Old Version
 
-| 項目 | 舊版 PBKDF2 | 新版 Argon2id |
+| Item | Old PBKDF2 | New Argon2id |
 |-----|-----------|--------------|
-| 抗 GPU 攻擊 | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ (+300%) |
-| 抗 ASIC 攻擊 | ⭐⭐ | ⭐⭐⭐⭐⭐ (+500%) |
-| 記憶體困難 | ❌ | ✅ (64 MB) |
-| 性能 | ~421ms | ~520ms (1.23x) |
+| GPU Attack Resistance | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ (+300%) |
+| ASIC Attack Resistance | ⭐⭐ | ⭐⭐⭐⭐⭐ (+500%) |
+| Memory-Hard | ❌ | ✅ (64 MB) |
+| Performance | ~421ms | ~520ms (1.23x) |
 
-**結論**：安全性大幅提升，性能損失可接受 🎯
-
----
-
-## 🎯 已完成的升級
-
-1. ✅ 安裝 `hash-wasm` 庫
-2. ✅ 實現 Argon2id WASM 密鑰派生
-3. ✅ 添加智能 Fallback 機制
-4. ✅ 更新所有密鑰生成函數
-5. ✅ 更新完整文檔
-6. ✅ 測試全部通過（5/5）
+**Conclusion**: Security significantly improved, acceptable performance cost 🎯
 
 ---
 
-## 📚 詳細文檔
+## 🎯 Completed Upgrades
 
-- **完整升級報告**：`ARGON2ID_UPGRADE_SUMMARY.md`
-- **加密機制說明**：`Encryption_Mechanism_Guide.md`
-- **安全最佳實務**：`SECURITY_BEST_PRACTICES.md`
+1. ✅ Installed `hash-wasm` library
+2. ✅ Implemented Argon2id WASM key derivation
+3. ✅ Added smart fallback mechanism
+4. ✅ Updated all key generation functions
+5. ✅ Updated complete documentation
+6. ✅ All tests passed (5/5)
 
 ---
 
-## ⚡ 性能測試結果
+## 📚 Detailed Documentation
+
+- **Complete Upgrade Report**: `ARGON2ID_UPGRADE_SUMMARY.md`
+- **Encryption Mechanism Guide**: `Encryption_Mechanism_Guide.md`
+- **Security Best Practices**: `SECURITY_BEST_PRACTICES.md`
+
+---
+
+## ⚡ Performance Test Results
 
 ```bash
-✅ Argon2id 性能:
-  - 加密時間: 346.07ms
-  - 解密時間: 173.60ms
-  - 總時間: 519.66ms
+✅ Argon2id Performance:
+  - Encryption time: 346.07ms
+  - Decryption time: 173.60ms
+  - Total time: 519.66ms
 
-✅ PBKDF2 性能 (Fallback):
-  - 加密時間: 281.31ms
-  - 解密時間: 139.99ms
-  - 總時間: 421.30ms
+✅ PBKDF2 Performance (Fallback):
+  - Encryption time: 281.31ms
+  - Decryption time: 139.99ms
+  - Total time: 421.30ms
 
-🎉 所有測試通過！(5/5)
-✅ Argon2id 集成成功，可用於生產環境
+🎉 All tests passed! (5/5)
+✅ Argon2id integration successful, ready for production
 ```
 
 ---
 
-## 🎉 恭喜！
+## 🎉 Congratulations!
 
-您的系統現已升級到 **業界領先的密碼安全標準**！
+Your system has been upgraded to **industry-leading password security standards**!
 
-**升級時間**：2025-11-21  
-**版本**：v3.0 (Argon2id Integration)  
-**狀態**：✅ 生產就緒
-
+**Upgrade Date**: 2025-11-21  
+**Version**: v3.0 (Argon2id Integration)  
+**Status**: ✅ Production-Ready

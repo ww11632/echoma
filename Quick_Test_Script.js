@@ -1,21 +1,21 @@
 /**
- * 快速测试脚本 - 在浏览器 Console 中运行
+ * Quick Test Script - Run in Browser Console
  * 
- * 使用方法：
- * 1. 打开应用（http://localhost:5173）
- * 2. 打开浏览器开发者工具（F12）
- * 3. 进入 Console 标签
- * 4. 复制并粘贴此脚本
- * 5. 按 Enter 执行
+ * Usage:
+ * 1. Open application (http://localhost:5173)
+ * 2. Open browser developer tools (F12)
+ * 3. Go to Console tab
+ * 4. Copy and paste this script
+ * 5. Press Enter to execute
  */
 
-console.log('🧪 开始功能测试...\n');
+console.log('🧪 Starting functional tests...\n');
 
 // ============================================
-// 测试 1: 时间戳格式检查
+// Test 1: Timestamp Format Check
 // ============================================
 function testTimestampFormat() {
-  console.log('📅 测试 1: 时间戳格式检查');
+  console.log('📅 Test 1: Timestamp Format Check');
   
   const keys = [
     'echoma_encrypted_mvp_records',
@@ -31,10 +31,10 @@ function testTimestampFormat() {
       try {
         let records;
         if (key.includes('encrypted')) {
-          // 加密数据需要解密，这里只检查结构
+          // Encrypted data needs decryption, only check structure here
           const parsed = JSON.parse(data);
           if (parsed.data && parsed.iv) {
-            console.log(`  ✅ ${key}: 加密数据存在`);
+            console.log(`  ✅ ${key}: Encrypted data exists`);
             foundRecords = true;
             continue;
           }
@@ -45,54 +45,54 @@ function testTimestampFormat() {
           if (record.timestamp) {
             const isISOString = typeof record.timestamp === 'string' && 
                               record.timestamp.includes('T');
-            console.log(`  ${isISOString ? '✅' : '❌'} ${key}: 时间戳格式 ${isISOString ? '正确' : '错误'}`);
-            console.log(`     示例: ${record.timestamp}`);
+            console.log(`  ${isISOString ? '✅' : '❌'} ${key}: Timestamp format ${isISOString ? 'correct' : 'incorrect'}`);
+            console.log(`     Example: ${record.timestamp}`);
             foundRecords = true;
           }
         }
       } catch (e) {
-        console.log(`  ⚠️ ${key}: 解析失败`, e.message);
+        console.log(`  ⚠️ ${key}: Parse failed`, e.message);
       }
     }
   }
   
   if (!foundRecords) {
-    console.log('  ⚠️ 未找到记录，请先创建一些记录');
+    console.log('  ⚠️ No records found, please create some records first');
   }
   
   console.log('');
 }
 
 // ============================================
-// 测试 2: 存储分离检查
+// Test 2: Storage Separation Check
 // ============================================
 function testStorageSeparation() {
-  console.log('🔐 测试 2: 存储分离检查');
+  console.log('🔐 Test 2: Storage Separation Check');
   
   const publicData = localStorage.getItem('echoma_encrypted_public_records');
   const privateData = localStorage.getItem('echoma_encrypted_mvp_records');
   const plainData = localStorage.getItem('echoma_mvp_records');
   
-  console.log(`  公开记录存储: ${publicData ? '✅ 存在' : '❌ 不存在'}`);
-  console.log(`  私密记录存储: ${privateData ? '✅ 存在' : '❌ 不存在'}`);
-  console.log(`  明文记录存储: ${plainData ? '⚠️ 存在（向后兼容）' : '✅ 不存在（已加密）'}`);
+  console.log(`  Public records storage: ${publicData ? '✅ Exists' : '❌ Does not exist'}`);
+  console.log(`  Private records storage: ${privateData ? '✅ Exists' : '❌ Does not exist'}`);
+  console.log(`  Plaintext records storage: ${plainData ? '⚠️ Exists (backward compatible)' : '✅ Does not exist (encrypted)'}`);
   
   if (publicData && privateData) {
-    console.log('  ✅ 公开和私密记录正确分离存储');
+    console.log('  ✅ Public and private records correctly separated in storage');
   } else if (publicData || privateData) {
-    console.log('  ⚠️ 只有一种类型的记录');
+    console.log('  ⚠️ Only one type of record exists');
   } else {
-    console.log('  ⚠️ 未找到加密记录');
+    console.log('  ⚠️ No encrypted records found');
   }
   
   console.log('');
 }
 
 // ============================================
-// 测试 3: 记录完整性检查
+// Test 3: Record Integrity Check
 // ============================================
 function testRecordIntegrity() {
-  console.log('📋 测试 3: 记录完整性检查');
+  console.log('📋 Test 3: Record Integrity Check');
   
   const keys = [
     'echoma_encrypted_mvp_records',
@@ -110,7 +110,7 @@ function testRecordIntegrity() {
       try {
         let records;
         if (key.includes('encrypted')) {
-          // 跳过加密数据的详细检查（需要解密）
+          // Skip detailed check for encrypted data (needs decryption)
           continue;
         }
         records = JSON.parse(data);
@@ -126,30 +126,30 @@ function testRecordIntegrity() {
           });
         }
       } catch (e) {
-        // 忽略解析错误
+        // Ignore parse errors
       }
     }
   }
   
-  console.log(`  总记录数: ${totalRecords}`);
-  console.log(`  有强度值的记录: ${recordsWithIntensity}/${totalRecords}`);
-  console.log(`  有标签的记录: ${recordsWithTags}/${totalRecords}`);
+  console.log(`  Total records: ${totalRecords}`);
+  console.log(`  Records with intensity: ${recordsWithIntensity}/${totalRecords}`);
+  console.log(`  Records with tags: ${recordsWithTags}/${totalRecords}`);
   
   if (totalRecords > 0) {
     const integrity = (recordsWithIntensity / totalRecords) * 100;
-    console.log(`  ${integrity === 100 ? '✅' : '⚠️'} 完整性: ${integrity.toFixed(1)}%`);
+    console.log(`  ${integrity === 100 ? '✅' : '⚠️'} Integrity: ${integrity.toFixed(1)}%`);
   } else {
-    console.log('  ⚠️ 未找到记录');
+    console.log('  ⚠️ No records found');
   }
   
   console.log('');
 }
 
 // ============================================
-// 测试 4: localStorage 键检查
+// Test 4: localStorage Key Check
 // ============================================
 function testLocalStorageKeys() {
-  console.log('🗝️ 测试 4: localStorage 键检查');
+  console.log('🗝️ Test 4: localStorage Key Check');
   
   const expectedKeys = [
     'echoma_encrypted_mvp_records',
@@ -160,7 +160,7 @@ function testLocalStorageKeys() {
   const allKeys = Object.keys(localStorage);
   const echomaKeys = allKeys.filter(key => key.startsWith('echoma'));
   
-  console.log(`  找到的 echoma 相关键: ${echomaKeys.length}`);
+  console.log(`  Found echoma-related keys: ${echomaKeys.length}`);
   echomaKeys.forEach(key => {
     const size = (localStorage.getItem(key)?.length || 0) / 1024;
     console.log(`    - ${key}: ${size.toFixed(2)} KB`);
@@ -175,10 +175,10 @@ function testLocalStorageKeys() {
 }
 
 // ============================================
-// 测试 5: 重复 ID 检查
+// Test 5: Duplicate ID Check
 // ============================================
 function testDuplicateIds() {
-  console.log('🔄 测试 5: 重复 ID 检查');
+  console.log('🔄 Test 5: Duplicate ID Check');
   
   const keys = [
     'echoma_encrypted_mvp_records',
@@ -194,7 +194,7 @@ function testDuplicateIds() {
       try {
         let records;
         if (key.includes('encrypted')) {
-          // 跳过加密数据
+          // Skip encrypted data
           continue;
         }
         records = JSON.parse(data);
@@ -206,7 +206,7 @@ function testDuplicateIds() {
           });
         }
       } catch (e) {
-        // 忽略解析错误
+        // Ignore parse errors
       }
     }
   }
@@ -214,9 +214,9 @@ function testDuplicateIds() {
   const uniqueIds = new Set(allIds);
   const duplicates = allIds.length - uniqueIds.size;
   
-  console.log(`  总记录数: ${allIds.length}`);
-  console.log(`  唯一 ID 数: ${uniqueIds.size}`);
-  console.log(`  ${duplicates === 0 ? '✅' : '❌'} 重复 ID: ${duplicates}`);
+  console.log(`  Total records: ${allIds.length}`);
+  console.log(`  Unique IDs: ${uniqueIds.size}`);
+  console.log(`  ${duplicates === 0 ? '✅' : '❌'} Duplicate IDs: ${duplicates}`);
   
   if (duplicates > 0) {
     const idCounts = {};
@@ -226,18 +226,18 @@ function testDuplicateIds() {
     const dupIds = Object.entries(idCounts)
       .filter(([_, count]) => count > 1)
       .map(([id, _]) => id);
-    console.log(`  重复的 ID: ${dupIds.slice(0, 5).join(', ')}${dupIds.length > 5 ? '...' : ''}`);
+    console.log(`  Duplicate IDs: ${dupIds.slice(0, 5).join(', ')}${dupIds.length > 5 ? '...' : ''}`);
   }
   
   console.log('');
 }
 
 // ============================================
-// 运行所有测试
+// Run All Tests
 // ============================================
 function runAllTests() {
   console.log('═══════════════════════════════════════');
-  console.log('  功能修复验证测试');
+  console.log('  Functional Fix Verification Tests');
   console.log('═══════════════════════════════════════\n');
   
   testTimestampFormat();
@@ -247,24 +247,22 @@ function runAllTests() {
   testDuplicateIds();
   
   console.log('═══════════════════════════════════════');
-  console.log('✅ 测试完成！');
+  console.log('✅ Tests complete!');
   console.log('═══════════════════════════════════════');
-  console.log('\n💡 提示:');
-  console.log('  - 如果看到 ❌，表示发现问题');
-  console.log('  - 如果看到 ⚠️，表示需要注意');
-  console.log('  - 如果看到 ✅，表示测试通过');
-  console.log('\n📝 详细测试步骤请查看: Functional_Test_Guide.md');
+  console.log('\n💡 Tips:');
+  console.log('  - If you see ❌, an issue was found');
+  console.log('  - If you see ⚠️, attention is needed');
+  console.log('  - If you see ✅, test passed');
+  console.log('\n📝 For detailed test steps, see: Functional_Test_Guide.md');
 }
 
-// 自动运行测试
+// Auto-run tests
 runAllTests();
 
-// 导出函数供手动调用
+// Export functions for manual calling
 window.testTimestampFormat = testTimestampFormat;
 window.testStorageSeparation = testStorageSeparation;
 window.testRecordIntegrity = testRecordIntegrity;
 window.testLocalStorageKeys = testLocalStorageKeys;
 window.testDuplicateIds = testDuplicateIds;
 window.runAllTests = runAllTests;
-
-

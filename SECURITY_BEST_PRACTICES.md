@@ -1,193 +1,192 @@
-# 加密安全最佳實務檢查報告
+# Encryption Security Best Practices Audit Report
 
-## ✅ 已符合的最佳實務
+## ✅ Best Practices Already Implemented
 
-### 1. **加密算法選擇**
-- ✅ 使用 **AES-GCM 256位**（業界標準，提供加密和認證）
-- ✅ IV 長度 = 12 bytes（AES-GCM 要求）
-- ✅ 每次加密使用唯一的隨機 IV（防止 IV 重用攻擊）
+### 1. **Encryption Algorithm Selection**
+- ✅ Uses **AES-GCM 256-bit** (industry standard, provides encryption and authentication)
+- ✅ IV length = 12 bytes (AES-GCM requirement)
+- ✅ Each encryption uses unique random IV (prevents IV reuse attacks)
 
-### 2. **密鑰派生（KDF）**
-- ✅ **優先使用 Argon2id**（記憶體困難，抗 GPU/ASIC 攻擊）
-  - 時間成本：3 次迭代
-  - 記憶體成本：64 MB (65536 KB)
-  - 並行度：4 執行緒
-- ✅ **自動 Fallback 到增強 PBKDF2**（若 WASM 不可用）
-  - 迭代次數：300k - 1M（根據設備性能自適應）
-  - 使用 SHA-256 哈希算法
-- ✅ 完整的 WASM 整合與 fallback 設計
+### 2. **Key Derivation (KDF)**
+- ✅ **Prioritize Argon2id** (memory-hard, resistant to GPU/ASIC attacks)
+  - Time cost: 3 iterations
+  - Memory cost: 64 MB (65536 KB)
+  - Parallelism: 4 threads
+- ✅ **Automatic Fallback to Enhanced PBKDF2** (if WASM unavailable)
+  - Iterations: 300k - 1M (auto-adjusted based on device performance)
+  - Uses SHA-256 hash algorithm
+- ✅ Complete WASM integration with fallback design
 
-### 3. **Salt 管理**
-- ✅ 加密時使用隨機 salt（≥16 bytes）
-- ✅ 每次加密使用唯一的 salt
-- ✅ 密鑰生成使用確定性 salt（基於應用+用戶標識）
-- ✅ Salt 存儲在加密頭中，支持解密
+### 3. **Salt Management**
+- ✅ Uses random salt for encryption (≥16 bytes)
+- ✅ Each encryption uses unique salt
+- ✅ Key generation uses deterministic salt (based on application + user identifier)
+- ✅ Salt stored in encryption header, supports decryption
 
-### 4. **IV/Nonce 管理**
-- ✅ 每次加密生成新的隨機 IV
-- ✅ IV 長度嚴格驗證（12 bytes）
-- ✅ IV 存儲在加密頭中
+### 4. **IV/Nonce Management**
+- ✅ Each encryption generates new random IV
+- ✅ IV length strictly validated (12 bytes)
+- ✅ IV stored in encryption header
 
-### 5. **版本化和向後兼容**
-- ✅ 版本化加密頭（支持未來算法升級）
-- ✅ 自動遷移舊格式數據
-- ✅ 清晰的版本號管理
+### 5. **Versioning and Backward Compatibility**
+- ✅ Versioned encryption header (supports future algorithm upgrades)
+- ✅ Automatic migration of old format data
+- ✅ Clear version number management
 
-### 6. **錯誤處理**
-- ✅ 明確的錯誤分類（密鑰錯誤、數據損壞等）
-- ✅ AES-GCM 認證標籤嚴格驗證
-- ✅ 用戶友好的錯誤提示
-- ✅ 不洩露敏感信息（如密鑰內容）
+### 6. **Error Handling**
+- ✅ Clear error classification (key errors, data corruption, etc.)
+- ✅ AES-GCM authentication tag strictly validated
+- ✅ User-friendly error messages
+- ✅ Does not leak sensitive information (such as key content)
 
-### 7. **密鑰管理**
-- ✅ 警告基於低熵源（地址/ID）生成密鑰的風險
-- ✅ 支持用戶密碼/短語輸入（推薦）
-- ✅ 確定性密鑰生成（相同輸入產生相同密鑰）
+### 7. **Key Management**
+- ✅ Warns about risks of generating keys from low-entropy sources (address/ID)
+- ✅ Supports user password/passphrase input (recommended)
+- ✅ Deterministic key generation (same input produces same key)
 
-### 8. **代碼質量**
-- ✅ TypeScript 類型安全
-- ✅ 清晰的註釋和文檔
-- ✅ 輸入驗證（密碼非空、格式檢查等）
+### 8. **Code Quality**
+- ✅ TypeScript type safety
+- ✅ Clear comments and documentation
+- ✅ Input validation (password non-empty, format checks, etc.)
 
-## ⚠️ 需要注意的改進點
+## ⚠️ Areas for Improvement
 
-### 1. **密鑰生成安全性**（已修復）
-- ✅ **已修復**：密鑰生成現在使用確定性 salt
-- ⚠️ **建議**：未來應要求用戶輸入密碼/短語，而不是僅依賴地址/ID
+### 1. **Key Generation Security** (Fixed)
+- ✅ **Fixed**: Key generation now uses deterministic salt
+- ⚠️ **Recommendation**: Future should require user password/passphrase input, not just rely on address/ID
 
-### 2. **Argon2id 集成**（✅ 已完成）
-- ✅ **當前狀態**：已完整集成 Argon2id WASM（使用 hash-wasm 庫）
-- ✅ **智能 Fallback**：自動檢測 WASM 可用性，失敗時使用增強 PBKDF2
-- ✅ **生產就緒**：包含完整的錯誤處理和性能優化
-- ✅ **安全參數**：遵循 OWASP 建議（3 次迭代 × 64 MB × 4 執行緒）
+### 2. **Argon2id Integration** (✅ Completed)
+- ✅ **Current status**: Fully integrated Argon2id WASM (using hash-wasm library)
+- ✅ **Smart Fallback**: Automatically detects WASM availability, uses enhanced PBKDF2 on failure
+- ✅ **Production-ready**: Includes complete error handling and performance optimization
+- ✅ **Security parameters**: Follows OWASP recommendations (3 iterations × 64 MB × 4 threads)
 
-### 3. **常量時間操作**（低優先級）
-- ℹ️ **說明**：Web Crypto API 的實現通常是常量時間的
-- ⚠️ **注意**：如果未來需要手動實現比較函數，應使用常量時間比較
+### 3. **Constant-Time Operations** (Low Priority)
+- ℹ️ **Note**: Web Crypto API implementations are usually constant-time
+- ⚠️ **Attention**: If manual comparison functions are needed in the future, should use constant-time comparison
 
-### 4. **密鑰存儲**（應用層考慮）
-- ⚠️ **建議**：考慮實現密鑰備份和恢復機制
-- ⚠️ **建議**：考慮多設備同步方案（需要安全的密鑰共享）
+### 4. **Key Storage** (Application Layer Consideration)
+- ⚠️ **Recommendation**: Consider implementing key backup and recovery mechanisms
+- ⚠️ **Recommendation**: Consider multi-device sync solutions (requires secure key sharing)
 
-### 5. **密碼強度要求**（未來增強）
-- ⚠️ **建議**：如果實現用戶密碼輸入，應添加密碼強度檢查
-- ⚠️ **建議**：考慮實現密碼複雜度要求
+### 5. **Password Strength Requirements** (Future Enhancement)
+- ⚠️ **Recommendation**: If user password input is implemented, should add password strength checks
+- ⚠️ **Recommendation**: Consider implementing password complexity requirements
 
-## 🔒 安全特性總結
+## 🔒 Security Features Summary
 
-### 已實現的核心安全措施
+### Core Security Measures Implemented
 
-1. **客戶端加密**
-   - 數據在離開設備前已加密
-   - 服務器無法看到明文
+1. **Client-Side Encryption**
+   - Data encrypted before leaving device
+   - Server cannot see plaintext
 
-2. **強密鑰派生**
-   - PBKDF2 自適應迭代次數（100k-1M）
-   - 支持 Argon2id（預留接口）
+2. **Strong Key Derivation**
+   - PBKDF2 adaptive iterations (100k-1M)
+   - Supports Argon2id (interface reserved)
 
-3. **唯一性保證**
-   - 每次加密使用唯一的隨機 salt 和 IV
-   - 相同內容加密後結果不同
+3. **Uniqueness Guarantee**
+   - Each encryption uses unique random salt and IV
+   - Same content produces different encrypted results
 
-4. **完整性驗證**
-   - AES-GCM 自動驗證認證標籤
-   - 檢測數據篡改
+4. **Integrity Verification**
+   - AES-GCM automatically verifies authentication tag
+   - Detects data tampering
 
-5. **向後兼容**
-   - 版本化加密頭
-   - 自動遷移舊格式
+5. **Backward Compatibility**
+   - Versioned encryption header
+   - Automatic migration of old formats
 
-## 📊 與業界標準對比
+## 📊 Comparison with Industry Standards
 
-| 安全要求 | 我們的實現 | 業界標準 | 狀態 |
-|---------|----------|---------|------|
-| 加密算法 | AES-GCM 256 | AES-GCM 256 | ✅ 符合 |
-| IV 長度 | 12 bytes | 12 bytes | ✅ 符合 |
-| Salt 長度 | ≥16 bytes | ≥16 bytes | ✅ 符合 |
-| KDF (主要) | Argon2id (3×64MB×4) | Argon2id 推薦 | ✅ 符合 |
-| KDF (Fallback) | PBKDF2 (300k-1M) | PBKDF2 ≥100k | ✅ 超出標準 |
-| IV 重用 | 每次隨機生成 | 禁止重用 | ✅ 符合 |
-| Salt 重用 | 每次隨機生成 | 禁止重用 | ✅ 符合 |
-| 密鑰派生 | 確定性（基於用戶標識） | 確定性 | ✅ 符合 |
-| 錯誤處理 | 明確分類 | 不洩露敏感信息 | ✅ 符合 |
-| 版本化 | 支持 | 推薦 | ✅ 符合 |
-| 內存硬 KDF | Argon2id + Fallback | 推薦 | ✅ 已實現 |
+| Security Requirement | Our Implementation | Industry Standard | Status |
+|---------------------|-------------------|------------------|--------|
+| Encryption Algorithm | AES-GCM 256 | AES-GCM 256 | ✅ Compliant |
+| IV Length | 12 bytes | 12 bytes | ✅ Compliant |
+| Salt Length | ≥16 bytes | ≥16 bytes | ✅ Compliant |
+| KDF (Primary) | Argon2id (3×64MB×4) | Argon2id Recommended | ✅ Compliant |
+| KDF (Fallback) | PBKDF2 (300k-1M) | PBKDF2 ≥100k | ✅ Exceeds Standard |
+| IV Reuse | Random generation each time | Reuse prohibited | ✅ Compliant |
+| Salt Reuse | Random generation each time | Reuse prohibited | ✅ Compliant |
+| Key Derivation | Deterministic (based on user ID) | Deterministic | ✅ Compliant |
+| Error Handling | Clear classification | No sensitive info leakage | ✅ Compliant |
+| Versioning | Supported | Recommended | ✅ Compliant |
+| Memory-Hard KDF | Argon2id + Fallback | Recommended | ✅ Implemented |
 
-## 🎯 總體評估
+## 🎯 Overall Assessment
 
-### 設計原則對齊情況
+### Design Principle Alignment
 
-我們的實現**對齊**業界最佳實務：
+Our implementation **aligns** with industry best practices:
 
-1. ✅ **核心加密機制**：設計原則對齊 NIST 和 OWASP 建議
-2. ✅ **密鑰管理**：使用確定性密鑰派生，支持解密
-3. ✅ **錯誤處理**：完善的錯誤分類和用戶提示
-4. ✅ **向後兼容**：版本化設計支持未來升級
-5. ✅ **Argon2id**：已完整集成 WASM 實現，含智能 fallback 機制
+1. ✅ **Core Encryption Mechanism**: Design principles align with NIST and OWASP recommendations
+2. ✅ **Key Management**: Uses deterministic key derivation, supports decryption
+3. ✅ **Error Handling**: Complete error classification and user prompts
+4. ✅ **Backward Compatibility**: Versioned design supports future upgrades
+5. ✅ **Argon2id**: Fully integrated WASM implementation with smart fallback mechanism
 
-### 主要優勢
+### Main Advantages
 
-- 使用業界標準的加密算法和參數
-- **記憶體困難的 Argon2id KDF**（抗 GPU/ASIC 攻擊）
-- 完善的輸入驗證和錯誤處理
-- 版本化設計支持未來升級
-- 清晰的代碼結構和文檔
-- **智能 fallback 機制**確保跨平台兼容性
+- Uses industry-standard encryption algorithms and parameters
+- **Memory-hard Argon2id KDF** (resistant to GPU/ASIC attacks)
+- Complete input validation and error handling
+- Versioned design supports future upgrades
+- Clear code structure and documentation
+- **Smart fallback mechanism** ensures cross-platform compatibility
 
-### 未來改進方向
+### Future Improvement Directions
 
-1. ✅ ~~完整集成 Argon2id~~（已完成）
-2. 實現用戶密碼/短語輸入界面（UI 改進）
-3. 添加密碼強度檢查（輸入驗證增強）
-4. 考慮密鑰備份和恢復機制（用戶體驗改進）
-5. 性能優化：根據設備能力動態調整 Argon2id 參數
+1. ✅ ~~Complete Argon2id integration~~ (Completed)
+2. Implement user password/passphrase input interface (UI improvement)
+3. Add password strength checks (input validation enhancement)
+4. Consider key backup and recovery mechanisms (user experience improvement)
+5. Performance optimization: Dynamically adjust Argon2id parameters based on device capabilities
 
-## 📚 參考標準
+## 📚 Reference Standards
 
-- **NIST SP 800-63B**：數字身份指南
-- **OWASP Cryptographic Storage Cheat Sheet**：加密存儲最佳實務
-- **Web Crypto API**：W3C 標準
-- **RFC 8018**：PBKDF2 規範
-- **RFC 9106**：Argon2 規範
-
----
-
-**結論**：我們的加密實現**完全對齊業界最佳實務**，核心安全措施都已到位。✅ **Argon2id 已完整集成**，提供業界領先的抗暴力破解能力。主要改進方向是增強密鑰管理（用戶密碼輸入 UI）和性能優化。
+- **NIST SP 800-63B**: Digital Identity Guidelines
+- **OWASP Cryptographic Storage Cheat Sheet**: Encryption storage best practices
+- **Web Crypto API**: W3C Standard
+- **RFC 8018**: PBKDF2 Specification
+- **RFC 9106**: Argon2 Specification
 
 ---
 
-## 🎉 Argon2id 升級完成
+**Conclusion**: Our encryption implementation **fully aligns with industry best practices**, with all core security measures in place. ✅ **Argon2id is fully integrated**, providing industry-leading brute-force resistance. Main improvement directions are enhancing key management (user password input UI) and performance optimization.
 
-### 升級亮點
+---
 
-- ✅ **記憶體困難算法**：Argon2id 抗 GPU/ASIC 攻擊
-- ✅ **WASM 整合**：使用 hash-wasm 庫實現高性能 WASM 執行
-- ✅ **智能 Fallback**：自動檢測 WASM 可用性，失敗時使用增強 PBKDF2
-- ✅ **向後兼容**：自動支持舊版 PBKDF2 加密數據的解密
-- ✅ **生產就緒**：完整的錯誤處理、性能優化和日誌記錄
-- ✅ **安全參數**：遵循 OWASP 建議（3 次迭代 × 64 MB × 4 執行緒）
+## 🎉 Argon2id Upgrade Complete
 
-### 技術實現
+### Upgrade Highlights
+
+- ✅ **Memory-Hard Algorithm**: Argon2id resistant to GPU/ASIC attacks
+- ✅ **WASM Integration**: Uses hash-wasm library for high-performance WASM execution
+- ✅ **Smart Fallback**: Automatically detects WASM availability, uses enhanced PBKDF2 on failure
+- ✅ **Backward Compatible**: Automatically supports decryption of old PBKDF2 encrypted data
+- ✅ **Production-Ready**: Complete error handling, performance optimization, and logging
+- ✅ **Security Parameters**: Follows OWASP recommendations (3 iterations × 64 MB × 4 threads)
+
+### Technical Implementation
 
 ```typescript
-// Argon2id 優先，自動 fallback 到 PBKDF2
-const encrypted = await encryptData(data, password); // 默認使用 Argon2id
+// Argon2id priority, auto fallback to PBKDF2
+const encrypted = await encryptData(data, password); // Default uses Argon2id
 ```
 
-### 性能影響
+### Performance Impact
 
-- **Argon2id**：~300-500ms（設備相關，記憶體困難提供最強安全性）
-- **Fallback PBKDF2**：~200-400ms（增強迭代次數，300k+）
-- **自動檢測**：首次使用時測試 WASM 可用性（~50ms）
+- **Argon2id**: ~300-500ms (device-dependent, memory-hard provides strongest security)
+- **Fallback PBKDF2**: ~200-400ms (enhanced iterations, 300k+)
+- **Auto Detection**: Tests WASM availability on first use (~50ms)
 
-### 安全提升
+### Security Improvements
 
-| 攻擊類型 | 舊版 PBKDF2 | 新版 Argon2id | 提升 |
-|---------|------------|--------------|------|
-| CPU 暴力破解 | 高抗性 | 極高抗性 | +50% |
-| GPU 加速攻擊 | 中抗性 | 極高抗性 | +300% |
-| ASIC 攻擊 | 低抗性 | 極高抗性 | +500% |
-| 記憶體權衡攻擊 | 無防護 | 高抗性 | ∞ |
+| Attack Type | Old PBKDF2 | New Argon2id | Improvement |
+|------------|-----------|--------------|-------------|
+| CPU Brute-Force | High Resistance | Very High Resistance | +50% |
+| GPU Accelerated Attack | Medium Resistance | Very High Resistance | +300% |
+| ASIC Attack | Low Resistance | Very High Resistance | +500% |
+| Memory Trade-Off Attack | No Protection | High Resistance | ∞ |
 
-**結論**：Argon2id 升級將抗暴力破解能力提升至現代產品安全標準，為未來正式產品奠定堅實安全基礎。
-
+**Conclusion**: Argon2id upgrade elevates brute-force resistance to modern product security standards, establishing a solid security foundation for future production products.

@@ -1,42 +1,42 @@
-# 安全測試套件說明
+# Security Test Suite Guide
 
-本安全測試套件涵蓋了以下五個關鍵安全測試場景：
+This security test suite covers the following five critical security test scenarios:
 
-## 1. 密碼學向量測試（AES-GCM）
+## 1. Cryptographic Vector Tests (AES-GCM)
 
-測試 AES-GCM 加密的安全屬性，確保以下攻擊必須失敗。
+Tests AES-GCM encryption security properties, ensuring the following attacks must fail.
 
-**交叉驗證**：採用 Google Wycheproof AES-GCM 測例子集做交叉驗證（Apache-2.0 授權）。為避免上游更新造成測試抖動，已將使用到的案例固定成快照並隨 repo 發佈。
+**Cross-Validation**: Uses a subset of Google Wycheproof AES-GCM test cases for cross-validation (Apache-2.0 license). To avoid test jitter from upstream updates, the used cases have been fixed as snapshots and published with the repo.
 
-### 測試項目：
-- **Tag 篡改測試**：修改認證標籤後，解密必須失敗，返回 `DATA_CORRUPTED` 錯誤
-- **IV 重用測試**：重用初始化向量時，必須在加密階段被主動檢測並拒絕，返回 `IV_REUSE_BLOCKED` 錯誤
-- **Header 竄改測試**：變更 schema/kdf/iterations/salt/iv/key_id 任一欄位，解密必須返回 `AAD_MISMATCH`（或底層 `DATA_CORRUPTED`）
-- **Header 新增欄位測試**：新增非必要欄位 → 應 `AAD_MISMATCH`（防止「灰色新增欄位」悄悄繞過校驗）
-- **Header 移除欄位測試**：移除必要欄位 → 應 `PARAM_MISMATCH` 或 `AAD_MISMATCH`
-- **Header 鍵順序打亂測試**：打亂 Header 鍵順序（值不變），應仍能成功解密（驗證 Canonical JSON 序列化）
-- **Canonical JSON 指紋一致性測試**：相同輸入在不同環境應產生完全一致的 Canonical JSON 和 SHA-256 指紋
-- **非 12 bytes IV 測試**：非 12 bytes IV → 直接拒絕，返回 `PARAM_MISMATCH`
-- **Base64URL Padding 一致性測試**：密文/IV/Salt 一律使用 Base64URL（無 padding，正則驗證 `^[A-Za-z0-9_-]*$`）；若偵測到標準 Base64 或混用 padding，返回 `PARAM_MISMATCH`；禁止使用 `atob/btoa` 原生 API
-- **AAD 空字符串規格化測試**：若 AAD 為空則明確傳 `new Uint8Array(0)`，不可傳 `null/undefined`；空 AAD vs 未傳 AAD 不可視為等價
-- **PBKDF2 迭代數過低測試**：迭代數 < 100,000 → 返回 `PARAM_MISMATCH`
-- **PBKDF2 迭代數過高測試**：迭代數 > 2,000,000 → 返回 `PARAM_MISMATCH`
-- **IV RNG 均勻性測試**：抽樣 10k 個 96-bit IV，檢查重複率 ~ 0（期望 2^-96 等級，實測應 0），和位元分佈（單比特偏差不顯著）
-- **定時側通道檢查**：使用大量錯誤輸入確保回傳時間分佈差異不顯著（變異係數 < 50%）；對比 INVALID_KEY 與 DATA_CORRUPTED 的延遲分佈（目標 AUC ~ 0.5，輸出 `aucInvalidVsCorrupted`、`ks_p`、`ttest_p`）
-- **截斷密文測試**：截斷密文（包括 tag）後，解密必須失敗，返回 `DATA_CORRUPTED` 錯誤
+### Test Items:
+- **Tag Tampering Test**: After modifying authentication tag, decryption must fail, return `DATA_CORRUPTED` error
+- **IV Reuse Test**: When reusing initialization vector, must be actively detected and rejected at encryption stage, return `IV_REUSE_BLOCKED` error
+- **Header Tampering Test**: Changing any field in schema/kdf/iterations/salt/iv/key_id, decryption must return `AAD_MISMATCH` (or underlying `DATA_CORRUPTED`)
+- **Header Field Addition Test**: Adding non-essential fields → should `AAD_MISMATCH` (prevent "gray field addition" from silently bypassing validation)
+- **Header Field Removal Test**: Removing essential fields → should `PARAM_MISMATCH` or `AAD_MISMATCH`
+- **Header Key Order Shuffle Test**: Shuffling Header key order (values unchanged), should still decrypt successfully (validates Canonical JSON serialization)
+- **Canonical JSON Fingerprint Consistency Test**: Same input should produce completely identical Canonical JSON and SHA-256 fingerprint in different environments
+- **Non-12 bytes IV Test**: Non-12 bytes IV → directly reject, return `PARAM_MISMATCH`
+- **Base64URL Padding Consistency Test**: Ciphertext/IV/Salt uniformly use **Base64URL** (no padding, regex validation `^[A-Za-z0-9_-]*$`); if standard Base64 or mixed padding detected, return `PARAM_MISMATCH`; **prohibit using `atob/btoa` native API**
+- **AAD Empty String Normalization Test**: If AAD is empty, explicitly pass `new Uint8Array(0)`, cannot pass `null/undefined`; empty AAD vs not passing AAD cannot be considered equivalent
+- **PBKDF2 Iteration Count Too Low Test**: Iterations < 100,000 → return `PARAM_MISMATCH`
+- **PBKDF2 Iteration Count Too High Test**: Iterations > 2,000,000 → return `PARAM_MISMATCH`
+- **IV RNG Uniformity Test**: Sample 10k 96-bit IVs, check repetition rate ~ 0 (expected 2^-96 level, actual should be 0), and bit distribution (single bit deviation not significant)
+- **Timing Side-Channel Check**: Use large number of wrong inputs to ensure return time distribution difference is not significant (coefficient of variation < 50%); compare INVALID_KEY vs DATA_CORRUPTED delay distribution (target AUC ~ 0.5, output `aucInvalidVsCorrupted`, `ks_p`, `ttest_p`)
+- **Truncated Ciphertext Test**: After truncating ciphertext (including tag), decryption must fail, return `DATA_CORRUPTED` error
 
-**Header 作為 AAD（Additional Authenticated Data）**：
-版本化加密頭（除 ciphertext/tag 外的所有欄位）會作為 AES-GCM 的 AAD 一併驗證。這防止「換頭不換身」的替換攻擊，確保加密頭與密文的完整性綁定。
+**Header as AAD (Additional Authenticated Data)**:
+The versioned encryption header (all fields except ciphertext/tag) is verified together as AES-GCM's AAD. This prevents "swap header without swapping body" replacement attacks, ensuring integrity binding between encryption header and ciphertext.
 
-**Canonical AAD 規範**：
-AAD 序列化必須可證明「唯一且穩定」。實作採用選項 B：使用 Canonical JSON（RFC8785 JCS）序列化 header，確保鍵順序、空白、數字格式化一致。這避免「鍵順序打亂導致驗證失敗」的問題。
+**Canonical AAD Specification**:
+AAD serialization must be provably "unique and stable". Implementation uses Option B: Use Canonical JSON (RFC8785 JCS) to serialize header, ensuring key order, whitespace, and number formatting consistency. This avoids "key order shuffle causing validation failure" issues.
 
-### 預期結果：
-所有篡改嘗試都應該導致解密失敗，並返回適當的錯誤類型（見下方「錯誤碼對照表」）。
+### Expected Results:
+All tampering attempts should cause decryption to fail and return appropriate error types (see "Error Code Reference Table" below).
 
-### 加密頭範例
+### Encryption Header Example
 
-標準加密頭結構（Base64URL 編碼）：
+Standard encryption header structure (Base64URL encoded):
 
 ```json
 {
@@ -50,379 +50,379 @@ AAD 序列化必須可證明「唯一且穩定」。實作採用選項 B：使�
 }
 ```
 
-**二進位編碼規範**：
-- 密文、IV、Salt 統一使用 **Base64URL** 編碼（無 padding）
-- **不允許**標準 Base64 或混用 padding
-- **禁止使用 `atob/btoa` 原生 API**（容易混出標準 Base64）
-- **Base64URL 嚴格驗證**：正則 `^[A-Za-z0-9_-]*$`（空字串允許，長度另驗）
-- 實作級驗證：`if (!B64URL_REGEX.test(s) || s.includes("=")) throw PARAM_MISMATCH;`
-- 若偵測到 padding（=），在資料層 parse 時直接拒絕（`PARAM_MISMATCH`），不要幫忙自動修正
-- CI grep 檢查：禁止 `atob/btoa` 在代碼中出現
-- 建議：ESLint custom rule 禁止 `atob/btoa`
-- 若偵測到混用編碼（例如前端用 Base64，後端用 Base64URL），返回 `PARAM_MISMATCH`
-- 測試中會驗證編碼一致性
+**Binary Encoding Specification**:
+- Ciphertext, IV, Salt uniformly use **Base64URL** encoding (no padding)
+- **Not allowed** standard Base64 or mixed padding
+- **Prohibit using `atob/btoa` native API** (easily produces standard Base64)
+- **Base64URL Strict Validation**: Regex `^[A-Za-z0-9_-]*$` (empty string allowed, length validated separately)
+- Implementation-level validation: `if (!B64URL_REGEX.test(s) || s.includes("=")) throw PARAM_MISMATCH;`
+- If padding (=) detected, directly reject at data layer parse (`PARAM_MISMATCH`), do not auto-correct
+- CI grep check: Prohibit `atob/btoa` from appearing in code
+- Recommendation: ESLint custom rule to prohibit `atob/btoa`
+- If mixed encoding detected (e.g., frontend uses Base64, backend uses Base64URL), return `PARAM_MISMATCH`
+- Tests will verify encoding consistency
 
-**IV 與 Tag 長度規範**：
-- `iv.length === 12` bytes（AES-GCM 標準）
-- `tagLength === 128` bits（AES-GCM 標準，硬限制）
-- 不符合規範 → 直接拒絕，返回 `PARAM_MISMATCH`
+**IV and Tag Length Specification**:
+- `iv.length === 12` bytes (AES-GCM standard)
+- `tagLength === 128` bits (AES-GCM standard, hard limit)
+- Non-compliant → directly reject, return `PARAM_MISMATCH`
 
-**PBKDF2 邊界規範**：
-- `PBKDF2.iterations` 必須滿足 `100,000 ≤ n ≤ 2,000,000`
-- 超出範圍一律返回 `PARAM_MISMATCH`
-- 防止 DoS/誤用
+**PBKDF2 Boundary Specification**:
+- `PBKDF2.iterations` must satisfy `100,000 ≤ n ≤ 2,000,000`
+- Out of range → return `PARAM_MISMATCH`
+- Prevents DoS/misuse
 
-**重要說明 - IV 重用檢測機制**：
-本套件的 IV 重用檢測為主動阻擋（由加密層維護 `keyId → IV` 集合），不是依賴解密時出錯。AES-GCM 本身無法自動告訴你「你重用了 IV」，因此我們在 `encryption.ts` 中實現了 session 級別的 IV registry。測試預期為：**加密步驟即報 `IV_REUSE_BLOCKED` 錯誤**，而不是等到解密階段才發現問題。
+**Important Note - IV Reuse Detection Mechanism**:
+This suite's IV reuse detection is active blocking (encryption layer maintains `keyId → IV` set), not relying on decryption errors. AES-GCM itself cannot automatically tell you "you reused IV", so we implemented session-level IV registry in `encryption.ts`. Test expectation: **Encryption step immediately reports `IV_REUSE_BLOCKED` error**, not discovering the problem at decryption stage.
 
-**keyId 定義與隱私保護**：
-為避免 keyId 成為「跨紀錄可關聯」的永久指紋，keyId 的計算方式為：
+**keyId Definition and Privacy Protection**:
+To avoid keyId becoming a permanent fingerprint for "cross-record correlation", keyId calculation method:
 ```
 keyId = first_128_bits(HKDF(KEK, info="echoma:keyid:v1:mode", salt=salt_keyid))
 ```
-其中：
-- `KEK` 為真正加密金鑰（從 password 派生）
-- `salt_keyid` 為應用域分離常數（"echoma:keyid:salt:v1"）
-- `mode` 為作用域（wallet/account/guest），避免跨身分模式關聯
-- 使用 HKDF 而非直接 SHA-256(password)，避免離線字典攻擊
+Where:
+- `KEK` is the actual encryption key (derived from password)
+- `salt_keyid` is application domain separation constant ("echoma:keyid:salt:v1")
+- `mode` is scope (wallet/account/guest), avoids cross-identity mode correlation
+- Uses HKDF instead of direct SHA-256(password), avoids offline dictionary attacks
 
-**作用域化**：
+**Scoping**:
 - `wallet`: "echoma:keyid:v1:wallet"
 - `account`: "echoma:keyid:v1:account"  
 - `guest`: "echoma:keyid:v1:guest"
-- 相同 KEK 在不同 mode → keyId 必須不同（測試：`keyid_cross_mode_diff`）
+- Same KEK in different mode → keyId must be different (test: `keyid_cross_mode_diff`)
 
-**重要隱私聲明**：
-- keyId 僅用於加密流程內部路由與 IV 重用檢測
-- **禁止用於跨紀錄/跨使用者關聯分析**
-- 若需持久化，應以 HKDF 再派生之指紋入庫（例如再做一次 HKDF），降低關聯性
+**Important Privacy Statement**:
+- keyId is only used for encryption flow internal routing and IV reuse detection
+- **Prohibited for cross-record/cross-user correlation analysis**
+- If persistence needed, should use HKDF re-derived fingerprint for storage (e.g., do another HKDF), reducing correlation
 
-**注意**：IV registry 是 session 級別的，在多分頁或重新整理後無法跨 session 檢測。此機制主要用於防止同一會話內的意外重用，跨 session 的檢測需要後端支持。
+**Note**: IV registry is session-level, cannot detect across sessions after multi-tab or refresh. This mechanism is mainly for preventing accidental reuse within the same session; cross-session IV reuse detection requires backend support.
 
-## 2. 參數回放測試
+## 2. Parameter Replay Tests
 
-測試同一數據在不同設備配置下的加密和解密兼容性。
+Tests encryption and decryption compatibility of same data under different device configurations.
 
-### 測試場景：
-- **低端手機**：100,000 次 PBKDF2 迭代
-- **中端手機**：300,000 次 PBKDF2 迭代
-- **高端手機**：500,000 次 PBKDF2 迭代
-- **桌機**：1,000,000 次 PBKDF2 迭代
+### Test Scenarios:
+- **Low-end Phone**: 100,000 PBKDF2 iterations
+- **Mid-range Phone**: 300,000 PBKDF2 iterations
+- **High-end Phone**: 500,000 PBKDF2 iterations
+- **Desktop**: 1,000,000 PBKDF2 iterations
 
-### 測試內容：
-1. 在不同設備上加密相同數據
-2. 驗證加密參數（迭代數）正確保存
-3. 跨設備解密：在設備 A 加密，在設備 B 解密
+### Test Content:
+1. Encrypt same data on different devices
+2. Verify encryption parameters (iteration count) correctly saved
+3. Cross-device decryption: Encrypt on device A, decrypt on device B
 
-### 預期結果：
-- 所有設備都能成功加密和解密
-- 跨設備解密應該成功（使用相同的密碼和參數）
+### Expected Results:
+- All devices can successfully encrypt and decrypt
+- Cross-device decryption should succeed (using same password and parameters)
 
-## 3. Base64/UTF-8 邊界測試
+## 3. Base64/UTF-8 Boundary Tests
 
-測試各種 Unicode 邊界情況，確保序列化/反序列化不破壞數據完整性。
+Tests various Unicode boundary cases, ensuring serialization/deserialization does not break data integrity.
 
-### 測試用例：
-- **Emoji**：大量 emoji 字符
-- **合字（Ligatures）**：如 ﬁ, ﬂ, ﬀ 等
-- **長文**：10KB 文本
-- **混合 Unicode**：多種語言和字符集混合
-- **零寬字符**：隱藏的控制字符
-- **代理對（Surrogate Pairs）**：需要兩個 16 位單元表示的字符
-- **組合字符**：帶聲調的字符
+### Test Cases:
+- **Emoji**: Large number of emoji characters
+- **Ligatures**: Such as ﬁ, ﬂ, ﬀ, etc.
+- **Long Text**: 10KB text
+- **Mixed Unicode**: Multiple languages and character sets mixed
+- **Zero-Width Characters**: Hidden control characters
+- **Surrogate Pairs**: Characters requiring two 16-bit units
+- **Combining Characters**: Characters with diacritics
 
-### 驗證方法：
-1. 加密原始文本
-2. JSON 序列化和反序列化
-3. 解密並驗證（層級化比較，記錄失敗層級）：
-   - **層級 1：字節長度比較** - 字節長度完全匹配
-   - **層級 2：逐字節比較** - 逐字節比較完全一致
-   - **層級 3：字符串比較** - 字符串內容完全相等
-   - **層級 4：Unicode 正規化驗證** - `NFC(原文) === NFC(解密結果)`，避免 Unicode 正規化差異造成假陰性
+### Verification Method:
+1. Encrypt original text
+2. JSON serialization and deserialization
+3. Decrypt and verify (hierarchical comparison, record failure level):
+   - **Level 1: Byte Length Comparison** - Byte length completely matches
+   - **Level 2: Byte-by-Byte Comparison** - Byte-by-byte comparison completely identical
+   - **Level 3: String Comparison** - String content completely equal
+   - **Level 4: Unicode Normalization Verification** - `NFC(original) === NFC(decrypted_result)`, avoids false negatives from Unicode normalization differences
 
-**層級化比較說明**：
-先比 bytes → 再比字串 → 最後比 NFC。在報告裡標註是哪一層 fail，定位更快。
+**Hierarchical Comparison Explanation**:
+Compare bytes first → then compare strings → finally compare NFC. Mark which level failed in report for faster localization.
 
-**Unicode 正規化說明**：
-有些來源會給 NFD（分解）字串，顯示一致但 bytes 不同。除逐字節比較外，另驗證 NFC（標準組合形式）相等，確保不會因為正規化差異而誤判為失敗。
+**Unicode Normalization Explanation**:
+Some sources provide NFD (decomposed) strings, display identical but bytes different. In addition to byte-by-byte comparison, also verify NFC (standard composed form) equality, ensuring not misjudged as failure due to normalization differences.
 
-### 預期結果：
-所有測試用例都應該通過，確保數據在加密/解密和序列化過程中完全無損。驗收標準：**bytes 相等且 NFC 相等，0 容忍**。
+### Expected Results:
+All test cases should pass, ensuring data is completely lossless during encryption/decryption and serialization. Acceptance criteria: **bytes equal and NFC equal, 0 tolerance**.
 
-## 4. Rate Limit 測試（瀏覽器探針版）
+## 4. Rate Limit Test (Browser Probe Version)
 
-模擬高並發請求，測試限流機制的有效性和恢復能力。
+Simulates high concurrency requests, tests rate limiting mechanism effectiveness and recovery capability.
 
-**⚠️ 重要限制**：
-此測試僅做健康探針，不代表後端實際吞吐。真實壓測請移至 Node/CI 環境，否則結果受瀏覽器併發限制與 CORS 影響，無法反映真實性能。
+**⚠️ Important Limitations**:
+This test is only a health probe, does not represent actual backend throughput. Real load testing should move to Node/CI environment, otherwise results are affected by browser concurrency limits and CORS, cannot reflect actual performance.
 
-### 測試配置：
-- **並發數**：20 個請求（瀏覽器端縮水版，真實壓測應在 Node/CI 環境進行）
-- **發送方式**：在 1 秒內分 10 批發送（每批間隔 100ms）
-- **目標端點**：AI 情緒響應端點（`/functions/v1/ai-emotion-response`）
-- **取消支持**：使用 AbortController，可以隨時取消測試
+### Test Configuration:
+- **Concurrency**: 20 requests (browser-side reduced version, real load testing should be in Node/CI environment)
+- **Sending Method**: Send in 10 batches within 1 second (100ms interval per batch)
+- **Target Endpoint**: AI emotion response endpoint (`/functions/v1/ai-emotion-response`)
+- **Cancel Support**: Uses AbortController, can cancel test anytime
 
-### 測試內容：
-1. 發送 20 個並發請求（瀏覽器端限制）
-2. 統計：
-   - 成功請求數（200 狀態碼）
-   - 被限流請求數（429 狀態碼，返回 `RATE_LIMITED` 錯誤）
-   - 認證錯誤數（401 狀態碼，返回 `UNAUTHORIZED` 錯誤）
-   - 其他錯誤數
-3. 等待 2 秒後測試恢復能力（單次請求應返回 200）
+### Test Content:
+1. Send 20 concurrent requests (browser-side limit)
+2. Statistics:
+   - Successful requests (200 status code)
+   - Rate-limited requests (429 status code, returns `RATE_LIMITED` error)
+   - Authentication errors (401 status code, returns `UNAUTHORIZED` error)
+   - Other errors
+3. Wait 2 seconds then test recovery capability (single request should return 200)
 
-### 預期結果：
-- **有效響應率**：`(200 + 429) / 有效響應 ≥ 60%`（無效響應不計入分母）
-- **無效響應限制**：`無效響應 / 總請求 < 20%`（網路錯誤/超時/0/0 視為無效樣本，單獨統計）
-- **恢復能力**：等待 2 秒後單次請求應返回 200
-- **驗收標準**：`(200 + 429) / 有效響應 ≥ 0.6` 且 `無效響應 < 20%`，且恢復測試通過
+### Expected Results:
+- **Valid Response Rate**: `(200 + 429) / valid responses ≥ 60%` (invalid responses not counted in denominator)
+- **Invalid Response Limit**: `invalid responses / total requests < 20%` (network errors/timeouts/0/0 treated as invalid samples, separately counted)
+- **Recovery Capability**: After waiting 2 seconds, single request should return 200
+- **Acceptance Criteria**: `(200 + 429) / valid responses ≥ 0.6` and `invalid responses < 20%`, and recovery test passes
 
-**容錯說明**：
-把成功判定改成「(200 + 429) / 有效響應 ≥ 0.6」；把 0/0、網路錯誤視為「無效樣本」單獨統計，避免在離線環境誤判失敗。
+**Fault Tolerance Explanation**:
+Change success determination to "(200 + 429) / valid responses ≥ 0.6"; treat 0/0, network errors as "invalid samples" separately counted, avoid false failures in offline environments.
 
-## 5. JWT 會話刷新平滑度測試
+## 5. JWT Session Refresh Smoothness Test
 
-測試 JWT 會話刷新期間的平滑過渡，確保不會出現「斷崖式」成功率下降。
+Tests smooth transition during JWT session refresh, ensuring no "cliff-like" success rate drop.
 
-**注意**：API Key Rotation 測試已移至後端/CI 環境，不應在前端暴露。
+**Note**: API Key Rotation test has been moved to backend/CI environment, should not be exposed in frontend.
 
-### 測試場景：
-- **測試時長**：5 秒
-- **測試間隔**：每 100ms 測試一次請求
-- **目標端點**：AI 情緒響應端點（使用當前會話的 JWT）
-- **時鐘偏移容忍**：行動裝置可能有 clock skew；結果 JSON 記錄伺服器 Date，允許 ±60s 容忍，降低誤報
+### Test Scenario:
+- **Test Duration**: 5 seconds
+- **Test Interval**: Test one request every 100ms
+- **Target Endpoint**: AI emotion response endpoint (using current session's JWT)
+- **Clock Skew Tolerance**: Mobile devices may have clock skew; result JSON records server Date, allows ±60s tolerance, reduces false positives
 
-### 測試方法：
-1. 在測試期間持續發送請求
-2. 每 100ms 測試一次請求（使用當前會話的 JWT）
-3. 記錄每個時間點的成功率
-4. 分析成功率變化曲線
+### Test Method:
+1. Continuously send requests during test period
+2. Test one request every 100ms (using current session's JWT)
+3. Record success rate at each time point
+4. Analyze success rate change curve
 
-### 驗證標準：
-- **不應有斷崖**：五點滑動視窗的最大差分 ≤ 0.5（避免單點雜訊觸發 cliff）
-- **應平滑過渡**：成功率應該逐漸變化（標準差 < 0.25）
-- **最小成功率**：過渡期間最小成功率應 ≥ 60%
-- **連續失敗限制**：1 秒視窗（10 次測試）內連續失敗 ≤ 5 次
+### Verification Criteria:
+- **Should Not Have Cliff**: Five-point sliding window maximum difference ≤ 0.5 (avoid single-point noise triggering cliff)
+- **Should Smoothly Transition**: Success rate should gradually change (standard deviation < 0.25)
+- **Minimum Success Rate**: Minimum success rate during transition should ≥ 60%
+- **Consecutive Failure Limit**: Within 1 second window (10 tests), consecutive failures ≤ 5
 
-### 預期結果：
-- `hasCliff = false`：沒有檢測到斷崖式下降（五點滑動視窗檢測）
-- `isSmooth = true`：過渡平滑
-- `minSuccessRate ≥ 0.6`：最小成功率大於等於 60%
-- `stddev < 0.25`：標準差小於 0.25
-- `maxConsecutiveFails ≤ 5`：1 秒視窗內連續失敗不超過 5 次
+### Expected Results:
+- `hasCliff = false`: No cliff-like drop detected (five-point sliding window detection)
+- `isSmooth = true`: Transition is smooth
+- `minSuccessRate ≥ 0.6`: Minimum success rate greater than or equal to 60%
+- `stddev < 0.25`: Standard deviation less than 0.25
+- `maxConsecutiveFails ≤ 5`: Within 1 second window, consecutive failures not exceeding 5
 
-**驗收標準**：`minSuccessRate ≥ 0.6`、無 cliff（五點滑動視窗）、標準差 < 0.25、連續失敗 ≤ 5（1 秒視窗）
+**Acceptance Criteria**: `minSuccessRate ≥ 0.6`, no cliff (five-point sliding window), standard deviation < 0.25, consecutive failures ≤ 5 (1 second window)
 
-## 安全改進（2025-01）
+## Security Improvements (2025-01)
 
-### 重要安全改進
+### Important Security Improvements
 
-1. **路由守衛**：安全測試頁面只在開發環境（`import.meta.env.DEV`）或設置 `VITE_ENABLE_SECURITY_TESTS=true` 時才可用，避免在正式環境暴露壓測入口。
+1. **Route Guard**: Security test page only available in development environment (`import.meta.env.DEV`) or when setting `VITE_ENABLE_SECURITY_TESTS=true`, avoiding exposing load testing entry in production environment.
 
-2. **IV 重用檢測**：在 `encryption.ts` 中實現了 session 級別的 IV registry，主動檢測並拒絕 IV 重用，防止安全漏洞。
+2. **IV Reuse Detection**: Implemented session-level IV registry in `encryption.ts`, actively detects and rejects IV reuse, preventing security vulnerabilities.
 
-3. **Rate Limit 測試限制**：
-   - 瀏覽器端只發送 20 個請求（小樣本探針）
-   - 真實壓測應在 Node/CI 環境進行
-   - 添加了 AbortController 支持，避免懸掛請求
+3. **Rate Limit Test Limitations**:
+   - Browser-side only sends 20 requests (small sample probe)
+   - Real load testing should be in Node/CI environment
+   - Added AbortController support, avoids hanging requests
 
-4. **認證模型分離**：
-   - 前端只測試 JWT 會話刷新平滑度
-   - API Key Rotation 測試已移至後端/CI 環境
-   - 不再在前端暴露 API Key rotation 邏輯
+4. **Authentication Model Separation**:
+   - Frontend only tests JWT session refresh smoothness
+   - API Key Rotation test moved to backend/CI environment
+   - No longer exposes API Key rotation logic in frontend
 
-5. **Web Worker 支持**：創建了 `securityTests.worker.ts` 用於處理長時間/大量 CPU 的測試，避免阻塞主線程。
+5. **Web Worker Support**: Created `securityTests.worker.ts` for handling long-running/large CPU tests, avoids blocking main thread.
 
-6. **UTF-8 測試增強**：新增了 ZWJ emoji、阿拉伯連寫、泰文附標、藏文、多層組合字符等邊界測試用例。
+6. **UTF-8 Test Enhancement**: Added ZWJ emoji, Arabic ligatures, Thai diacritics, Tibetan, multi-layer combining characters and other boundary test cases.
 
-## 使用方法
+## Usage
 
-### 1. 訪問測試頁面
+### 1. Access Test Page
 
-**重要**：安全測試頁面只在以下情況下可用：
-- 開發環境（`npm run dev`）
-- 設置環境變量 `VITE_ENABLE_SECURITY_TESTS=true`
+**Important**: Security test page is only available under the following conditions:
+- Development environment (`npm run dev`)
+- Setting environment variable `VITE_ENABLE_SECURITY_TESTS=true`
 
-在瀏覽器中訪問：`/security-tests`
+Access in browser: `/security-tests`
 
-### 2. 登錄（可選，但建議）
+### 2. Login (Optional, but Recommended)
 
-**重要**：要運行完整的測試套件（包括 Rate Limit 和 JWT 會話刷新測試），需要先登錄 Supabase：
+**Important**: To run complete test suite (including Rate Limit and JWT session refresh tests), need to login to Supabase first:
 
-1. 訪問 `/auth` 頁面
-2. 使用現有帳號登錄，或註冊新帳號
-3. 登錄成功後，返回 `/security-tests` 頁面
+1. Visit `/auth` page
+2. Login with existing account, or register new account
+3. After successful login, return to `/security-tests` page
 
-**注意**：
-- 前三個測試（密碼學向量、參數回放、UTF-8 邊界）**不需要登錄**即可運行
-- 後兩個測試（Rate Limit、JWT 會話刷新）**需要登錄**才能運行
-- 如果未登錄，後兩個測試會返回 401 認證錯誤（`UNAUTHORIZED`），這是預期的行為
+**Note**:
+- First three tests (cryptographic vectors, parameter replay, UTF-8 boundaries) **do not require login** to run
+- Last two tests (Rate Limit, JWT session refresh) **require login** to run
+- If not logged in, last two tests will return 401 authentication error (`UNAUTHORIZED`), this is expected behavior
 
-### 3. 運行測試
+### 3. Run Tests
 
-點擊「運行所有測試」按鈕，系統將依次執行所有測試套件。
+Click "Run All Tests" button, system will execute all test suites sequentially.
 
-### 4. 查看結果
+### 4. View Results
 
-測試完成後，頁面會顯示：
-- **測試匯總**：總體統計信息
-- **各測試套件結果**：每個測試的詳細結果
-- **通過/失敗狀態**：每個測試項的通過情況
-- **詳細錯誤信息**：失敗測試的錯誤詳情
+After tests complete, page will display:
+- **Test Summary**: Overall statistics
+- **Individual Test Suite Results**: Detailed results for each test
+- **Pass/Fail Status**: Pass status for each test item
+- **Detailed Error Information**: Error details for failed tests
 
-## 注意事項
+## Notes
 
-1. **Rate Limit 測試**需要有效的 Supabase 認證會話。如果未登錄，該測試會返回 401 認證錯誤（這是預期的行為）。
+1. **Rate Limit Test** requires valid Supabase authentication session. If not logged in, this test will return 401 authentication error (this is expected behavior).
 
-2. **JWT 會話刷新測試**需要有效的 Supabase 認證會話。如果未登錄，該測試會返回 401 認證錯誤（這是預期的行為）。
+2. **JWT Session Refresh Test** requires valid Supabase authentication session. If not logged in, this test will return 401 authentication error (this is expected behavior).
 
-3. **API Key Rotation 測試**已移至後端/CI 環境，不應在前端進行。後端測試會模擬雙讀期與快取 TTL 失效，前端僅顯示結果，不參與鍵值傳輸。
+3. **API Key Rotation Test** has been moved to backend/CI environment, should not be performed in frontend. Backend tests will simulate dual-read period and cache TTL expiration, frontend only displays results, does not participate in key value transmission.
 
-4. 某些測試（如 Rate Limit）可能會對服務器造成負載，建議在測試環境運行。
+4. Some tests (such as Rate Limit) may cause load on server, recommend running in test environment.
 
-5. 測試結果會顯示在頁面上，可以複製 JSON 格式的詳細信息用於進一步分析。
+5. Test results will be displayed on page, can copy JSON format detailed information for further analysis.
 
-6. **核心安全測試**（密碼學向量、參數回放、UTF-8 邊界）不需要登錄即可運行，這些測試驗證了加密系統的核心安全屬性。
+6. **Core Security Tests** (cryptographic vectors, parameter replay, UTF-8 boundaries) do not require login to run, these tests verify core security properties of encryption system.
 
-## 技術實現
+## Technical Implementation
 
-- **加密庫**：使用 Web Crypto API 實現 AES-GCM
-- **測試框架**：自定義測試框架，支持異步測試和結果聚合
-- **UI 組件**：使用 shadcn/ui 組件庫構建測試界面
-- **Web Worker**：長時或大量 CPU 的測試（如批量 AES-GCM）在 Web Worker 執行；主執行緒僅負責渲染，避免 UI 掛起
+- **Encryption Library**: Uses Web Crypto API to implement AES-GCM
+- **Test Framework**: Custom test framework, supports async tests and result aggregation
+- **UI Components**: Uses shadcn/ui component library to build test interface
+- **Web Worker**: Long-running or large CPU tests (such as batch AES-GCM) execute in Web Worker; main thread only responsible for rendering, avoids UI hanging
 
-## 文件結構
+## File Structure
 
 ```
 src/
 ├── lib/
-│   ├── securityTests.ts           # 測試實現
-│   ├── securityTests.worker.ts    # Web Worker（用於 CPU 密集型測試）
-│   └── encryption.ts              # 加密實現（包含 IV 重用檢測）
+│   ├── securityTests.ts           # Test implementation
+│   ├── securityTests.worker.ts    # Web Worker (for CPU-intensive tests)
+│   └── encryption.ts              # Encryption implementation (includes IV reuse detection)
 └── pages/
-    └── SecurityTests.tsx          # 測試 UI 頁面
+    └── SecurityTests.tsx          # Test UI page
 ```
 
-## 環境變量
+## Environment Variables
 
-- `VITE_ENABLE_SECURITY_TESTS`：設置為 `"true"` 時，即使在生產環境也啟用安全測試頁面
+- `VITE_ENABLE_SECURITY_TESTS`: When set to `"true"`, enables security test page even in production environment
 
-  **⚠️ 風險警告**：此選項僅供短期排錯；長開於生產會暴露壓測入口，可能被濫用造成流量放大。建議只在開發環境使用，或設置後立即關閉。
+  **⚠️ Risk Warning**: This option is only for short-term debugging; leaving it on in production will expose load testing entry, may be abused causing traffic amplification. Recommend only using in development environment, or close immediately after setting.
 
-- 默認情況下，只在開發環境（`import.meta.env.DEV`）啟用
+- By default, only enabled in development environment (`import.meta.env.DEV`)
 
-## 錯誤碼對照表
+## Error Code Reference Table
 
-本套件使用統一的錯誤碼，供前後端對齊：
+This suite uses unified error codes for frontend-backend alignment:
 
-| 錯誤碼 | 說明 | 常見場景 |
-|--------|------|----------|
-| `INVALID_KEY` | 密碼/派生參數不匹配 | PBKDF2 迭代數不同、密碼錯誤、KDF 參數不符 |
-| `DATA_CORRUPTED` | 密文/認證標籤被竄改或截斷 | Tag 篡改、Base64 傳輸截斷、密文損壞 |
-| `IV_REUSE_BLOCKED` | 檢測到同一 keyId 重用 IV，被主動阻止 | 重試重放舊 IV、加密階段檢測到重用 |
-| `UNAUTHORIZED` | 缺少/過期 JWT | 未登入、會話過期、JWT 無效 |
-| `RATE_LIMITED` | 觸發限流配額 | 高並發測試、超過速率限制 |
-| `PARAM_MISMATCH` | Header 缺欄位或不合法 | 缺少 iv/salt/kdf/iterations、長度不符 |
-| `AAD_MISMATCH` | AAD 驗證失敗 | Header 被竄改或與密文不一致 |
+| Error Code | Description | Common Scenarios |
+|------------|-------------|------------------|
+| `INVALID_KEY` | Password/derivation parameters mismatch | PBKDF2 iteration count different, wrong password, KDF parameters mismatch |
+| `DATA_CORRUPTED` | Ciphertext/authentication tag tampered or truncated | Tag tampering, Base64 transmission truncation, ciphertext corruption |
+| `IV_REUSE_BLOCKED` | Detected same keyId reusing IV, actively blocked | Retry replaying old IV, detected reuse at encryption stage |
+| `UNAUTHORIZED` | Missing/expired JWT | Not logged in, session expired, JWT invalid |
+| `RATE_LIMITED` | Triggered rate limit quota | High concurrency testing, exceeded rate limit |
+| `PARAM_MISMATCH` | Header missing fields or illegal | Missing iv/salt/kdf/iterations, length mismatch |
+| `AAD_MISMATCH` | AAD verification failed | Header tampered or inconsistent with ciphertext |
 
-**注意**：
-- `IV_REUSE_BLOCKED` 是在加密階段由 IV registry 主動檢測並拒絕的，不是解密時才發現
-- `AAD_MISMATCH` 在解密階段由 AES-GCM 的 AAD 驗證機制檢測
-- 其他錯誤碼通常在解密或 API 調用階段返回
+**Note**:
+- `IV_REUSE_BLOCKED` is actively detected and rejected by IV registry at encryption stage, not discovered at decryption
+- `AAD_MISMATCH` is detected at decryption stage by AES-GCM's AAD verification mechanism
+- Other error codes usually returned at decryption or API call stage
 
-## 測試驗收標準（CI 機械判斷）
+## Test Acceptance Criteria (CI Automated Judgment)
 
-以下標準用於 CI 自動化驗收，所有測試必須通過才能視為合格：
+The following criteria are used for CI automated acceptance, all tests must pass to be considered qualified:
 
-### 1. 密碼學向量測試
-- **驗收標準**：100% 通過；任一項失敗即 Fail
-- Tag 篡改測試：必須返回 `DATA_CORRUPTED`（含非預期成功告警）
-- IV 重用測試：必須返回 `IV_REUSE_BLOCKED`（加密階段，含非預期成功告警）
-- Header 竄改測試：必須返回 `AAD_MISMATCH` 或 `DATA_CORRUPTED`
-- Header 新增欄位測試：必須返回 `AAD_MISMATCH`
-- Header 移除欄位測試：必須返回 `PARAM_MISMATCH` 或 `AAD_MISMATCH`
-- Header 鍵順序打亂測試：必須通過（Canonical JSON 序列化）
-- Canonical JSON 指紋一致性測試：相同輸入必須產生完全一致的指紋
-- 非 12 bytes IV 測試：必須返回 `PARAM_MISMATCH`
-- Base64URL Padding 一致性測試：必須通過（無 padding，正則驗證）
-- AAD 空字符串規格化測試：必須通過（明確傳 `new Uint8Array(0)`）
-- PBKDF2 迭代數過低測試：必須返回 `PARAM_MISMATCH`
-- PBKDF2 迭代數過高測試：必須返回 `PARAM_MISMATCH`
-- IV RNG 均勻性測試：重複率 = 0，位元分佈無顯著偏差
-- keyId 跨模式差異測試：必須通過（不同 mode 產生不同 keyId）
-- 定時側通道檢查：AUC ≤ 0.6、ks_p ≥ 0.05、變異係數 < 50%
-- 截斷密文測試：必須返回 `DATA_CORRUPTED`（含非預期成功告警）
+### 1. Cryptographic Vector Tests
+- **Acceptance Criteria**: 100% pass; any item failure = Fail
+- Tag tampering test: Must return `DATA_CORRUPTED` (including unexpected success alert)
+- IV reuse test: Must return `IV_REUSE_BLOCKED` (encryption stage, including unexpected success alert)
+- Header tampering test: Must return `AAD_MISMATCH` or `DATA_CORRUPTED`
+- Header field addition test: Must return `AAD_MISMATCH`
+- Header field removal test: Must return `PARAM_MISMATCH` or `AAD_MISMATCH`
+- Header key order shuffle test: Must pass (Canonical JSON serialization)
+- Canonical JSON fingerprint consistency test: Same input must produce completely identical fingerprint
+- Non-12 bytes IV test: Must return `PARAM_MISMATCH`
+- Base64URL padding consistency test: Must pass (no padding, regex validation)
+- AAD empty string normalization test: Must pass (explicitly pass `new Uint8Array(0)`)
+- PBKDF2 iteration count too low test: Must return `PARAM_MISMATCH`
+- PBKDF2 iteration count too high test: Must return `PARAM_MISMATCH`
+- IV RNG uniformity test: Repetition rate = 0, bit distribution no significant deviation
+- keyId cross-mode difference test: Must pass (different mode produces different keyId)
+- Timing side-channel check: AUC ≤ 0.6, ks_p ≥ 0.05, coefficient of variation < 50%
+- Truncated ciphertext test: Must return `DATA_CORRUPTED` (including unexpected success alert)
 
-### 2. 參數回放測試
-- **驗收標準**：四檔迭代數（100k/300k/500k/1M）跨解密 100% 成功
-- 所有設備配置都能成功加密和解密
-- 跨設備解密必須成功
+### 2. Parameter Replay Tests
+- **Acceptance Criteria**: Four-tier iteration counts (100k/300k/500k/1M) cross-decryption 100% success
+- All device configurations can successfully encrypt and decrypt
+- Cross-device decryption must succeed
 
-### 3. UTF-8 邊界測試
-- **驗收標準**：bytes 相等且 NFC 相等，0 容忍
-- 所有測試用例必須通過
-- 字節級別完全匹配
-- Unicode 正規化後完全匹配
+### 3. UTF-8 Boundary Tests
+- **Acceptance Criteria**: bytes equal and NFC equal, 0 tolerance
+- All test cases must pass
+- Byte-level completely match
+- Unicode normalization completely match
 
-### 4. Rate Limit 測試（瀏覽器探針版）
+### 4. Rate Limit Test (Browser Probe Version)
 
-**Rate Probe 退化紅線（驗收門檻）**：
-- `p95 ≤ 1500ms`（示例，依後端設定調整）
+**Rate Probe Degradation Redline (Acceptance Threshold)**:
+- `p95 ≤ 1500ms` (example, adjust based on backend settings)
 - `tailShare(>2000ms) ≤ 10%`
-- `(200 + 429) / 有效響應 ≥ 60%`
-- `無效響應 < 20%`
+- `(200 + 429) / valid responses ≥ 60%`
+- `invalid responses < 20%`
 - `recovery200 = true`
-- `headersOk = true`（429 必須帶 Retry-After 或 vendor header）
-- `replayDedupOk = true`（Idempotency-Key 去重測試通過）
-- 失敗直接視為退化，避免「200 但超慢」被誤判 OK
+- `headersOk = true` (429 must include Retry-After or vendor header)
+- `replayDedupOk = true` (Idempotency-Key deduplication test passes)
+- Failure directly considered degradation, avoid "200 but very slow" misjudged as OK
 
-**429 Header 驗證**：
-- 驗證 429 是否帶 `Retry-After`（秒或日期格式）或 vendor header（如 `X-RateLimit-Remaining` / `Reset`）
-- `rateProbe.headersOk = true` 作為驗收的一部分
+**429 Header Verification**:
+- Verify 429 includes `Retry-After` (seconds or date format) or vendor header (such as `X-RateLimit-Remaining` / `Reset`)
+- `rateProbe.headersOk = true` as part of acceptance
 
-**Replay 防護實測**：
-- 對相同 `Idempotency-Key` 的 3 次請求：僅允許一次成功，其餘應返回 409/專用錯誤
+**Replay Protection Actual Test**:
+- For 3 requests with same `Idempotency-Key`: Only allow one success, others should return 409/dedicated error
 - `rateProbe.replayDedupOk = true`
-- `dedupScope = "per-user-per-endpoint"`（去重範圍）
-- `dedupTtlMs = 120000`（去重視窗：2 分鐘）
-- **驗收標準**：`(200 + 429) / 有效響應 ≥ 0.6`；無效響應 < 20%；等待 2s 後單次請求 200 成功
-- 有效響應率 ≥ 60%（無效響應不計入分母）
-- 無效響應（網路錯誤/超時/0/0）< 20%
-- 恢復測試必須通過
+- `dedupScope = "per-user-per-endpoint"` (deduplication scope)
+- `dedupTtlMs = 120000` (deduplication window: 2 minutes)
+- **Acceptance Criteria**: `(200 + 429) / valid responses ≥ 0.6`; invalid responses < 20%; after waiting 2s, single request 200 success
+- Valid response rate ≥ 60% (invalid responses not counted in denominator)
+- Invalid responses (network errors/timeouts/0/0) < 20%
+- Recovery test must pass
 
-### 5. JWT 會話刷新平滑度測試
+### 5. JWT Session Refresh Smoothness Test
 
-**JWT 平滑門檻（驗收標準）**：
+**JWT Smooth Threshold (Acceptance Criteria)**:
 - `minSuccessRate ≥ 0.6`
-- 五點滑動視窗最大差分 ≤ 0.5
+- Five-point sliding window maximum difference ≤ 0.5
 - `stddev < 0.25`
-- 1 秒視窗 `maxConsecutiveFails ≤ 5`
-- 刷新前後 1s 視窗的 4xx 比例 ≤ 10%
-- 必須輸出 `skewMs`（伺服器日期回寫與客戶端差異：`serverNow - clientNow`，允許 ±60s 容忍）
-- 必須輸出 `preRefreshSuccess`、`postRefreshSuccess`（刷新前後 500ms 視窗平均成功率）
-- 必須輸出 `peak4xxWindow`（刷新前後 1s 內 4xx 峰值時間戳，方便對齊伺服器 log）
-- 必須輸出 `retryAfterHeaders`（429/503 是否帶 Retry-After 或 RateLimit-Reset）
-- **驗收標準**：`minSuccessRate ≥ 0.6`、無 cliff（五點滑動視窗）、標準差 < 0.25、連續失敗 ≤ 5（1 秒視窗）
-- 最小成功率 ≥ 60%
-- 無斷崖式下降（五點滑動視窗的最大差分 ≤ 0.5）
-- 標準差 < 0.25
-- 1 秒視窗（10 次測試）內連續失敗 ≤ 5
+- 1 second window `maxConsecutiveFails ≤ 5`
+- 4xx ratio within 1s window before/after refresh ≤ 10%
+- Must output `skewMs` (server date write-back vs client difference: `serverNow - clientNow`, allows ±60s tolerance)
+- Must output `preRefreshSuccess`, `postRefreshSuccess` (average success rate within 500ms window before/after refresh)
+- Must output `peak4xxWindow` (4xx peak timestamp within 1s before/after refresh, convenient for aligning with server logs)
+- Must output `retryAfterHeaders` (whether 429/503 includes Retry-After or RateLimit-Reset)
+- **Acceptance Criteria**: `minSuccessRate ≥ 0.6`, no cliff (five-point sliding window), standard deviation < 0.25, consecutive failures ≤ 5 (1 second window)
+- Minimum success rate ≥ 60%
+- No cliff-like drop (five-point sliding window maximum difference ≤ 0.5)
+- Standard deviation < 0.25
+- Within 1 second window (10 tests), consecutive failures ≤ 5
 
-## 未來擴展注意事項
+## Future Extension Notes
 
-### Argon2id 支持
-若日後切換到 Argon2id，需要：
-1. 在「參數回放測試」新增 `kdf=argon2id` 情境
-2. 在「密碼學向量測試」加入不同 KDF 混用情境（舊 PBKDF2 → 新 Argon2id）
-3. 確保 Header 版本化能正確路由解密
+### Argon2id Support
+If switching to Argon2id in the future, need to:
+1. Add `kdf=argon2id` scenario in "Parameter Replay Tests"
+2. Add different KDF mixing scenarios in "Cryptographic Vector Tests" (old PBKDF2 → new Argon2id)
+3. Ensure Header versioning can correctly route decryption
 
-### IV Registry 限制
-- IV registry 是 session 級別的，在多分頁或重新整理後無法跨 session 檢測
-- 跨 session 的 IV 重用檢測需要後端支持（建議在 Edge Function 層實現）
+### IV Registry Limitations
+- IV registry is session-level, cannot detect across sessions after multi-tab or refresh
+- Cross-session IV reuse detection requires backend support (recommend implementing at Edge Function layer)
 
-### Worker 壽命管理
-- 測試結束/頁面離開時必須 `terminate()` worker 並清理 IV registry，防止記憶體殭屍
-- 建議在 `useEffect` cleanup 函數中處理：
+### Worker Lifetime Management
+- Must `terminate()` worker and clean up IV registry when test ends/page leaves, prevent memory zombies
+- Recommend handling in `useEffect` cleanup function:
 
 ```typescript
 useEffect(() => {
@@ -430,69 +430,69 @@ useEffect(() => {
     if (worker) {
       worker.terminate();
     }
-    // 清理 IV registry（如果需要）
+    // Clean up IV registry (if needed)
   };
 }, []);
 ```
 
-### 重放防護（伺服器端）
-- 對受保護端點以 `Replay-Nonce`（一次性、短時 TTL）或 `Idempotency-Key`（客戶端送）+ 伺服器去重
-- 在探針裡驗證「重放 → 409/PARAM_MISMATCH/專用錯誤」
-- 建議在 Rate Limit 測試中加入重放檢測
+### Replay Protection (Server-Side)
+- For protected endpoints, use `Replay-Nonce` (one-time, short TTL) or `Idempotency-Key` (client sends) + server deduplication
+- In probe, verify "replay → 409/PARAM_MISMATCH/dedicated error"
+- Recommend adding replay detection in Rate Limit test
 
-### 結構化審計欄位
-在輸出 JSON/伺服器審計日誌都應包含：
-- `request_id`：請求唯一標識
-- `session_id`：會話標識
-- `key_id_hash`：keyId 的二次衍生（HKDF 再派生），降低關聯性
-- `rate_bucket`：限流桶標識
-- 對齊排障流程
+### Structured Audit Fields
+Output JSON/server audit logs should all include:
+- `request_id`: Request unique identifier
+- `session_id`: Session identifier
+- `key_id_hash`: keyId's secondary derivation (HKDF re-derived), reducing correlation
+- `rate_bucket`: Rate limit bucket identifier
+- Align troubleshooting process
 
-### 時間/隱私邊界
-- `created_at` 可能成為側通道（重放/使用者活躍度推斷）
-- 建議：時間戳取分鐘級四捨五入或以 server 時間回填
-- 文檔註明此設計目的：降低時間粒度，減少側通道洩漏
+### Time/Privacy Boundaries
+- `created_at` may become side-channel (replay/user activity inference)
+- Recommendation: Timestamp rounded to minute level or server time backfilled
+- Document this design purpose: Reduce time granularity, reduce side-channel leakage
 
-### 可觀測性對齊
-- 429/401/5xx 路徑加結構化欄位（審計欄位建議）
-- 務必把 `request_id` 回傳到前端測試 JSON 裡，PR review 才能 1:1 對齊後端 log
-- 輸出 JSON 應包含：`request_id`、`session_id`、`key_id_hash`（二次衍生）、`rate_bucket`
+### Observability Alignment
+- Add structured fields to 429/401/5xx paths (audit field recommendations)
+- Must return `request_id` to frontend test JSON, PR review can 1:1 align with backend logs
+- Output JSON should include: `request_id`, `session_id`, `key_id_hash` (secondary derivation), `rate_bucket`
 
-### 計時精度與校準
-- 瀏覽器計時器常被降噪
-- 跑 timing test 前先做自校準（空轉 N 次量測成熟延遲）
-- 把 `baselineJitterMs` 記進報表，否則 AUC/KS 可能誤判
+### Timing Precision and Calibration
+- Browser timers are often denoised
+- Before running timing test, do self-calibration (idle N times to measure baseline delay)
+- Record `baselineJitterMs` in report, otherwise AUC/KS may misjudge
 
-### UTF-8 最大長度保護
-- 長文測到 10KB 沒問題，但實際上線最好也限制「單次解密最大 payload」（例如 1MB）
-- 在文件標註最大長度，避免 OOM 類事故
+### UTF-8 Maximum Length Protection
+- Long text tested to 10KB is fine, but actually online should also limit "maximum payload per decryption" (e.g., 1MB)
+- Mark maximum length in documentation, avoid OOM-type incidents
 
-### 環境旗標保護
-- CI 加一條保護，禁止 `VITE_ENABLE_SECURITY_TESTS=true` 出現在 Dockerfile 或任何 prod build 命令
-- 建議在 CI 中添加 grep 檢查
+### Environment Flag Protection
+- CI adds one protection, prohibit `VITE_ENABLE_SECURITY_TESTS=true` from appearing in Dockerfile or any prod build command
+- Recommend adding grep check in CI
 
-## 可重現性支持（SEED）
+## Reproducibility Support (SEED)
 
-所有測試支持 SEED 參數，確保測試結果可重現：
+All tests support SEED parameter, ensuring test results are reproducible:
 
-- **設置 SEED**：在測試開始前調用 `setTestSeed(seed)`，所有隨機明文/IV/批次節奏都由種子驅動
-- **記錄 SEED**：每次測試的 SEED 會記錄到結果 JSON 中
-- **重放失敗用例**：使用相同的 SEED 可以一鍵重放失敗的測試用例
+- **Set SEED**: Before test starts, call `setTestSeed(seed)`, all random plaintext/IV/batch rhythm driven by seed
+- **Record SEED**: Each test's SEED will be recorded in result JSON
+- **Replay Failed Cases**: Using same SEED can one-click replay failed test cases
 
-**使用方式**：
+**Usage**:
 ```typescript
 import { setTestSeed } from '@/lib/securityTests';
 
-// 設置固定 SEED（例如從失敗報告中獲取）
+// Set fixed SEED (e.g., from failure report)
 setTestSeed(1337);
 
-// 運行測試（結果將完全可重現）
+// Run tests (results will be completely reproducible)
 await runAllSecurityTests(...);
 ```
 
-## 測試輸出格式（標準化 JSON）
+## Test Output Format (Standardized JSON)
 
-每次前端探針與 CI 壓測輸出為統一 JSON 格式（例如 `benchmarks/security-<date>.json`），用於機械比對與趨勢分析：
+Each frontend probe and CI load test outputs unified JSON format (e.g., `benchmarks/security-<date>.json`), for automated comparison and trend analysis:
 
 ```json
 {
@@ -540,22 +540,22 @@ await runAllSecurityTests(...);
 }
 ```
 
-此格式可用於：
-- CI 自動化驗收
-- 趨勢分析（在 README 放最近三次趨勢小圖）
-- 儀表板顯示歷史對比
+This format can be used for:
+- CI automated acceptance
+- Trend analysis (put recent three trend charts in README)
+- Dashboard displaying historical comparison
 
-**JSON Schema 驗證**：
-輸出 JSON 必須符合 `benchmarks/schema/security.v1.json` Schema。CI 使用 `ajv` 驗證，避免欄位漂移。
+**JSON Schema Validation**:
+Output JSON must conform to `benchmarks/schema/security.v1.json` Schema. CI uses `ajv` for validation, avoiding field drift.
 
-**非預期成功告警**：
-在應該失敗的測試（如篡改、錯長度）若得到 200/解密成功，務必打紅燈並輸出「最小復現樣本」：`header`、`iv`、`ciphertext`、`SEED`。這對快速回歸極有用。
+**Unexpected Success Alert**:
+In tests that should fail (such as tampering, wrong length), if getting 200/decryption success, must flag red and output "minimal reproduction sample": `header`, `iv`, `ciphertext`, `SEED`. This is extremely useful for quick regression.
 
-## 安全建議
+## Security Recommendations
 
 ### Content Security Policy (CSP)
 
-建議為安全測試頁面設置嚴格的 CSP：
+Recommend setting strict CSP for security test page:
 
 ```
 Content-Security-Policy: 
@@ -566,63 +566,63 @@ Content-Security-Policy:
   frame-ancestors 'none';
 ```
 
-**重要提醒**：Supabase 區域子域不同需要同步更新 `connect-src`，避免誤判「網路錯誤」。例如：
-- 美國區域：`https://*.supabase.co`
-- 歐洲區域：`https://*.supabase.io`
-- 其他區域：根據實際使用的 Supabase 專案區域調整
+**Important Reminder**: Supabase regional subdomains differ, need to synchronously update `connect-src`, avoid misjudging "network errors". For example:
+- US region: `https://*.supabase.co`
+- Europe region: `https://*.supabase.io`
+- Other regions: Adjust based on actual Supabase project region used
 
-**Web Worker 與 WASM 支持**：
-若使用 Web Worker 或 WASM，建議補充：
+**Web Worker and WASM Support**:
+If using Web Worker or WASM, recommend adding:
 ```
 worker-src 'self' blob:;
 connect-src 'self' https://*.supabase.co https://*.supabase.io;
 ```
-如果有 WASM：`script-src 'self' 'wasm-unsafe-eval';`（僅在確需時開）
+If WASM: `script-src 'self' 'wasm-unsafe-eval';` (only open when definitely needed)
 
-**COOP/COEP 建議**：
-考慮設置 `Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy: require-corp`（COOP/COEP）以獲得更穩定的 worker/共享記憶體表現。
+**COOP/COEP Recommendations**:
+Consider setting `Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy: require-corp` (COOP/COEP) for more stable worker/shared memory performance.
 
-**重要**：把 COOP/COEP 只開在 `/security-tests` route（或獨立 origin），避免影響主應用第三方整合。
+**Important**: Only enable COOP/COEP on `/security-tests` route (or independent origin), avoid affecting main application third-party integrations.
 
-**Trusted Types + CSP 強化**：
-若頁面有任何字串拼接到 DOM 的風險，建議開 `require-trusted-types-for 'script'` 並在測試頁使用自定義 policy；即便是內部工具頁，這能避免細節滑坡。
+**Trusted Types + CSP Enhancement**:
+If page has any risk of string concatenation to DOM, recommend enabling `require-trusted-types-for 'script'` and using custom policy in test page; even for internal tool pages, this can avoid detail slippage.
 
-這可以防止測試頁被植入奇怪腳本，確保測試環境的安全性。
+This can prevent test page from being injected with strange scripts, ensuring test environment security.
 
-### 風險旗標掃描
+### Risk Flag Scanning
 
-在 CI 中已實現自動檢查，禁止以下旗標長駐在產線環境變數或 `.env.example`：
+CI has implemented automatic checks, prohibiting the following flags from persisting in production environment variables or `.env.example`:
 
 - `VITE_ENABLE_SECURITY_TESTS=true`
 - `VITE_FORCE_ENABLE_SECURITY_TESTS=true`
 - `console.profile`
 - `debug_test=true`
 
-**CI 檢查腳本**：
-- 位置：`scripts/ci/check-security-flags.sh`
-- GitHub Actions：`.github/workflows/security-check.yml`
-- 檢查範圍：
-  - `.env.example`：不應包含任何 `VITE_*SECURITY_TESTS*` 環境變數
-  - `Dockerfile` / `Dockerfile.*`：不應包含安全測試相關的環境變數
-  - `docker-compose.yml`：不應包含安全測試相關的環境變數
-  - `package.json` 構建腳本：不應包含安全測試相關的環境變數
-  - 所有 shell 腳本：不應設置 `VITE_*SECURITY_TESTS*=true`
+**CI Check Script**:
+- Location: `scripts/ci/check-security-flags.sh`
+- GitHub Actions: `.github/workflows/security-check.yml`
+- Check Scope:
+  - `.env.example`: Should not contain any `VITE_*SECURITY_TESTS*` environment variables
+  - `Dockerfile` / `Dockerfile.*`: Should not contain security test-related environment variables
+  - `docker-compose.yml`: Should not contain security test-related environment variables
+  - `package.json` build scripts: Should not contain security test-related environment variables
+  - All shell scripts: Should not set `VITE_*SECURITY_TESTS*=true`
 
-**運行檢查**：
+**Run Check**:
 ```bash
-# 本地運行 CI 檢查
+# Run CI check locally
 npm run ci:check-security-flags
 
-# 或直接運行腳本
+# Or run script directly
 bash scripts/ci/check-security-flags.sh
 ```
 
-**修復建議**：
-1. 從 `.env.example` 中移除所有 `VITE_*SECURITY_TESTS*` 環境變數
-2. 從 Dockerfile 和 docker-compose 文件中移除安全測試相關的環境變數
-3. 從生產構建腳本中移除安全測試相關的環境變數
-4. 安全測試頁面應僅在開發環境或特殊測試場景中使用
+**Fix Recommendations**:
+1. Remove all `VITE_*SECURITY_TESTS*` environment variables from `.env.example`
+2. Remove security test-related environment variables from Dockerfile and docker-compose files
+3. Remove security test-related environment variables from production build scripts
+4. Security test page should only be used in development environment or special test scenarios
 
-## 擴展測試
+## Extending Tests
 
-如需添加新的測試場景，可以在 `securityTests.ts` 中添加新的測試函數，並在 `runAllSecurityTests` 中調用。
+If you need to add new test scenarios, you can add new test functions in `securityTests.ts` and call them in `runAllSecurityTests`.

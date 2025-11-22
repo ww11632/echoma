@@ -1,185 +1,184 @@
-# Seal Access Policies 使用指南
+# Seal Access Policies User Guide
 
-## 概述
+## Overview
 
-Seal Access Policies 允许您控制谁可以访问您的加密情绪记录。启用后，您可以：
-- **分享记录**：授权特定地址访问您的私有记录
-- **管理权限**：查看、添加、撤销授权
-- **链上验证**：所有权限操作都记录在 Sui 区块链上，可公开验证和审计
+Seal Access Policies allow you to control who can access your encrypted emotion records. Once enabled, you can:
+- **Share records**: Authorize specific addresses to access your private records
+- **Manage permissions**: View, add, and revoke authorizations
+- **On-chain verification**: All permission operations are recorded on the Sui blockchain, publicly verifiable and auditable
 
-## 使用流程
+## Usage Flow
 
-### 1. 启用 Seal Access Policies
+### 1. Enable Seal Access Policies
 
-在记录情绪时：
-1. 确保已连接钱包
-2. 启用"鑄造為 NFT"选项
-3. 启用"啟用 Seal Access Policies"选项
-4. 完成记录并铸造 NFT
+When recording emotions:
+1. Ensure wallet is connected
+2. Enable "Mint as NFT" option
+3. Enable "Enable Seal Access Policies" option
+4. Complete recording and mint NFT
 
-### 2. 分享记录（授权访问）
+### 2. Share Records (Authorize Access)
 
-#### 📍 位置一：记录页面（记录完成后立即分享）
+#### 📍 Location 1: Record Page (Share immediately after recording)
 
-**路径**：`/record` 页面 → 记录完成后
+**Path**: `/record` page → After recording completes
 
-**步骤**：
-1. 完成情绪记录并成功铸造 NFT 后
-2. 在右侧栏的"儲存設定"区域下方，会显示**"分享記錄"**按钮
-3. 点击"分享記錄"按钮
-4. 在弹出的对话框中：
-   - 选择要分享的对象（心理師、伴侶、家人、醫生、朋友、或自定义地址）
-   - 输入对方的钱包地址（66 字符，以 `0x` 开头）
-   - 点击"分享"按钮
-5. 确认钱包交易
+**Steps**:
+1. After completing emotion record and successfully minting NFT
+2. Below the "Storage Settings" area in the right sidebar, a **"Share Record"** button will appear
+3. Click the "Share Record" button
+4. In the popup dialog:
+   - Select the person to share with (Therapist, Partner, Family, Doctor, Friend, or custom address)
+   - Enter the recipient's wallet address (66 characters, starting with `0x`)
+   - Click "Share" button
+5. Confirm wallet transaction
 
-**适用场景**：记录完成后立即分享给他人
+**Use case**: Share immediately after recording
 
-#### 📍 位置二：时间轴页面（随时管理权限）
+#### 📍 Location 2: Timeline Page (Manage permissions anytime)
 
-**路径**：`/timeline` 页面 → 点击记录 → 详情对话框
+**Path**: `/timeline` page → Click record → Detail dialog
 
-**步骤**：
-1. 进入"時間軸"页面（点击首页的"查看時間軸"或导航到 `/timeline`）
-2. 找到要分享的记录（必须是已铸造为 NFT 的记录）
-3. 点击该记录卡片，打开详情对话框
-4. 在详情对话框底部，找到**"訪問權限管理"**部分
-5. 点击**"授權訪問"**按钮
-6. 在弹出的对话框中：
-   - 选择角色（可选）：伴侶、家人、心理師、醫生、AI Agent、朋友、其他
-   - 输入钱包地址
-   - 点击"授權"按钮
-7. 确认钱包交易
+**Steps**:
+1. Go to "Timeline" page (click "View Timeline" on homepage or navigate to `/timeline`)
+2. Find the record to share (must be a record minted as NFT)
+3. Click the record card to open detail dialog
+4. At the bottom of the detail dialog, find the **"Access Permission Management"** section
+5. Click the **"Authorize Access"** button
+6. In the popup dialog:
+   - Select role (optional): Partner, Family, Therapist, Doctor, AI Agent, Friend, Other
+   - Enter wallet address
+   - Click "Authorize" button
+7. Confirm wallet transaction
 
-**适用场景**：随时管理已记录的情绪的访问权限
+**Use case**: Manage access permissions for recorded emotions anytime
 
-### 3. 管理授权（在时间轴页面）
+### 3. Manage Authorizations (On Timeline Page)
 
-**路径**：`/timeline` 页面 → 点击记录 → 详情对话框 → "訪問權限管理"部分
+**Path**: `/timeline` page → Click record → Detail dialog → "Access Permission Management" section
 
-在时间线的记录详情中，您可以：
+In the timeline record details, you can:
 
-#### 查看授权列表
-- 查看所有已授权访问的地址
-- 查看每个地址的角色标签（如：伴侶、心理師等）
-- 查看授权时间
+#### View Authorization List
+- View all addresses that have been granted access
+- View role labels for each address (e.g., Partner, Therapist, etc.)
+- View authorization time
 
-#### 授权新地址
-1. 在"訪問權限管理"部分，点击**"授權訪問"**按钮
-2. 选择角色（可选）：
-   - 伴侶
-   - 家人
-   - 心理師
-   - 醫生
+#### Authorize New Address
+1. In the "Access Permission Management" section, click the **"Authorize Access"** button
+2. Select role (optional):
+   - Partner
+   - Family
+   - Therapist
+   - Doctor
    - AI Agent
-   - 朋友
-   - 其他
-3. 输入钱包地址（66 字符，以 0x 开头）
-4. 点击"授權"按钮
-5. 确认钱包交易
+   - Friend
+   - Other
+3. Enter wallet address (66 characters, starting with 0x)
+4. Click "Authorize" button
+5. Confirm wallet transaction
 
-#### 撤销授权
-1. 在授权列表中找到要撤销的地址
-2. 点击该地址旁边的"撤销"按钮（UserMinus 图标）
-3. 确认钱包交易
+#### Revoke Authorization
+1. Find the address to revoke in the authorization list
+2. Click the "Revoke" button (UserMinus icon) next to that address
+3. Confirm wallet transaction
 
-**注意**：撤销授权后，该地址将无法再访问该记录。
+**Note**: After revoking authorization, that address will no longer be able to access the record.
 
-#### 查看授权历史
-1. 在"訪問權限管理"部分，点击**"歷史"**按钮
-2. 查看所有授权/撤销操作的历史记录
-3. 包括操作时间、地址和交易哈希
+#### View Authorization History
+1. In the "Access Permission Management" section, click the **"History"** button
+2. View history of all authorization/revocation operations
+3. Includes operation time, address, and transaction hash
 
-### 4. 访问被分享的记录
+### 4. Access Shared Records
 
-当有人授权您访问记录时：
-1. 确保您使用被授权的钱包地址连接
-2. 在时间线中，您应该能看到该记录
-3. 点击记录查看详情
-4. 系统会自动使用您的钱包密钥解密内容
+When someone authorizes you to access a record:
+1. Ensure you're connected with the authorized wallet address
+2. In the timeline, you should be able to see the record
+3. Click the record to view details
+4. System will automatically decrypt content using your wallet key
 
-## 功能特点
+## Features
 
-### ✅ 链上验证
-- 所有授权操作都记录在 Sui 区块链上
-- 任何人都可以验证某个地址是否有访问权限
-- 完整的操作历史可审计
+### ✅ On-Chain Verification
+- All authorization operations are recorded on the Sui blockchain
+- Anyone can verify if an address has access permissions
+- Complete operation history is auditable
 
-### ✅ 角色管理
-- 为每个授权地址设置角色标签
-- 方便识别和管理不同的授权对象
-- 角色信息保存在本地，便于管理
+### ✅ Role Management
+- Set role labels for each authorized address
+- Easy to identify and manage different authorized parties
+- Role information saved locally for easy management
 
-### ✅ 灵活控制
-- 随时可以授权新地址
-- 随时可以撤销授权
-- 支持多个地址同时访问
+### ✅ Flexible Control
+- Can authorize new addresses anytime
+- Can revoke authorization anytime
+- Supports multiple addresses accessing simultaneously
 
-### ✅ 隐私保护
-- 只有被授权的地址才能解密记录
-- 授权操作本身是公开的，但记录内容仍然是加密的
-- 记录所有者始终可以访问自己的记录
+### ✅ Privacy Protection
+- Only authorized addresses can decrypt records
+- Authorization operations themselves are public, but record content remains encrypted
+- Record owner can always access their own records
 
-## 注意事项
+## Important Notes
 
-1. **PolicyRegistry 必须存在**
-   - 如果看到"PolicyRegistry 未找到"警告，需要先部署 Seal Access Policies 合约
-   - 部署后，PolicyRegistry ID 会自动配置
+1. **PolicyRegistry Must Exist**
+   - If you see "PolicyRegistry not found" warning, need to deploy Seal Access Policies contract first
+   - After deployment, PolicyRegistry ID will be automatically configured
 
-2. **需要钱包连接**
-   - 所有授权/撤销操作都需要钱包签名
-   - 确保钱包有足够的 SUI 代币支付 Gas 费用
+2. **Wallet Connection Required**
+   - All authorization/revocation operations require wallet signature
+   - Ensure wallet has sufficient SUI tokens to pay Gas fees
 
-3. **地址格式**
-   - Sui 钱包地址必须是 66 字符
-   - 必须以 `0x` 开头
+3. **Address Format**
+   - Sui wallet address must be 66 characters
+   - Must start with `0x`
 
-4. **网络匹配**
-   - 确保授权者和被授权者使用相同的网络（testnet/mainnet）
-   - 不同网络的授权不会生效
+4. **Network Matching**
+   - Ensure authorizer and authorized use the same network (testnet/mainnet)
+   - Authorizations on different networks won't take effect
 
-## 快速导航
+## Quick Navigation
 
-### 分享记录的位置
+### Share Record Locations
 
-1. **记录完成后立即分享**：
-   - 页面：`/record`（记录页面）
-   - 位置：记录完成后，右侧栏下方
-   - 按钮：**"分享記錄"**
+1. **Share immediately after recording**:
+   - Page: `/record` (Record page)
+   - Location: After recording completes, below right sidebar
+   - Button: **"Share Record"**
 
-2. **随时管理权限**：
-   - 页面：`/timeline`（时间轴页面）
-   - 位置：点击记录 → 详情对话框 → 底部
-   - 部分：**"訪問權限管理"**
-   - 按钮：**"授權訪問"**（添加新授权）
+2. **Manage permissions anytime**:
+   - Page: `/timeline` (Timeline page)
+   - Location: Click record → Detail dialog → Bottom
+   - Section: **"Access Permission Management"**
+   - Button: **"Authorize Access"** (Add new authorization)
 
-## 常见问题
+## FAQ
 
-### Q: 如何知道谁可以访问我的记录？
-A: 进入时间轴页面（`/timeline`），点击记录打开详情，在"訪問權限管理"部分可以看到所有已授权的地址列表。
+### Q: How do I know who can access my records?
+A: Go to the timeline page (`/timeline`), click a record to open details, and you can see all authorized addresses in the "Access Permission Management" section.
 
-### Q: 记录完成后没有看到"分享記錄"按钮？
-A: 确保：
-1. 已启用"鑄造為 NFT"选项
-2. 已启用"啟用 Seal Access Policies"选项
-3. NFT 已成功铸造（`lastMintedNftId` 存在）
+### Q: Don't see "Share Record" button after recording?
+A: Ensure:
+1. "Mint as NFT" option is enabled
+2. "Enable Seal Access Policies" option is enabled
+3. NFT was successfully minted (`lastMintedNftId` exists)
 
-### Q: 撤销授权后，对方还能看到记录吗？
-A: 不能。撤销授权后，该地址将无法再解密和访问该记录。
+### Q: Can the other party still see the record after revoking authorization?
+A: No. After revoking authorization, that address will no longer be able to decrypt and access the record.
 
-### Q: 可以授权多个地址吗？
-A: 可以。您可以授权任意数量的地址访问同一个记录。
+### Q: Can I authorize multiple addresses?
+A: Yes. You can authorize any number of addresses to access the same record.
 
-### Q: 授权操作需要费用吗？
-A: 是的，每次授权/撤销操作都需要支付 Sui 网络的 Gas 费用。
+### Q: Do authorization operations cost fees?
+A: Yes, each authorization/revocation operation requires paying Sui network Gas fees.
 
-### Q: 授权记录在哪里查看？
-A: 所有授权操作都记录在 Sui 区块链上，可以通过 Sui Explorer 查看交易详情。
+### Q: Where can I view authorization records?
+A: All authorization operations are recorded on the Sui blockchain, and can be viewed via Sui Explorer transaction details.
 
-## 技术细节
+## Technical Details
 
-- **合约模块**：`seal_access_policies`
-- **PolicyRegistry**：共享对象，存储所有访问策略
-- **访问策略**：每个 EntryNFT 对应一个访问策略
-- **授权事件**：`AccessGrantedEvent` 和 `AccessRevokedEvent`
-
+- **Contract Module**: `seal_access_policies`
+- **PolicyRegistry**: Shared object storing all access policies
+- **Access Policy**: Each EntryNFT corresponds to one access policy
+- **Authorization Events**: `AccessGrantedEvent` and `AccessRevokedEvent`

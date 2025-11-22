@@ -1,182 +1,181 @@
-# Faucet - 獲取測試代幣指南
+# Faucet - Test Token Acquisition Guide
 
-> 本文檔說明如何獲取 Sui Testnet 和 Walrus 測試代幣
+> This document explains how to obtain Sui Testnet and Walrus test tokens
 
-## 🪙 需要的代幣
+## 🪙 Required Tokens
 
-使用 Walrus 上傳數據需要兩種代幣：
+Using Walrus to upload data requires two types of tokens:
 
-1. **SUI** - 支付交易費用（gas）
-2. **WAL** - 支付存儲費用
+1. **SUI** - Pay transaction fees (gas)
+2. **WAL** - Pay storage fees
 
-## 💧 Sui Testnet SUI 代幣
+## 💧 Sui Testnet SUI Tokens
 
-### 方法 1：官方水龍頭（推薦）
+### Method 1: Official Faucet (Recommended)
 
-**網址**：https://faucet.sui.io/
+**URL**: https://faucet.sui.io/
 
-**步驟**：
-1. 訪問 https://faucet.sui.io/
-2. 連接你的 Sui 錢包（如 Sui Wallet）
-3. 選擇 **Testnet** 網絡
-4. 點擊「Request SUI」按鈕
-5. 等待代幣到賬（通常幾秒到幾分鐘）
+**Steps**:
+1. Visit https://faucet.sui.io/
+2. Connect your Sui wallet (e.g., Sui Wallet)
+3. Select **Testnet** network
+4. Click "Request SUI" button
+5. Wait for tokens to arrive (usually seconds to minutes)
 
-### 方法 2：社群水龍頭
+### Method 2: Community Faucet
 
-**Blockbolt 水龍頭**：https://faucet.blockbolt.io/
+**Blockbolt Faucet**: https://faucet.blockbolt.io/
 
-**步驟**：
-1. 訪問 https://faucet.blockbolt.io/
-2. 輸入你的 Sui 錢包地址或 SuiNS 名稱
-3. 選擇 Testnet
-4. 完成驗證（如需要）
-5. 請求測試代幣
+**Steps**:
+1. Visit https://faucet.blockbolt.io/
+2. Enter your Sui wallet address or SuiNS name
+3. Select Testnet
+4. Complete verification (if required)
+5. Request test tokens
 
-### 方法 3：Sui Discord
+### Method 3: Sui Discord
 
-**步驟**：
-1. 加入 [Sui Discord 伺服器](https://discord.com/invite/sui)
-2. 前往 `#testnet-faucet` 頻道
-3. 輸入以下指令：
+**Steps**:
+1. Join [Sui Discord Server](https://discord.com/invite/sui)
+2. Go to `#testnet-faucet` channel
+3. Enter the following command:
    ```
-   !faucet <你的錢包地址>
+   !faucet <your wallet address>
    ```
-4. 例如：
+4. Example:
    ```
    !faucet 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
    ```
 
-### 方法 4：使用 Sui CLI
+### Method 4: Using Sui CLI
 
-**步驟**：
+**Steps**:
 ```bash
-# 安裝 Sui CLI（如果還沒安裝）
+# Install Sui CLI (if not installed)
 cargo install --locked --git https://github.com/MystenLabs/sui.git --branch testnet sui
 
-# 配置 Sui 客戶端連接到 testnet
+# Configure Sui client to connect to testnet
 sui client
 
-# 從水龍頭獲取測試代幣
+# Get test tokens from faucet
 sui client faucet
 ```
 
-## 🦭 Walrus WAL 代幣
+## 🦭 Walrus WAL Tokens
 
-### 方法 1：使用 Walrus CLI（推薦）
+### Method 1: Using Walrus CLI (Recommended)
 
-**步驟**：
+**Steps**:
 ```bash
-# 安裝 Walrus CLI（如果還沒安裝）
-# 請參考 Walrus 官方文檔
+# Install Walrus CLI (if not installed)
+# Please refer to Walrus official documentation
 
-# 使用 SUI 代幣以 1:1 比例兌換 WAL 代幣
+# Exchange SUI tokens for WAL tokens at 1:1 ratio
 walrus get-wal
 
-# 查看 WAL 餘額
+# Check WAL balance
 sui client balance
 ```
 
-**說明**：
-- 需要先有 SUI 測試代幣
-- 以 1:1 的比例將 SUI 兌換為 WAL
-- 在 testnet 上，WAL 和 SUI 可以互換
+**Notes**:
+- Need to have SUI test tokens first
+- Exchange SUI to WAL at 1:1 ratio
+- On testnet, WAL and SUI are interchangeable
 
-### 方法 2：Stakely 水龍頭
+### Method 2: Stakely Faucet
 
-**網址**：https://stakely.io/faucet/walrus-testnet-wal
+**URL**: https://stakely.io/faucet/walrus-testnet-wal
 
-**步驟**：
-1. 訪問 https://stakely.io/faucet/walrus-testnet-wal
-2. 輸入你的 Walrus 測試網地址（Sui 地址）
-3. 完成驗證步驟（可能需要 Twitter 分享）
-4. 提交請求
-5. 等待代幣到賬
+**Steps**:
+1. Visit https://stakely.io/faucet/walrus-testnet-wal
+2. Enter your Walrus testnet address (Sui address)
+3. Complete verification steps (may require Twitter share)
+4. Submit request
+5. Wait for tokens to arrive
 
-**注意**：
-- 可能需要 Twitter 驗證
-- 確保推文是公開的
-- 可能需要等待一段時間
+**Notes**:
+- May require Twitter verification
+- Ensure tweet is public
+- May need to wait some time
 
-## 📝 建議流程
+## 📝 Recommended Workflow
 
-### 第一次使用
+### First Time Use
 
-1. **獲取 SUI 代幣**
-   - 訪問 https://faucet.sui.io/
-   - 連接錢包並選擇 Testnet
-   - 請求 SUI 代幣
+1. **Get SUI Tokens**
+   - Visit https://faucet.sui.io/
+   - Connect wallet and select Testnet
+   - Request SUI tokens
 
-2. **獲取 WAL 代幣**
-   - 使用 Walrus CLI：`walrus get-wal`
-   - 或使用 Stakely 水龍頭
+2. **Get WAL Tokens**
+   - Use Walrus CLI: `walrus get-wal`
+   - Or use Stakely faucet
 
-3. **檢查餘額**
-   - 在錢包中查看 SUI 和 WAL 餘額
-   - 確保有足夠的代幣（建議至少 0.1 SUI 和 0.1 WAL）
+3. **Check Balance**
+   - View SUI and WAL balance in wallet
+   - Ensure sufficient tokens (recommend at least 0.1 SUI and 0.1 WAL)
 
-### 代幣需求估算
+### Token Requirement Estimation
 
-**每次上傳大約需要**：
-- **SUI**：約 0.001-0.01 SUI（gas 費用，取決於數據大小）
-- **WAL**：取決於數據大小和存儲時長（epochs）
+**Each upload approximately requires**:
+- **SUI**: About 0.001-0.01 SUI (gas fees, depends on data size)
+- **WAL**: Depends on data size and storage duration (epochs)
 
-**建議餘額**：
-- **SUI**：至少 0.1 SUI（足夠多次上傳）
-- **WAL**：至少 0.1 WAL（足夠多次上傳）
+**Recommended Balance**:
+- **SUI**: At least 0.1 SUI (enough for multiple uploads)
+- **WAL**: At least 0.1 WAL (enough for multiple uploads)
 
-## ⚠️ 注意事項
+## ⚠️ Important Notes
 
-1. **測試代幣沒有實際價值**
-   - 僅供開發和測試使用
-   - 不能用於主網
+1. **Test tokens have no real value**
+   - For development and testing only
+   - Cannot be used on mainnet
 
-2. **水龍頭限制**
-   - 通常有請求頻率限制（如每 24 小時一次）
-   - 不要濫用水龍頭
+2. **Faucet Limitations**
+   - Usually has request frequency limits (e.g., once per 24 hours)
+   - Don't abuse faucets
 
-3. **網絡選擇**
-   - 確保錢包連接到 **Testnet**
-   - 不要使用 Mainnet 地址
+3. **Network Selection**
+   - Ensure wallet is connected to **Testnet**
+   - Don't use Mainnet addresses
 
-4. **地址格式**
-   - Sui 地址格式：`0x` 開頭，64 個十六進制字符
-   - 例如：`0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef`
+4. **Address Format**
+   - Sui address format: Starts with `0x`, 64 hexadecimal characters
+   - Example: `0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef`
 
-## 🔗 相關連結
+## 🔗 Related Links
 
-- [Sui 官方水龍頭](https://faucet.sui.io/)
-- [Sui 文檔 - 獲取代幣](https://docs.sui.io/guides/developer/getting-started/get-coins)
+- [Sui Official Faucet](https://faucet.sui.io/)
+- [Sui Documentation - Get Coins](https://docs.sui.io/guides/developer/getting-started/get-coins)
 - [Sui Discord](https://discord.com/invite/sui)
-- [Blockbolt 水龍頭](https://faucet.blockbolt.io/)
-- [Stakely Walrus 水龍頭](https://stakely.io/faucet/walrus-testnet-wal)
-- [Walrus 官方文檔](https://docs.wal.app/)
+- [Blockbolt Faucet](https://faucet.blockbolt.io/)
+- [Stakely Walrus Faucet](https://stakely.io/faucet/walrus-testnet-wal)
+- [Walrus Official Documentation](https://docs.wal.app/)
 
-## 💡 常見問題
+## 💡 FAQ
 
-### Q: 為什麼需要兩種代幣？
-
-A: 
-- **SUI** 用於支付 Sui 區塊鏈的交易費用（gas）
-- **WAL** 用於支付 Walrus 存儲服務的費用
-
-### Q: 可以只用 SUI 嗎？
-
-A: 在 testnet 上，可以使用 Walrus CLI 將 SUI 兌換為 WAL（1:1 比例）。
-
-### Q: 水龍頭請求失敗怎麼辦？
+### Q: Why do I need two types of tokens?
 
 A: 
-1. 檢查網絡連接
-2. 確認錢包地址正確
-3. 確認選擇了 Testnet 網絡
-4. 等待一段時間後重試
-5. 嘗試其他水龍頭
+- **SUI** is used to pay transaction fees (gas) on the Sui blockchain
+- **WAL** is used to pay fees for Walrus storage service
 
-### Q: 如何查看代幣餘額？
+### Q: Can I use only SUI?
+
+A: On testnet, you can use Walrus CLI to exchange SUI for WAL (1:1 ratio).
+
+### Q: What if faucet request fails?
 
 A: 
-- 在 Sui Wallet 中查看
-- 使用 Sui CLI：`sui client balance`
-- 在 Sui Explorer 中查看你的地址
+1. Check network connection
+2. Confirm wallet address is correct
+3. Confirm Testnet network is selected
+4. Wait a bit and retry
+5. Try other faucets
 
+### Q: How to check token balance?
+
+A: 
+- View in Sui Wallet
+- Use Sui CLI: `sui client balance`
+- View your address on Sui Explorer
