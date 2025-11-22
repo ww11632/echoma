@@ -54,11 +54,15 @@ export async function checkRateLimit(
       .from('ai_audit_logs')
       .insert({
         user_id: userId,
-        endpoint: 'rate_limit_check',
-        status: 'pending',
-        response_time_ms: 0,
-        tokens_used: 0,
-        metadata: { reservation: true, reservation_id: pendingReservationId },
+        api_endpoint: 'rate_limit_check',
+        input_length: 0,
+        input_summary: `Rate limit reservation: ${pendingReservationId}`,
+        language: 'en',
+        model_name: 'rate_limit',
+        response_category: 'pending',
+        response_length: 0,
+        risk_level: 'low',
+        security_check_passed: true,
       });
     
     if (insertError) {
@@ -85,7 +89,7 @@ export async function checkRateLimit(
         .from('ai_audit_logs')
         .delete()
         .eq('user_id', userId)
-        .eq('metadata->>reservation_id', pendingReservationId);
+        .eq('input_summary', `Rate limit reservation: ${pendingReservationId}`);
       
       return {
         allowed: false,
@@ -103,7 +107,7 @@ export async function checkRateLimit(
         .from('ai_audit_logs')
         .delete()
         .eq('user_id', userId)
-        .eq('metadata->>reservation_id', pendingReservationId);
+        .eq('input_summary', `Rate limit reservation: ${pendingReservationId}`);
       
       return {
         allowed: false,
@@ -163,11 +167,15 @@ export async function checkAnonymousRateLimit(
       .from('ai_audit_logs')
       .insert({
         user_id: anonUserId,
-        endpoint: 'rate_limit_check',
-        status: 'pending',
-        response_time_ms: 0,
-        tokens_used: 0,
-        metadata: { reservation: true, reservation_id: pendingReservationId, ip: requestIp },
+        api_endpoint: 'rate_limit_check_anon',
+        input_length: 0,
+        input_summary: `Rate limit reservation: ${pendingReservationId} (IP: ${requestIp || 'unknown'})`,
+        language: 'en',
+        model_name: 'rate_limit',
+        response_category: 'pending',
+        response_length: 0,
+        risk_level: 'low',
+        security_check_passed: true,
       });
     
     if (insertError) {
@@ -195,7 +203,7 @@ export async function checkAnonymousRateLimit(
         .from('ai_audit_logs')
         .delete()
         .eq('user_id', anonUserId)
-        .eq('metadata->>reservation_id', pendingReservationId);
+        .eq('input_summary', `Rate limit reservation: ${pendingReservationId} (IP: ${requestIp || 'unknown'})`);
       
       // Allow request on error to prevent blocking legitimate users
       return {
@@ -214,7 +222,7 @@ export async function checkAnonymousRateLimit(
         .from('ai_audit_logs')
         .delete()
         .eq('user_id', anonUserId)
-        .eq('metadata->>reservation_id', pendingReservationId);
+        .eq('input_summary', `Rate limit reservation: ${pendingReservationId} (IP: ${requestIp || 'unknown'})`);
       
       return {
         allowed: false,
@@ -268,11 +276,15 @@ export async function checkIPRateLimit(
       .from('ai_audit_logs')
       .insert({
         user_id: ipUserId,
-        endpoint: 'rate_limit_check_ip',
-        status: 'pending',
-        response_time_ms: 0,
-        tokens_used: 0,
-        metadata: { reservation: true, reservation_id: pendingReservationId, ip: requestIp },
+        api_endpoint: 'rate_limit_check_ip',
+        input_length: 0,
+        input_summary: `Rate limit reservation: ${pendingReservationId} (IP: ${requestIp})`,
+        language: 'en',
+        model_name: 'rate_limit',
+        response_category: 'pending',
+        response_length: 0,
+        risk_level: 'low',
+        security_check_passed: true,
       });
     
     if (insertError) {
@@ -300,7 +312,7 @@ export async function checkIPRateLimit(
         .from('ai_audit_logs')
         .delete()
         .eq('user_id', ipUserId)
-        .eq('metadata->>reservation_id', pendingReservationId);
+        .eq('input_summary', `Rate limit reservation: ${pendingReservationId} (IP: ${requestIp})`);
       
       // Allow request on error to prevent blocking legitimate users
       return {
@@ -319,7 +331,7 @@ export async function checkIPRateLimit(
         .from('ai_audit_logs')
         .delete()
         .eq('user_id', ipUserId)
-        .eq('metadata->>reservation_id', pendingReservationId);
+        .eq('input_summary', `Rate limit reservation: ${pendingReservationId} (IP: ${requestIp})`);
       
       console.warn(`[IPRateLimit] IP ${requestIp} exceeded rate limit: ${requestCount}/${RATE_LIMIT_CONFIG.maxRequestsPerIP}`);
       
@@ -386,7 +398,7 @@ export async function checkCombinedRateLimit(
         .from('ai_audit_logs')
         .delete()
         .eq('user_id', userId)
-        .eq('metadata->>reservation_id', userLimit.reservationId);
+        .eq('input_summary', `Rate limit reservation: ${userLimit.reservationId}`);
     }
     return { ...ipLimit, limitType: 'ip' };
   }
