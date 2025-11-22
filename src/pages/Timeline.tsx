@@ -312,19 +312,23 @@ const Timeline = () => {
                 const response = await supabase.functions.invoke('get-emotions');
                 if (!response.error && response.data?.success) {
                   const convertedRecords: EmotionRecord[] = response.data.records.map((r: any) => {
-                    // 如果 blob_id 或 walrus_url 是 null/undefined，視為本地記錄
-                    const hasWalrusData = r.blob_id && r.walrus_url;
-                    const isLocal = !hasWalrusData || 
-                                  r.walrus_url?.startsWith("local://") || 
-                                  r.blob_id?.startsWith("local_");
+                    // 更寬鬆地判斷是否有 Walrus 資料：只要有非本地 blob_id 或 walrus_url 即視為 Walrus
+                    const rawBlobId = r.blob_id || extractBlobIdFromUrl(r.walrus_url || "") || "";
+                    const nonLocalBlobId = rawBlobId && !String(rawBlobId).startsWith("local_");
+                    const hasWalrusData =
+                      nonLocalBlobId ||
+                      (r.walrus_url && !r.walrus_url.startsWith("local://"));
+                    const isLocal = !hasWalrusData;
                     
-                    // 為沒有 Walrus 資料的記錄生成本地 ID
-                    const blobId = hasWalrusData 
-                      ? r.blob_id 
+                    // 缺少 walrus_url 時，用 blob_id 補齊標準 Walrus URL（避免被誤判為本地）
+                    const blobId = hasWalrusData
+                      ? (nonLocalBlobId ? rawBlobId : (r.walrus_url || "").split("/").pop() || rawBlobId)
                       : `local_${r.id.slice(0, 8)}`;
                     
                     const walrusUrl = hasWalrusData
-                      ? r.walrus_url
+                      ? (r.walrus_url && !r.walrus_url.startsWith("local://")
+                          ? r.walrus_url
+                          : (blobId ? getWalrusUrl(blobId, currentNetworkSnapshot) : `local://${r.id}`))
                       : `local://${r.id}`;
                     
                     console.log(`[Timeline] Processing Supabase record ${r.id}:`, {
@@ -365,19 +369,21 @@ const Timeline = () => {
                 try {
                   const apiRecords = await getEmotions(session.access_token);
                   const convertedApiRecords: EmotionRecord[] = apiRecords.map((r: any) => {
-                    // 如果 blob_id 或 walrus_url 是 null/undefined，視為本地記錄
-                    const hasWalrusData = r.blob_id && r.walrus_url;
-                    const isLocal = !hasWalrusData || 
-                                  r.walrus_url?.startsWith("local://") || 
-                                  r.blob_id?.startsWith("local_");
+                    const rawBlobId = r.blob_id || extractBlobIdFromUrl(r.walrus_url || "") || "";
+                    const nonLocalBlobId = rawBlobId && !String(rawBlobId).startsWith("local_");
+                    const hasWalrusData =
+                      nonLocalBlobId ||
+                      (r.walrus_url && !r.walrus_url.startsWith("local://"));
+                    const isLocal = !hasWalrusData;
                     
-                    // 為沒有 Walrus 資料的記錄生成本地 ID
-                    const blobId = hasWalrusData 
-                      ? r.blob_id 
+                    const blobId = hasWalrusData
+                      ? (nonLocalBlobId ? rawBlobId : (r.walrus_url || "").split("/").pop() || rawBlobId)
                       : `local_${r.id.slice(0, 8)}`;
                     
                     const walrusUrl = hasWalrusData
-                      ? r.walrus_url
+                      ? (r.walrus_url && !r.walrus_url.startsWith("local://")
+                          ? r.walrus_url
+                          : (blobId ? getWalrusUrl(blobId, currentNetworkSnapshot) : `local://${r.id}`))
                       : `local://${r.id}`;
                     
                     return {
