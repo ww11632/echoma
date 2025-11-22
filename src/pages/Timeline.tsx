@@ -1373,6 +1373,14 @@ const Timeline = () => {
       const snapshotTimestamp = snapshot.timestamp
         ? new Date(snapshot.timestamp).toISOString()
         : null;
+      // Normalize emotion to support legacy payloads
+      const resolvedEmotion =
+        snapshot.emotion ||
+        snapshot.selectedEmotion ||
+        snapshot.mood ||
+        snapshot.feeling ||
+        snapshot.emotionType ||
+        record.emotion;
       
       // 更新記錄的 metadata（例如真實時間戳與情緒/強度）
       // 修正：始終執行更新，確保解密後的情緒能正確顯示
@@ -1383,13 +1391,13 @@ const Timeline = () => {
           const updatedRecord = {
             ...r,
             created_at: snapshotTimestamp || r.created_at,
-            emotion: snapshot.emotion && snapshot.emotion !== "encrypted" ? snapshot.emotion : r.emotion,
+            emotion: resolvedEmotion && resolvedEmotion !== "encrypted" ? resolvedEmotion : r.emotion,
             intensity: typeof snapshot.intensity === "number" ? snapshot.intensity : r.intensity,
             wallet_address: snapshot.walletAddress || r.wallet_address,
           };
           console.log(`[Timeline] 🔄 Updating record ${r.id}:`, {
             oldEmotion: r.emotion,
-            snapshotEmotion: snapshot.emotion,
+            snapshotEmotion: resolvedEmotion,
             newEmotion: updatedRecord.emotion,
             willChange: updatedRecord.emotion !== r.emotion,
           });
@@ -1399,10 +1407,10 @@ const Timeline = () => {
       });
       
       // 紀錄解密後的情緒，避免重新載入後又顯示鎖頭
-      if (snapshot.emotion) {
+      if (resolvedEmotion) {
         setDecryptedEmotions(prev => ({
           ...prev,
-          [record.id]: snapshot.emotion,
+          [record.id]: resolvedEmotion,
         }));
       }
 
