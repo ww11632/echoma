@@ -897,61 +897,65 @@ const Record = () => {
           });
         }
         
-        // Try to save metadata to backend and Supabase (optional)
+        // Save record - try Supabase first, then fallback to local storage
         try {
-          // Backup encrypted_data to Supabase (if user chose to backup)
           const { data: { session: backupSession } } = await supabase.auth.getSession();
-          if (backupToDatabase) {
-            if (!backupSession?.user?.id) {
-              console.warn("[Record] ⚠️ Backup requested but no Supabase session.");
-            } else {
-              console.log("[Record] Backing up encrypted_data to Supabase after SDK upload...");
-              // 優先使用 NFT ID 作為 sui_ref（如果已鑄造），否則使用 Walrus blob 的 object ID
-              const suiRef = nftId || sdkResult.suiRef;
-              
-              // 準備插入數據，transaction_digest 是可選的
-              const recordData: any = {
-                user_id: backupSession.user.id,
-                emotion: selectedEmotion as any,
-                intensity: intensityValue,
-                blob_id: sdkResult.blobId,
-                walrus_url: sdkResult.walrusUrl, // 使用 SDK 返回的 walrusUrl，它已经包含正確的网络信息
-                payload_hash: '',
-                encrypted_data: encryptedString,
-                is_public: isPublic,
-                proof_status: 'confirmed' as any,
-                sui_ref: suiRef, // 使用 NFT ID（如果已鑄造）或 Walrus blob object ID
-                wallet_address: currentAccount.address,
-              };
-              
-              // 只有在有 transaction_digest 時才添加（避免數據庫字段不存在時出錯）
-              if (nftTransactionDigest) {
-                recordData.transaction_digest = nftTransactionDigest;
-              }
-              
-              const { error: backupError } = await supabase
-                .from('emotion_records')
-                .insert([recordData]);
-              
-              if (backupError) {
-                console.error("[Record] Failed to backup to Supabase:", backupError);
-                // 如果是 transaction_digest 字段不存在的錯誤，記錄但不影響主流程
-                if (backupError.message?.includes("transaction_digest") || backupError.message?.includes("column")) {
-                  console.warn("[Record] ⚠️ transaction_digest field may not exist in database. Please run migration.");
-                }
-              } else {
-                console.log("[Record] ✅ Successfully backed up to Supabase", nftId ? `with NFT ID: ${nftId}` : "", nftTransactionDigest ? `and transaction: ${nftTransactionDigest.slice(0, 8)}...` : "");
-              }
+          let savedToSupabase = false;
+          
+          // Try to save to Supabase if user has session and opted in
+          if (backupToDatabase && backupSession?.user?.id) {
+            console.log("[Record] Saving to Supabase after SDK upload...");
+            const suiRef = nftId || sdkResult.suiRef;
+            
+            const recordData: any = {
+              user_id: backupSession.user.id,
+              emotion: selectedEmotion as any,
+              intensity: intensityValue,
+              blob_id: sdkResult.blobId,
+              walrus_url: sdkResult.walrusUrl,
+              payload_hash: '',
+              encrypted_data: encryptedString,
+              is_public: isPublic,
+              proof_status: 'confirmed' as any,
+              sui_ref: suiRef,
+            };
+            
+            if (nftTransactionDigest) {
+              recordData.transaction_digest = nftTransactionDigest;
             }
-          } else {
-            console.log("[Record] ⚠️ 跳过 Supabase 备份（用户未勾選）");
-            // 如果铸造了 NFT 但没有备份到数据库，提示用户
-            if (nftId) {
-              console.warn("[Record] ⚠️ NFT 已铸造但未保存到数据库。记录可能不会立即出現在 Timeline 中，可以使用 Timeline 的「同步 NFT」功能手動同步。");
+            
+            const { error: backupError } = await supabase
+              .from('emotion_records')
+              .insert([recordData]);
+            
+            if (backupError) {
+              console.error("[Record] Failed to save to Supabase:", backupError);
+            } else {
+              console.log("[Record] ✅ Saved to Supabase", nftId ? `with NFT ID: ${nftId}` : "");
+              savedToSupabase = true;
             }
           }
+          
+          // If not saved to Supabase, save to local storage
+          if (!savedToSupabase) {
+            console.log("[Record] Saving to local storage...");
+            const localRecord: EmotionRecord = {
+              id: `local_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+              emotion: selectedEmotion as any,
+              intensity: intensityValue,
+              timestamp: new Date().toISOString(),
+              note: description || '',
+              proof: nftId || sdkResult.suiRef,
+              version: "1.0.0",
+              isPublic,
+              tags: tags.length > 0 ? tags : undefined,
+            };
+            
+            await addEmotionRecord(localRecord, currentAccount.address);
+            console.log("[Record] ✅ Saved to local storage");
+          }
         } catch (metadataError) {
-          console.warn("[Record] Metadata save failed (not critical):", metadataError);
+          console.warn("[Record] Save failed:", metadataError);
         }
         
         // 如果铸造了带 Seal Policies 的 NFT，不要自动跳转，让用户可以分享
