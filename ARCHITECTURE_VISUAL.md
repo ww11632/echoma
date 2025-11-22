@@ -109,7 +109,7 @@ graph LR
 
 ## 🆚 Differentiation: Echoma vs. Traditional Web3 Diary
 
-| Feature | Traditional Web3 Diary | Echoma |
+| Feature | Public-by-Default IPFS Diaries | Echoma |
 |---------|------------------------|---------|
 | **Encryption** | ❌ Server-side or None | ✅ **Client-side AES-GCM-256 + Argon2id** |
 | **Key Derivation** | 🔴 Simple PBKDF2 (10k iter) | 🟢 **Argon2id (64MB Memory-Hard)** |
