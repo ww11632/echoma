@@ -615,8 +615,14 @@ const Timeline = () => {
                     
                     // 嘗試從 allRecords 中找到有相同 blob_id 的 Supabase 記錄
                     const matchingSupabaseRecord = blobIdFromNft 
-                      ? allRecords.find(r => r.blob_id === blobIdFromNft && r.emotion !== "encrypted")
+                      ? allRecords.find(r => r.blob_id === blobIdFromNft && r.emotion && r.emotion !== "encrypted")
                       : null;
+                    
+                    console.log(`[Timeline] Creating NFT record for ${nft.nftId}, found matching Supabase record:`, matchingSupabaseRecord ? {
+                      id: matchingSupabaseRecord.id,
+                      emotion: matchingSupabaseRecord.emotion,
+                      blob_id: matchingSupabaseRecord.blob_id
+                    } : 'none');
                     
                     // 創建 NFT 記錄
                     const nftRecord: EmotionRecord = {
@@ -678,9 +684,20 @@ const Timeline = () => {
                       const intensity = Math.min(100, Math.max(0, (nft.moodScore / 10) * 100));
                       const tags = nft.tagsCsv ? nft.tagsCsv.split(",").map(t => t.trim()).filter(Boolean) : [];
                       
+                      // 優先使用existing記錄的emotion（如果不是encrypted）
+                      const resolvedEmotion = (existing.emotion && existing.emotion !== "encrypted") 
+                        ? existing.emotion 
+                        : "encrypted";
+                      
+                      console.log(`[Timeline] Replacing Blob with NFT, emotion resolution:`, {
+                        existingEmotion: existing.emotion,
+                        resolvedEmotion,
+                        nftId: nft.nftId
+                      });
+                      
                       const nftRecord: EmotionRecord = {
                         id: nft.nftId,
-                        emotion: existing.emotion || "encrypted", // 保留原有記錄的 emotion
+                        emotion: resolvedEmotion, // 優先使用 database 記錄的 emotion
                         intensity: intensity,
                         description: nft.moodText || existing.description || "",
                         blob_id: blobIdFromNft,
