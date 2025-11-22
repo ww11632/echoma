@@ -1192,21 +1192,24 @@ const Timeline = () => {
   const getEmotionValue = useCallback((record: EmotionRecord) => {
     // 優先使用解密後的情緒
     const decrypted = decryptedEmotions[record.id];
+    
+    let result: string;
+    if (decrypted && decrypted !== "encrypted") {
+      result = decrypted;
+    } else if (record.emotion && record.emotion !== "encrypted") {
+      result = record.emotion;
+    } else {
+      result = "encrypted";
+    }
+    
     console.log(`[Timeline getEmotionValue] Record ${record.id}:`, {
       decrypted,
       recordEmotion: record.emotion,
       hasDecrypted: !!decrypted,
+      finalResult: result,
     });
     
-    if (decrypted && decrypted !== "encrypted") {
-      return decrypted;
-    }
-    // 如果數據庫中的 emotion 是有效值（不是 "encrypted" 且不是 null/undefined），直接使用
-    if (record.emotion && record.emotion !== "encrypted") {
-      return record.emotion;
-    }
-    // 否則返回 "encrypted" 顯示鎖頭圖標
-    return "encrypted";
+    return result;
   }, [decryptedEmotions]);
 
   // 解密記錄描述
