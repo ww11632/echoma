@@ -920,10 +920,6 @@ const Record = () => {
               sui_ref: suiRef,
             };
             
-            if (nftTransactionDigest) {
-              recordData.transaction_digest = nftTransactionDigest;
-            }
-            
             const { error: backupError } = await supabase
               .from('emotion_records')
               .insert([recordData]);
