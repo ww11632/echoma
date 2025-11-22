@@ -1192,24 +1192,15 @@ const Timeline = () => {
   const getEmotionValue = useCallback((record: EmotionRecord) => {
     // 優先使用解密後的情緒
     const decrypted = decryptedEmotions[record.id];
-    
-    let result: string;
     if (decrypted && decrypted !== "encrypted") {
-      result = decrypted;
-    } else if (record.emotion && record.emotion !== "encrypted") {
-      result = record.emotion;
-    } else {
-      result = "encrypted";
+      return decrypted;
     }
-    
-    console.log(`[Timeline getEmotionValue] Record ${record.id}:`, {
-      decrypted,
-      recordEmotion: record.emotion,
-      hasDecrypted: !!decrypted,
-      finalResult: result,
-    });
-    
-    return result;
+    // 如果數據庫中的 emotion 是有效值，直接使用
+    if (record.emotion && record.emotion !== "encrypted") {
+      return record.emotion;
+    }
+    // 否則返回 "encrypted"
+    return "encrypted";
   }, [decryptedEmotions]);
 
   // 解密記錄描述
@@ -1382,17 +1373,6 @@ const Timeline = () => {
       
       // 解析解密後的 JSON 獲取快照
       const snapshot = JSON.parse(decryptedString);
-      console.log(`[Timeline] 📦 Full snapshot for ${record.id}:`, snapshot);
-      console.log(`[Timeline] 📦 Snapshot data for ${record.id}:`, {
-        emotion: snapshot.emotion,
-        selectedEmotion: snapshot.selectedEmotion,
-        mood: snapshot.mood,
-        feeling: snapshot.feeling,
-        emotionType: snapshot.emotionType,
-        intensity: snapshot.intensity,
-        timestamp: snapshot.timestamp,
-        hasDescription: !!snapshot.description,
-      });
       
       const snapshotTimestamp = snapshot.timestamp
         ? new Date(snapshot.timestamp).toISOString()
@@ -1405,12 +1385,6 @@ const Timeline = () => {
         snapshot.feeling ||
         snapshot.emotionType ||
         record.emotion;
-      
-      console.log(`[Timeline] 🎯 Resolved emotion for ${record.id}:`, {
-        resolvedEmotion,
-        isValid: resolvedEmotion && resolvedEmotion !== "encrypted",
-        willUpdateDecryptedEmotions: resolvedEmotion && resolvedEmotion !== "encrypted",
-      });
       
       // 更新記錄的 metadata（例如真實時間戳與情緒/強度）
       // 修正：始終執行更新，確保解密後的情緒能正確顯示
@@ -1438,20 +1412,11 @@ const Timeline = () => {
       
       // 紀錄解密後的情緒，避免重新載入後又顯示鎖頭
       // 修正：只有當 resolvedEmotion 不是 "encrypted" 時才記錄
-      console.log(`[Timeline] 💾 Setting decryptedEmotion for ${record.id}:`, {
-        resolvedEmotion,
-        willSet: resolvedEmotion && resolvedEmotion !== "encrypted",
-      });
-      
       if (resolvedEmotion && resolvedEmotion !== "encrypted") {
-        setDecryptedEmotions(prev => {
-          const next = {
-            ...prev,
-            [record.id]: resolvedEmotion,
-          };
-          console.log(`[Timeline] ✅ Updated decryptedEmotions:`, next);
-          return next;
-        });
+        setDecryptedEmotions(prev => ({
+          ...prev,
+          [record.id]: resolvedEmotion,
+        }));
       }
 
       // 儲存解密後的描述
@@ -3957,14 +3922,6 @@ const Timeline = () => {
                   gradient: "from-gray-400 to-slate-400",
                   color: "#94a3b8",
                 };
-                
-                console.log(`[Timeline Render] Record ${record.id.slice(0, 8)}:`, {
-                  displayEmotion,
-                  emotionKey,
-                  emoji: emotionConfig.emoji,
-                  label: emotionConfig.label,
-                });
-                
                 const isLocal = isLocalRecord(record);
                 
                 return (
