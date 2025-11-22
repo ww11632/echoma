@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Button } from "@/components/ui/button";
@@ -136,6 +136,7 @@ const Timeline = () => {
   const [recordsWithSealPolicies, setRecordsWithSealPolicies] = useState<Set<string>>(new Set());
   const [checkingSealPolicies, setCheckingSealPolicies] = useState(false);
   const checkingSealPoliciesRef = useRef(false);
+  const location = useLocation();
 
   const emotionLabels = {
     joy: { label: t("emotions.joy"), emoji: "😊", gradient: "from-yellow-400 to-orange-400", color: "#fbbf24" },
@@ -149,6 +150,7 @@ const Timeline = () => {
   const [records, setRecords] = useState<EmotionRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isQueryingOnChain, setIsQueryingOnChain] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0); // 用于强制刷新
   const [decryptingRecords, setDecryptingRecords] = useState<Set<string>>(new Set());
   const [decryptedDescriptions, setDecryptedDescriptions] = useState<Record<string, string>>({});
   const [decryptedAiResponses, setDecryptedAiResponses] = useState<Record<string, string>>({});
@@ -1206,7 +1208,15 @@ const Timeline = () => {
     return () => {
       isCancelled = true;
     };
-  }, [currentAccount, network]); // 添加 network 到依赖项，网络切换时自动重新加载
+  }, [currentAccount, network, refreshTrigger]); // 添加 refreshTrigger 到依赖项
+
+  // 监听路由变化，当用户导航到此页面时重新加载数据
+  useEffect(() => {
+    console.log("[Timeline] Route changed to:", location.pathname);
+    if (location.pathname === '/timeline') {
+      setRefreshTrigger(prev => prev + 1); // 触发重新加载
+    }
+  }, [location.pathname]);
 
   // 监听网络切换，重新加载记录
   // 通过添加 network 到依赖项，当网络切换时会自动重新加载
