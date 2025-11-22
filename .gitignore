@@ -31,3 +31,7 @@ ios/App/**/*.xcworkspace/xcuserdata/
 *.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
 *.xcuserstate
+
+# Test data
+server/data/*.json
+server/data/*.db
