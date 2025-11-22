@@ -1600,6 +1600,18 @@ export async function getAuthorizedAddresses(
   const normalizedEntryId = normalizeSuiObjectId(entryNftId);
   const normalizedRegistryId = normalizeSuiObjectId(registryId);
 
+  const normalizeAddr = (addr: any) => {
+    if (!addr) return null;
+    try {
+      if (typeof addr === "string") return normalizeSuiObjectId(addr).toLowerCase();
+      if (addr?.value) return normalizeSuiObjectId(addr.value).toLowerCase();
+      if (addr?.fields?.bytes) return normalizeSuiObjectId(addr.fields.bytes).toLowerCase();
+    } catch {
+      // fall through
+    }
+    return String(addr).toLowerCase();
+  };
+
   try {
     // 1) 直接读取策略动态字段，拿到当前授权地址列表（最准确）
     try {
@@ -1620,7 +1632,7 @@ export async function getAuthorizedAddresses(
       if (Array.isArray(authorizedVec)) {
         // Move vector<address> comes back as array of bech32 or 0x strings; normalize to 0x lowercase
         return authorizedVec
-          .map((addr: string) => addr?.toString()?.toLowerCase())
+          .map((addr: any) => normalizeAddr(addr))
           .filter(Boolean);
       }
     } catch (dfError: any) {
@@ -1653,12 +1665,16 @@ export async function getAuthorizedAddresses(
 
     // 2) 回退到历史事件重建授权列表
     const history = await queryAccessHistory(entryNftId, registryId, targetNetwork, client);
+    // 重建时使用时间升序，确保撤销不会被更早的授权覆盖
     const authorizedSet = new Set<string>();
-    for (const event of history) {
+    const chronological = [...history].sort((a, b) => a.timestamp - b.timestamp);
+    for (const event of chronological) {
+      const addr = normalizeAddr(event.address);
+      if (!addr) continue;
       if (event.type === "grant") {
-        authorizedSet.add(event.address.toLowerCase());
+        authorizedSet.add(addr);
       } else if (event.type === "revoke") {
-        authorizedSet.delete(event.address.toLowerCase());
+        authorizedSet.delete(addr);
       }
     }
     return Array.from(authorizedSet);
@@ -1685,7 +1701,15 @@ export async function queryAccessHistory(
   const targetNetwork = network || getCurrentNetwork();
   const client = suiClient || getClientForNetwork(targetNetwork);
   const packageId = getPackageId(targetNetwork);
-  const targetNftLower = entryNftId.toLowerCase();
+  const normalizeId = (id?: string | null) => {
+    if (!id) return "";
+    try {
+      return normalizeSuiObjectId(id).toLowerCase();
+    } catch {
+      return id.toLowerCase();
+    }
+  };
+  const targetNftLower = normalizeId(entryNftId);
 
   try {
     // Paginate module events to ensure we don't miss older grants/revokes
@@ -1726,12 +1750,12 @@ export async function queryAccessHistory(
 
           try {
             const parsed = typeof e.parsedJson === "string" ? JSON.parse(e.parsedJson) : e.parsedJson;
-            const eventNftId = parsed?.entry_nft_id?.toLowerCase();
+            const eventNftId = normalizeId(parsed?.entry_nft_id || parsed?.entryNftId);
             if (eventNftId !== targetNftLower) continue;
 
             results.push({
               type: kind,
-              address: parsed?.grantee || "",
+              address: normalizeId(parsed?.grantee || ""),
               timestamp: e.timestampMs ? Number(e.timestampMs) : Date.now(),
               transactionDigest: e.id.txDigest || "",
             });
