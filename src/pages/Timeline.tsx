@@ -327,17 +327,22 @@ const Timeline = () => {
                       ? r.walrus_url
                       : `local://${r.id}`;
                     
-                    console.log(`[Timeline] Processing record ${r.id}:`, {
+                    console.log(`[Timeline] Processing Supabase record ${r.id}:`, {
                       hasWalrusData,
                       isLocal,
                       blob_id: blobId,
                       walrus_url: walrusUrl,
-                      emotion: r.emotion, // 添加日誌
+                      originalEmotion: r.emotion,
+                      isValidEmotion: r.emotion && ['joy', 'sadness', 'anger', 'anxiety', 'confusion', 'peace'].includes(r.emotion),
                     });
+                    
+                    // 確保emotion是有效值，如果DB返回的emotion是有效的就使用，否則才標記為encrypted
+                    const validEmotions = ['joy', 'sadness', 'anger', 'anxiety', 'confusion', 'peace'];
+                    const isValidEmotion = r.emotion && validEmotions.includes(r.emotion);
                     
                     return {
                       id: r.id,
-                      emotion: r.emotion && r.emotion !== '' ? r.emotion : "encrypted",
+                      emotion: isValidEmotion ? r.emotion : "encrypted",
                       intensity: r.intensity || 50,
                       description: r.description,
                       blob_id: blobId,
@@ -613,9 +618,14 @@ const Timeline = () => {
                     // 解析標籤
                     const tags = nft.tagsCsv ? nft.tagsCsv.split(",").map(t => t.trim()).filter(Boolean) : [];
                     
-                    // 嘗試從 allRecords 中找到有相同 blob_id 的 Supabase 記錄
+                    // 嘗試從 allRecords 中找到有相同 blob_id 的 Supabase 記錄，並確保emotion是有效值
+                    const validEmotions = ['joy', 'sadness', 'anger', 'anxiety', 'confusion', 'peace'];
                     const matchingSupabaseRecord = blobIdFromNft 
-                      ? allRecords.find(r => r.blob_id === blobIdFromNft && r.emotion && r.emotion !== "encrypted")
+                      ? allRecords.find(r => 
+                          r.blob_id === blobIdFromNft && 
+                          r.emotion && 
+                          validEmotions.includes(r.emotion)
+                        )
                       : null;
                     
                     console.log(`[Timeline] Creating NFT record for ${nft.nftId}, found matching Supabase record:`, matchingSupabaseRecord ? {
@@ -627,7 +637,7 @@ const Timeline = () => {
                     // 創建 NFT 記錄
                     const nftRecord: EmotionRecord = {
                       id: nft.nftId, // 使用 NFT ID 作為唯一標識
-                      emotion: matchingSupabaseRecord?.emotion || "encrypted", // 優先使用 Supabase 記錄的 emotion
+                      emotion: matchingSupabaseRecord?.emotion || "encrypted", // 優先使用有效的 Supabase emotion
                       intensity: intensity,
                       description: nft.moodText || "", // NFT 中存儲的 mood_text（這是描述，不是 emotion 類型）
                       blob_id: blobIdFromNft || `nft_${nft.nftId.slice(0, 8)}`, // 使用從 URL 提取的 blob ID，或生成 NFT 前綴的 ID
@@ -684,13 +694,14 @@ const Timeline = () => {
                       const intensity = Math.min(100, Math.max(0, (nft.moodScore / 10) * 100));
                       const tags = nft.tagsCsv ? nft.tagsCsv.split(",").map(t => t.trim()).filter(Boolean) : [];
                       
-                      // 優先使用existing記錄的emotion（如果不是encrypted）
-                      const resolvedEmotion = (existing.emotion && existing.emotion !== "encrypted") 
-                        ? existing.emotion 
-                        : "encrypted";
+                      // 優先使用existing記錄的emotion（如果是有效值）
+                      const validEmotions = ['joy', 'sadness', 'anger', 'anxiety', 'confusion', 'peace'];
+                      const isValidExistingEmotion = existing.emotion && validEmotions.includes(existing.emotion);
+                      const resolvedEmotion = isValidExistingEmotion ? existing.emotion : "encrypted";
                       
                       console.log(`[Timeline] Replacing Blob with NFT, emotion resolution:`, {
                         existingEmotion: existing.emotion,
+                        isValidExistingEmotion,
                         resolvedEmotion,
                         nftId: nft.nftId
                       });
