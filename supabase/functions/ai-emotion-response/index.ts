@@ -72,6 +72,11 @@ Deno.serve(async (req) => {
       } else {
         user = authData.user;
         console.log('User authenticated:', user.id);
+        
+        // Create service client for authenticated user rate limiting
+        if (supabaseUrl && supabaseServiceKey) {
+          serviceClient = createClient(supabaseUrl, supabaseServiceKey);
+        }
       }
     } else {
       // Anonymous user path - require anonymousId in request body
@@ -212,7 +217,27 @@ Deno.serve(async (req) => {
       }
     } else if (user) {
       // Check rate limit for authenticated users (before processing request)
-      const rateLimitCheck = await checkRateLimit(supabase, user.id);
+      // Use service client for rate limiting to bypass RLS
+      if (!serviceClient) {
+        console.error('[AI Response] Service client not available for authenticated rate limiting');
+        const errorMessage = normalizedLanguage.startsWith('zh')
+          ? '服務暫時不可用，請稍後再試。'
+          : 'Service temporarily unavailable. Please try again later.';
+        
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: errorMessage,
+            errorCode: 'SERVICE_UNAVAILABLE'
+          }),
+          {
+            status: 503,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+      
+      const rateLimitCheck = await checkRateLimit(serviceClient, user.id);
       if (!rateLimitCheck.allowed) {
         console.warn('[AI Response] Rate limit exceeded for user:', user.id);
         // Note: normalizedLanguage is available here since we parse body first
