@@ -1,5 +1,6 @@
 // src/lib/mintContract.ts
 import { Transaction } from "@mysten/sui/transactions";
+import { fromB64, normalizeSuiObjectId } from "@mysten/sui/utils";
 import { SuiClient } from "@mysten/sui/client";
 import { getClientForNetwork } from "./suiClient";
 import { getCurrentNetwork, type SuiNetwork } from "./networkConfig";
@@ -1460,8 +1461,57 @@ export async function isPublicSeal(
   const targetNetwork = network || getCurrentNetwork();
   const client = suiClient || getClientForNetwork(targetNetwork);
   const packageId = getPackageId(targetNetwork);
+  const normalizedEntryId = normalizeSuiObjectId(entryNftId);
+  const normalizedRegistryId = normalizeSuiObjectId(registryId);
 
   try {
+    // 1) Try reading the dynamic field directly (avoids devInspect RPC serialization issues)
+    try {
+      const dynamicField = await client.getDynamicFieldObject({
+        parentId: normalizedRegistryId,
+        name: {
+          type: "0x2::object::ID",
+          value: normalizedEntryId,
+        },
+      });
+
+      if ((dynamicField as any)?.error) {
+        throw new Error((dynamicField as any).error?.code || "Dynamic Field not found");
+      }
+
+      const policyValue = (dynamicField.data as any)?.content?.fields?.value?.fields;
+      const isPublic = policyValue?.seal_type?.fields?.is_public;
+
+      if (typeof isPublic === "boolean") {
+        return isPublic;
+      }
+    } catch (dfError: any) {
+      const dfMessage = dfError?.message || "";
+      const isRpcError =
+        dfMessage.includes("RPC_SERIALIZATION_ERROR") ||
+        dfMessage.includes("malformed utf8") ||
+        dfMessage.includes("Deserialization error");
+      const isPolicyNotFound =
+        dfMessage.includes("Dynamic Field not found") ||
+        dfMessage.includes("Entry does not exist") ||
+        dfMessage.includes("not found") ||
+        dfMessage.includes("borrow_child_object_mut") ||
+        dfMessage.includes("dynamic_field");
+
+      if (isRpcError) {
+        console.warn("[mintContract] RPC serialization error when reading policy dynamic field:", dfMessage);
+        throw new Error(`RPC_SERIALIZATION_ERROR: ${dfMessage}`);
+      }
+
+      if (isPolicyNotFound) {
+        throw new Error(`Entry NFT ${normalizedEntryId} 没有访问策略。此 NFT 可能不是使用 Seal Access Policies 铸造的。`);
+      }
+
+      console.warn("[mintContract] Unexpected error reading policy dynamic field, falling back to devInspect:", dfError);
+      // Fallback to devInspect below
+    }
+
+    // 2) Fallback: devInspect the Move call
     // Use Transaction class for better compatibility
     const tx = new Transaction();
     // Set a dummy sender for devInspectTransactionBlock (required for transaction building)
@@ -1469,8 +1519,8 @@ export async function isPublicSeal(
     tx.moveCall({
       target: `${packageId}::${POLICY_MODULE}::is_public_seal`,
       arguments: [
-        tx.pure.id(entryNftId),
-        tx.object(registryId),
+        tx.pure.id(normalizedEntryId),
+        tx.object(normalizedRegistryId),
       ],
     });
 
@@ -1483,7 +1533,11 @@ export async function isPublicSeal(
       const returnValue = result.results[0].returnValues?.[0];
       if (returnValue) {
         const [value] = returnValue;
-        return value[0] === 1;
+        if (typeof value === "string") {
+          const decoded = fromB64(value);
+          return decoded[0] === 1;
+        }
+        return Array.isArray(value) ? value[0] === 1 : false;
       }
     }
     return false;
