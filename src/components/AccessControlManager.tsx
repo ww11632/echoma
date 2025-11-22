@@ -156,18 +156,18 @@ export const AccessControlManager: React.FC<AccessControlManagerProps> = ({
     try {
       // 检查是否为公开记录（添加重试机制，因为链上索引可能需要时间）
       let publicStatus = false;
-      let retries = 3;
+      let retries = 5; // 增加到5次重试
       let lastError: Error | null = null;
       
       while (retries > 0) {
         try {
           publicStatus = await isPublicSeal(entryNftId, policyRegistryId, effectiveNetwork, suiClient);
           // 如果检查成功（无论 true/false），说明策略存在
-        console.log(`[AccessControlManager] ✅ 访问策略检查成功，isPublic: ${publicStatus}`);
-        break;
-      } catch (error: any) {
-        lastError = error;
-        const errorMessage = error?.message || "";
+          console.log(`[AccessControlManager] ✅ 访问策略检查成功，isPublic: ${publicStatus}`);
+          break;
+        } catch (error: any) {
+          lastError = error;
+          const errorMessage = error?.message || "";
           
           // 检查是否是 RPC 序列化错误
           if (errorMessage.includes("RPC_SERIALIZATION_ERROR") || 
@@ -175,9 +175,10 @@ export const AccessControlManager: React.FC<AccessControlManagerProps> = ({
               errorMessage.includes("Deserialization error")) {
             retries--;
             if (retries > 0) {
-              console.warn(`[AccessControlManager] ⚠️ RPC 序列化错误，尝试重试（剩余重试: ${retries}）`);
-              // 等待后重试
-              await new Promise((resolve) => setTimeout(resolve, 2000));
+              console.warn(`[AccessControlManager] ⚠️ RPC 序列化错误，等待后重试（剩余重试: ${retries}）`);
+              // 使用指数退避：2s, 3s, 4s, 5s
+              const waitTime = (6 - retries) * 1000;
+              await new Promise((resolve) => setTimeout(resolve, waitTime));
             } else {
               // 所有重试都失败了，尝试使用交易事件作为备选方案
               console.warn(`[AccessControlManager] ⚠️ RPC 序列化错误持续，尝试备选方案...`);
@@ -188,6 +189,8 @@ export const AccessControlManager: React.FC<AccessControlManagerProps> = ({
                   const isPublicFromEvent = diagnosis.policyCreatedEvent.is_public || false;
                   console.log(`[AccessControlManager] ✅ 通过交易事件验证成功，isPublic: ${isPublicFromEvent}`);
                   publicStatus = isPublicFromEvent;
+                  // 标记为成功，不需要在UI显示错误
+                  lastError = null;
                   break; // 跳出重试循环
                 } else {
                   console.error(`[AccessControlManager] ❌ 备选方案失败：策略未找到`);
@@ -202,8 +205,9 @@ export const AccessControlManager: React.FC<AccessControlManagerProps> = ({
             retries--;
             if (retries > 0) {
               console.warn(`[AccessControlManager] ⚠️ 访问策略检查失败，可能是索引延迟（剩余重试: ${retries}）`);
-              // 等待后重试
-              await new Promise((resolve) => setTimeout(resolve, 2000));
+              // 使用指数退避
+              const waitTime = (6 - retries) * 1000;
+              await new Promise((resolve) => setTimeout(resolve, waitTime));
             } else {
               // 所有重试都失败了
               console.error(`[AccessControlManager] ❌ 访问策略检查失败：${errorMessage}`);
@@ -214,6 +218,11 @@ export const AccessControlManager: React.FC<AccessControlManagerProps> = ({
             throw error;
           }
         }
+      }
+      
+      // 如果所有重试都失败了，抛出最后一个错误
+      if (lastError) {
+        throw lastError;
       }
       
       setIsPublic(publicStatus);
@@ -259,10 +268,10 @@ export const AccessControlManager: React.FC<AccessControlManagerProps> = ({
       if (errorDescription.includes("RPC_SERIALIZATION_ERROR") ||
           errorDescription.includes("malformed utf8") ||
           errorDescription.includes("Deserialization error")) {
-        errorTitle = "RPC 序列化錯誤";
-        errorDescription = `遇到 RPC 序列化錯誤，這通常是臨時性問題。\n\n建議操作：\n1. 點擊「Retry」按鈕重試\n2. 刷新頁面\n3. 如果問題持續，稍後再試\n\n技術細節: ${errorDescription.split(':').pop()?.trim() || '未知錯誤'}`;
-        console.error(`[AccessControlManager] ❌ RPC 序列化錯誤:`, errorDescription);
-      } 
+        errorTitle = "暫時無法讀取權限資訊";
+        errorDescription = `區塊鏈節點返回的資料格式有誤，這通常是短暫的節點問題。\n\n✅ 系統已自動重試多次\n💡 建議操作：\n1. 點擊下方「重試」按鈕\n2. 若持續失敗，請稍後（1-2分鐘）再試\n3. 此錯誤不影響您的資料安全\n\n🔧 技術細節：${errorDescription.includes('malformed utf8') ? 'UTF-8 解碼錯誤' : 'RPC 序列化錯誤'}`;
+        console.error(`[AccessControlManager] ❌ RPC 序列化錯誤（已重試5次）:`, errorDescription);
+      }
       // 如果是"没有访问策略"错误，进行诊断
       else if (errorDescription.includes("没有访问策略")) {
         errorTitle = "訪問策略未找到";
