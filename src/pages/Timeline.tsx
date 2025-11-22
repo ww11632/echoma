@@ -1292,6 +1292,13 @@ const Timeline = () => {
     return record.emotion;
   }, [decryptedEmotions]);
 
+  // 將情緒值標準化並驗證是否存在於 emotionLabels 中
+  const normalizeEmotionKey = useCallback((value?: string | null) => {
+    if (!value) return null;
+    const key = value.trim().toLowerCase();
+    return emotionLabels[key as keyof typeof emotionLabels] ? key : null;
+  }, [emotionLabels]);
+
   // 解密記錄描述
   const decryptDescription = useCallback(async (record: EmotionRecord) => {
     // NFT 記錄的描述（mood_text）是明文存儲的，不需要解密
@@ -2448,8 +2455,11 @@ const Timeline = () => {
     
     // 計算情緒轉換
     for (let i = 0; i < sortedRecords.length - 1; i++) {
-      const from = getEmotionValue(sortedRecords[i]);
-      const to = getEmotionValue(sortedRecords[i + 1]);
+      const from = normalizeEmotionKey(getEmotionValue(sortedRecords[i]));
+      const to = normalizeEmotionKey(getEmotionValue(sortedRecords[i + 1]));
+      
+      // 跳過無效或相同情緒的轉換，避免重複/無效的行
+      if (!from || !to || from === to) continue;
       
       if (!transitions[from]) {
         transitions[from] = {};
@@ -2480,7 +2490,7 @@ const Timeline = () => {
     return correlations
       .sort((a, b) => b.strength - a.strength)
       .slice(0, 10);
-  }, [records, getEmotionValue]);
+  }, [records, getEmotionValue, normalizeEmotionKey]);
 
   // 情緒日曆熱力圖數據
   const emotionCalendarData = useMemo(() => {
