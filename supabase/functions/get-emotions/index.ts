@@ -11,25 +11,30 @@ Deno.serve(async (req) => {
   try {
     console.log('Processing get emotions request');
     
-    const supabase = createClient(
+    // Get auth token from header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('No authorization header');
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    
+    // Create Supabase client with user's auth token
+    const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
+        global: {
+          headers: { Authorization: authHeader },
+        },
         auth: {
           persistSession: false,
         },
       }
     );
 
-    // Get user from auth header
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('No authorization header');
-    }
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
+    // Verify user authentication
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
 
     if (authError || !user) {
       console.error('Auth error:', authError);
@@ -38,8 +43,8 @@ Deno.serve(async (req) => {
 
     console.log('User authenticated:', user.id);
 
-    // Get user's emotion records
-    const { data: records, error: dbError } = await supabase
+    // Get user's emotion records with authenticated client
+    const { data: records, error: dbError } = await supabaseClient
       .from('emotion_records')
       .select('*')
       .eq('user_id', user.id)
