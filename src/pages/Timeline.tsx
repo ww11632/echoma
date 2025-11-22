@@ -1379,8 +1379,13 @@ const Timeline = () => {
       
       // 解析解密後的 JSON 獲取快照
       const snapshot = JSON.parse(decryptedString);
+      console.log(`[Timeline] 📦 Full snapshot for ${record.id}:`, snapshot);
       console.log(`[Timeline] 📦 Snapshot data for ${record.id}:`, {
         emotion: snapshot.emotion,
+        selectedEmotion: snapshot.selectedEmotion,
+        mood: snapshot.mood,
+        feeling: snapshot.feeling,
+        emotionType: snapshot.emotionType,
         intensity: snapshot.intensity,
         timestamp: snapshot.timestamp,
         hasDescription: !!snapshot.description,
@@ -1397,6 +1402,12 @@ const Timeline = () => {
         snapshot.feeling ||
         snapshot.emotionType ||
         record.emotion;
+      
+      console.log(`[Timeline] 🎯 Resolved emotion for ${record.id}:`, {
+        resolvedEmotion,
+        isValid: resolvedEmotion && resolvedEmotion !== "encrypted",
+        willUpdateDecryptedEmotions: resolvedEmotion && resolvedEmotion !== "encrypted",
+      });
       
       // 更新記錄的 metadata（例如真實時間戳與情緒/強度）
       // 修正：始終執行更新，確保解密後的情緒能正確顯示
