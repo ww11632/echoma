@@ -625,8 +625,18 @@ const AuthTimeline = () => {
   }, [t]);
 
   // Return decrypted emotion when available so UI doesn't fall back to the lock icon
+  // 💡 優化：如果數據庫中的 emotion 已經是有效值（不是 "encrypted" 或 null），直接使用
   const getEmotionValue = useCallback((record: EmotionRecord) => {
-    return decryptedEmotions[record.id] || record.emotion;
+    // 優先使用解密後的情緒
+    if (decryptedEmotions[record.id]) {
+      return decryptedEmotions[record.id];
+    }
+    // 如果數據庫中的 emotion 是有效值（不是 "encrypted" 且不是 null/undefined），直接使用
+    if (record.emotion && record.emotion !== "encrypted") {
+      return record.emotion;
+    }
+    // 否則返回 "encrypted" 顯示鎖頭圖標
+    return record.emotion || "encrypted";
   }, [decryptedEmotions]);
 
   // 解密記錄描述
