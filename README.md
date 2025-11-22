@@ -40,23 +40,54 @@ Emotional and mental health data is among the **most sensitive personal informat
 
 ### Our Solution: Four-Layer Defense
 
-- **Layer 1:** Client-side cryptography (Argon2id → AES-GCM)
-- **Layer 2:** Encrypted blobs on Walrus
-- **Layer 3:** NFT attestations on Sui
-- **Layer 4:** Seal-based grant/revoke governance
+```mermaid
+flowchart TD
 
-```
-📝 User Input
-    ↓
-🔐 Layer 1: Client-Side Encryption (Argon2id + AES-GCM-256)
-    ↓
-☁️ Layer 2: Decentralized Storage (Walrus)
-    ↓
-⛓️ Layer 3: Blockchain Attestation (Sui NFT)
-    ↓
-🔒 Layer 4: Dynamic Access Control (Seal Policies)
-    ↓
-✅ Platform-Zero-Knowledge Archive (E2EE)
+    subgraph Client ["📱 Client Side (Trusted Zone)"]
+
+        User([📝 User Input])
+
+        Layer1[("🔐 Layer 1<br/>Argon2id + AES-GCM-256")]
+
+    end
+
+    subgraph Cloud ["☁️ Decentralized Network"]
+
+        Layer2[("☁️ Layer 2<br/>Walrus Storage<br/>(Encrypted Blobs)")]
+
+        Layer3[("⛓️ Layer 3<br/>Sui Blockchain<br/>(NFT Attestations)")]
+
+    end
+
+    subgraph Access ["🛡️ Governance"]
+
+        Layer4["🔒 Layer 4<br/>Seal Policies<br/>(Grant/Revoke)"]
+
+    end
+
+    User --> Layer1
+
+    Layer1 -- "Encrypted Blob" --> Layer2
+
+    Layer2 -- "Blob ID" --> Layer3
+
+    Layer3 -. "Proof" .-> Layer4
+
+    Layer4 ==> Done([✅ Platform-Zero-Knowledge])
+
+    style Client fill:#e6fcf5,stroke:#2b8a3e
+
+    style Cloud fill:#edf2ff,stroke:#364fc7
+
+    style Access fill:#fff3bf,stroke:#f08c00
+
+    style Layer1 fill:#fff,stroke:#333,stroke-width:2px
+
+    style Layer2 fill:#fff,stroke:#333,stroke-width:2px
+
+    style Layer3 fill:#fff,stroke:#333,stroke-width:2px
+
+    style Layer4 fill:#fff,stroke:#333,stroke-width:2px
 ```
 
 ### How We Address Track Requirements
