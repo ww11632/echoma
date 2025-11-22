@@ -899,18 +899,6 @@ const Record = () => {
         
         // Try to save metadata to backend and Supabase (optional)
         try {
-          const selectedEpochs = epochs[0];
-          await postEmotion({
-            emotion: selectedEmotion,
-            intensity: intensityValue,
-            description: sanitizedDescription,
-            encryptedData: encryptedString,
-            isPublic,
-            walletAddress: currentAccount.address,
-            epochs: selectedEpochs,
-            network: currentNetwork, // 传递当前选择的网络
-          });
-          
           // Backup encrypted_data to Supabase (if user chose to backup)
           const { data: { session: backupSession } } = await supabase.auth.getSession();
           if (backupToDatabase) {
@@ -927,7 +915,7 @@ const Record = () => {
                 emotion: selectedEmotion as any,
                 intensity: intensityValue,
                 blob_id: sdkResult.blobId,
-                walrus_url: sdkResult.walrusUrl, // 使用 SDK 返回的 walrusUrl，它已经包含正确的网络信息
+                walrus_url: sdkResult.walrusUrl, // 使用 SDK 返回的 walrusUrl，它已经包含正確的网络信息
                 payload_hash: '',
                 encrypted_data: encryptedString,
                 is_public: isPublic,
@@ -956,10 +944,10 @@ const Record = () => {
               }
             }
           } else {
-            console.log("[Record] ⚠️ 跳过 Supabase 备份（用户未勾选）");
+            console.log("[Record] ⚠️ 跳过 Supabase 备份（用户未勾選）");
             // 如果铸造了 NFT 但没有备份到数据库，提示用户
             if (nftId) {
-              console.warn("[Record] ⚠️ NFT 已铸造但未保存到数据库。记录可能不会立即出现在 Timeline 中，可以使用 Timeline 的「同步 NFT」功能手动同步。");
+              console.warn("[Record] ⚠️ NFT 已铸造但未保存到数据库。记录可能不会立即出現在 Timeline 中，可以使用 Timeline 的「同步 NFT」功能手動同步。");
             }
           }
         } catch (metadataError) {
