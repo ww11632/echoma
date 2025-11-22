@@ -4195,7 +4195,7 @@ const Timeline = () => {
                                   {record.description}
                                 </p>
                               </div>
-                            ) : decryptedDescriptions[record.id] ? (
+                            ) : record.id in decryptedDescriptions ? (
                               // 已解密，顯示內容
                               <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
                                 <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
@@ -4203,7 +4203,7 @@ const Timeline = () => {
                                   <span className="text-green-500">{t("timeline.decrypted")}</span>
                                 </div>
                                 <p className="text-sm whitespace-pre-wrap break-words">
-                                  {decryptedDescriptions[record.id]}
+                                  {decryptedDescriptions[record.id] || t("timeline.noDescription")}
                                 </p>
                               </div>
                             ) : decryptErrors[record.id] ? (
@@ -4395,44 +4395,15 @@ const Timeline = () => {
                                   {record.description}
                                 </p>
                               </div>
-                            ) : decryptedDescriptions[record.id] ? (
+                            ) : record.id in decryptedDescriptions ? (
                               // 已解密，顯示內容
                               <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <Unlock className="w-3 h-3 text-green-500" />
-                                    <span className="text-green-500">{t("timeline.decrypted")}</span>
-                                  </div>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                      // 隱藏解密內容
-                                      setDecryptedDescriptions(prev => {
-                                        const next = { ...prev };
-                                        delete next[record.id];
-                                        return next;
-                                      });
-                                      setDecryptedEmotions(prev => {
-                                        const next = { ...prev };
-                                        delete next[record.id];
-                                        return next;
-                                      });
-                                      // 清除錯誤資訊
-                                      setDecryptErrors(prev => {
-                                        const next = { ...prev };
-                                        delete next[record.id];
-                                        return next;
-                                      });
-                                    }}
-                                    className="h-6 px-2 text-xs"
-                                  >
-                                    <EyeOff className="w-3 h-3 mr-1" />
-                                    {t("timeline.hideContent")}
-                                  </Button>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                                  <Unlock className="h-3 w-3" />
+                                  <span className="text-green-500">{t("timeline.decrypted")}</span>
                                 </div>
                                 <p className="text-sm whitespace-pre-wrap break-words">
-                                  {decryptedDescriptions[record.id]}
+                                  {decryptedDescriptions[record.id] || t("timeline.noDescription")}
                                 </p>
                                 {decryptedAiResponses[record.id] && (
                                   <div className="mt-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
