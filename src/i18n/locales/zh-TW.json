@@ -382,6 +382,7 @@
       "suiScan": "Sui Scan"
     },
     "viewOnSuiScan": "在 Sui Scan 查看",
+    "viewMintTransaction": "查看鑄造交易",
     "errorType": {
       "network": "網路錯誤",
       "not_found": "資料未找到",
@@ -709,6 +710,8 @@
     "noAuthorizedHint": "點擊上方按鈕授權他人訪問此記錄",
     "grantedAt": "授權於",
     "revokeAccess": "撤銷訪問",
+    "historyGrant": "授權",
+    "historyRevoke": "撤銷",
     "info": {
       "title": "鏈上驗證與審計",
       "verifiable": "所有授權操作都記錄在 Sui 區塊鏈上，可公開驗證",

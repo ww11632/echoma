@@ -382,6 +382,7 @@
       "suiScan": "Sui Scan"
     },
     "viewOnSuiScan": "View on Sui Scan",
+    "viewMintTransaction": "View Mint Transaction",
     "errorType": {
       "network": "Network Error",
       "not_found": "Data Not Found",
@@ -719,6 +720,8 @@
     "noAuthorizedHint": "Click the button above to authorize others to access this record",
     "grantedAt": "Granted At",
     "revokeAccess": "Revoke Access",
+    "historyGrant": "Granted",
+    "historyRevoke": "Revoked",
     "info": {
       "title": "On-Chain Verification & Audit",
       "verifiable": "All authorization operations are recorded on Sui blockchain and publicly verifiable",

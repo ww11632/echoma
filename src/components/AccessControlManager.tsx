@@ -58,7 +58,7 @@ export const AccessControlManager: React.FC<AccessControlManagerProps> = ({
   onAccessChanged,
   network,
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { toast } = useToast();
   const currentAccount = useCurrentAccount();
   const { currentWallet } = useCurrentWallet();
@@ -764,11 +764,11 @@ export const AccessControlManager: React.FC<AccessControlManagerProps> = ({
                     {item.address.slice(0, 8)}...{item.address.slice(-6)}
                   </span>
                   <span className="text-muted-foreground">
-                    {item.type === "grant" ? "授權" : "撤銷"}
+                    {item.type === "grant" ? t("accessControl.historyGrant") : t("accessControl.historyRevoke")}
                   </span>
                 </div>
                 <span className="text-muted-foreground">
-                  {new Date(item.timestamp).toLocaleDateString("zh-TW", {
+                  {new Date(item.timestamp).toLocaleDateString(i18n.language === 'zh-TW' ? 'zh-TW' : 'en-US', {
                     month: "short",
                     day: "numeric",
                     hour: "2-digit",
@@ -813,7 +813,7 @@ export const AccessControlManager: React.FC<AccessControlManagerProps> = ({
                 {item.grantedAt && (
                   <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                     <Clock className="h-3 w-3" />
-                    {t("accessControl.grantedAt") || "授權於"} {new Date(item.grantedAt).toLocaleString("zh-TW")}
+                    {t("accessControl.grantedAt") || "授權於"} {new Date(item.grantedAt).toLocaleString(i18n.language === 'zh-TW' ? 'zh-TW' : 'en-US')}
                   </div>
                 )}
               </div>

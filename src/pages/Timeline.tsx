@@ -4741,10 +4741,10 @@ const Timeline = () => {
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="px-2 py-1 rounded-full bg-purple-500/10 text-purple-500 text-xs hover:bg-purple-500/20 transition-colors inline-flex items-center gap-1"
-                                    title="查看鑄造交易"
+                                    title={t("timeline.viewMintTransaction")}
                                   >
                                     <Sparkles className="w-3 h-3" />
-                                    查看鑄造交易
+                                    {t("timeline.viewMintTransaction")}
                                     <span>↗</span>
                                   </a>
                                 )}
