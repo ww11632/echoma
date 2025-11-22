@@ -855,7 +855,8 @@ const AuthTimeline = () => {
       // 儲存解密後的描述
       setDecryptedDescriptions(prev => ({
         ...prev,
-        [record.id]: snapshot.description || '',
+        // fallback to record.description to avoid blank UI if snapshot lacks description
+        [record.id]: snapshot.description || record.description || '',
       }));
       
       // 清除失敗標記（如果之前失敗過）
