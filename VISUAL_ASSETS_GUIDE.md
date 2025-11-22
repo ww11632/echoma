@@ -1,4 +1,4 @@
-# 🎨 Visual Assets Guide for echōma
+# 🎨 Visual Assets Guide for Echoma
 
 > **為評審者和用戶提供視覺化資料的製作指南**
 
@@ -36,7 +36,7 @@
    # 錄製螢幕（QuickTime Player）
    # 1. 打開 QuickTime Player
    # 2. 文件 → 新增螢幕錄製
-   # 3. 錄製 echōma 操作流程
+   # 3. 錄製 Echoma 操作流程
    # 4. 儲存為 demo.mov
    
    # 轉換為 GIF
@@ -55,7 +55,7 @@
 
 #### 錄製腳本（20 秒）：
 ```
-[0-3秒]   打開 echōma → 連接錢包
+[0-3秒]   打開 Echoma → 連接錢包
 [3-6秒]   撰寫日記 → 點擊加密（顯示參數）
 [6-9秒]   上傳到 Walrus（顯示 Blob ID）
 [9-12秒]  鑄造 NFT（交易確認動畫）
@@ -169,7 +169,7 @@ gifsicle -O3 --lossy=80 -o demo-optimized.gif demo.gif
 ### 配色方案：
 
 ```css
-/* echōma Brand Colors */
+/* Echoma Brand Colors */
 :root {
   /* Primary */
   --primary-red: #ff6b6b;      /* Encryption */
@@ -280,7 +280,7 @@ font-family: 'JetBrains Mono', 'Fira Code', monospace;
 [0:00-0:30]   開場 - 問題陳述
               "傳統日記的隱私問題"
 
-[0:30-1:30]   解決方案 - echōma 介紹
+[0:30-1:30]   解決方案 - Echoma 介紹
               "客戶端加密 + 去中心化存儲"
 
 [1:30-3:30]   功能演示
@@ -295,7 +295,7 @@ font-family: 'JetBrains Mono', 'Fira Code', monospace;
               - Sui 集成
 
 [4:30-5:00]   結尾 - Call to Action
-              "立即體驗 echōma"
+              "立即體驗 Echoma"
 ```
 
 ---
@@ -337,7 +337,7 @@ brew install gifsicle
 gifsicle -O3 --lossy=80 -o public/demo-optimized.gif public/demo.gif
 
 # 5. 更新 README
-echo "![echōma Demo](./public/demo-optimized.gif)" >> README.md
+echo "![Echoma Demo](./public/demo-optimized.gif)" >> README.md
 ```
 
 ### 2. 截取關鍵截圖
@@ -360,7 +360,7 @@ mkdir -p public/screenshots
 ```markdown
 ## 🎬 Demo
 
-![echōma Demo](./public/demo-optimized.gif)
+![Echoma Demo](./public/demo-optimized.gif)
 
 ## 📸 Screenshots
 
@@ -393,7 +393,7 @@ mkdir -p public/screenshots
 - ✅ 清晰的 Icon
 - ✅ 友好的插圖
 
-### echōma 應用：
+### Echoma 應用：
 ```
 採用：
 - Stripe 的專業感（技術文檔）
@@ -427,7 +427,7 @@ cwebp -q 85 image.png -o image.webp
 <picture>
   <source srcset="image.webp" type="image/webp">
   <source srcset="image.jpg" type="image/jpeg">
-  <img src="image.jpg" alt="echōma Demo" loading="lazy">
+  <img src="image.jpg" alt="Echoma Demo" loading="lazy">
 </picture>
 ```
 

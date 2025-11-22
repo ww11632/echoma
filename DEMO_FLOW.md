@@ -1,4 +1,4 @@
-# 🎬 echōma Demo Flow Guide
+# 🎬 Echoma Demo Flow Guide
 
 > **5分鐘演示腳本 | 讓評審者快速理解核心價值**
 
@@ -6,7 +6,7 @@
 
 ## 🎯 演示目標
 
-展示 echōma **不只是普通的 Web3 日記**，而是具備：
+展示 Echoma **不只是普通的 Web3 日記**，而是具備：
 1. ✅ 生產級加密（Argon2id + AES-GCM）
 2. ✅ 去中心化存儲（Walrus）
 3. ✅ 鏈上所有權證明（Sui NFT）
@@ -24,7 +24,7 @@ sequenceDiagram
     participant A as 🌐 App
     participant W as 👛 Wallet
     
-    U->>A: 打開 echōma
+    U->>A: 打開 Echoma
     A->>A: 加載雙語 UI (ZH/EN)
     A->>W: 連接 Sui 錢包
     W->>U: ✅ 錢包已連接
@@ -38,7 +38,7 @@ sequenceDiagram
 - 👛 無縫 Sui 錢包集成
 
 **演示話術：**
-> "echōma 提供專業級的用戶體驗，不是技術 demo，而是可以直接使用的產品。"
+> "Echoma 提供專業級的用戶體驗，不是技術 demo，而是可以直接使用的產品。"
 
 ---
 
@@ -127,7 +127,7 @@ sequenceDiagram
 普通 Web3 日記：
   PBKDF2 10,000 iterations → GPU 破解 ~3 小時
 
-echōma：
+Echoma：
   Argon2id 64MB Memory-Hard → GPU 破解 ~12 小時
 ```
 
@@ -254,11 +254,11 @@ sequenceDiagram
    ```
 
 **演示話術：**
-> "這是 echōma 的殺手級功能：**Seal Access Policies**。不同於傳統 NFT『擁有即可看』的模式，我們實現了動態訪問控制。你可以隨時授權或撤銷朋友的訪問權限，而且所有操作都在鏈上，完全去中心化。"
+> "這是 Echoma 的殺手級功能：**Seal Access Policies**。不同於傳統 NFT『擁有即可看』的模式，我們實現了動態訪問控制。你可以隨時授權或撤銷朋友的訪問權限，而且所有操作都在鏈上，完全去中心化。"
 
 **對比展示：**
 
-| 傳統 Web3 日記 | echōma Seal Policies |
+| 傳統 Web3 日記 | Echoma Seal Policies |
 |---------------|---------------------|
 | ❌ NFT 轉移 = 失去控制 | ✅ 保留所有權 + 授權訪問 |
 | ❌ 無法撤銷訪問 | ✅ 隨時撤銷 |
@@ -300,7 +300,7 @@ graph TB
 
 ## 🎯 總結（30秒）
 
-### echōma 的三大核心價值：
+### Echoma 的三大核心價值：
 
 1. **🔒 生產級安全**
    - Argon2id（64MB Memory-Hard）
@@ -384,7 +384,7 @@ graph TB
 
 文字疊加：
 "Privacy + Ownership + Control"
-"echōma - Emotional Encryption Chain"
+"Echoma - Emotional Encryption Chain"
 ```
 
 ---

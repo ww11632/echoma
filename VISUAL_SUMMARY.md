@@ -1,6 +1,6 @@
 # ✅ Visual Assets Delivery Summary
 
-> **echōma 視覺化資產交付總結**
+> **Echoma 視覺化資產交付總結**
 
 ---
 
@@ -125,7 +125,7 @@
 - 驗證步驟和檢查清單
 
 ### ✅ **展現差異化價值**
-- 對比表格（傳統 vs echōma）
+- 對比表格（傳統 vs Echoma）
 - 具體數據（+300% GPU 抗性）
 - 獨特功能（Seal Policies）
 
@@ -242,7 +242,7 @@
 ## 🎯 核心價值主張（Pitch）
 
 ### 一句話描述：
-> **echōma = 生產級加密（Argon2id） + 去中心化存儲（Walrus） + 動態訪問控制（Seal Policies）**
+> **Echoma = 生產級加密（Argon2id） + 去中心化存儲（Walrus） + 動態訪問控制（Seal Policies）**
 
 ### 三大差異化：
 1. **🔐 安全性**：Argon2id（64MB Memory-Hard），GPU 抗性 +300%

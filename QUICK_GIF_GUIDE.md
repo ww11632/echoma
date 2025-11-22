@@ -38,7 +38,7 @@ chmod +x scripts/create-demo-gif.sh
 
 3. **录制操作流程（20 秒）**
    ```
-   [0-3秒]   打开 echōma → 连接 Sui 钱包
+   [0-3秒]   打开 Echoma → 连接 Sui 钱包
    [3-6秒]   点击"新建日记本" → 创建成功
    [6-9秒]   撰写日记内容 → 点击"保存"
    [9-12秒]  显示加密参数（Argon2id）→ 上传 Walrus
@@ -266,12 +266,12 @@ brew install --cask licecap
 ## 🎬 Demo
 
 <div align="center">
-  <img src="./public/demos/demo.gif" alt="echōma Demo" width="100%" />
+  <img src="./public/demos/demo.gif" alt="Echoma Demo" width="100%" />
 </div>
 
 ### 快速预览
 
-![echōma 操作演示](./public/demos/demo.gif)
+![Echoma 操作演示](./public/demos/demo.gif)
 
 ---
 ```
@@ -282,12 +282,12 @@ brew install --cask licecap
 ## 🎬 演示
 
 <div align="center">
-  <img src="./public/demos/demo.gif" alt="echōma 演示" width="100%" />
+  <img src="./public/demos/demo.gif" alt="Echoma 演示" width="100%" />
 </div>
 
 ### 快速预览
 
-![echōma 操作演示](./public/demos/demo.gif)
+![Echoma 操作演示](./public/demos/demo.gif)
 
 ---
 ```
@@ -402,7 +402,7 @@ gifski --version
 
 ## 🎉 完成！
 
-录制好的 Demo GIF 将大大提升 echōma 的展示效果，让评审者和用户快速理解产品功能！
+录制好的 Demo GIF 将大大提升 Echoma 的展示效果，让评审者和用户快速理解产品功能！
 
 **下一步：**
 1. 运行 `./scripts/create-demo-gif.sh`

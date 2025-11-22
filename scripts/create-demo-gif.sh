@@ -1,10 +1,10 @@
 #!/bin/bash
 # scripts/create-demo-gif.sh
-# 快速创建 echōma Demo GIF
+# 快速创建 Echoma Demo GIF
 
 set -e
 
-echo "🎬 echōma Demo GIF 制作工具"
+echo "🎬 Echoma Demo GIF 制作工具"
 echo "================================"
 echo ""
 
@@ -40,7 +40,7 @@ echo "  1. 打开 QuickTime Player"
 echo "  2. 文件 → 新建屏幕录制"
 echo "  3. 选择录制区域（建议 1280x720）"
 echo "  4. 录制以下流程（约 20 秒）："
-echo "     - [0-3s]  打开 echōma → 连接钱包"
+echo "     - [0-3s]  打开 Echoma → 连接钱包"
 echo "     - [3-6s]  撰写日记内容"
 echo "     - [6-9s]  点击加密（展示参数）"
 echo "     - [9-12s] 上传到 Walrus"
@@ -125,12 +125,12 @@ echo "================================"
 echo ""
 echo "## 🎬 Demo"
 echo ""
-echo "![echōma Demo](./public/demos/demo.gif)"
+echo "![Echoma Demo](./public/demos/demo.gif)"
 echo ""
 echo "或者使用 HTML 控制尺寸："
 echo ""
 echo '<div align="center">'
-echo '  <img src="./public/demos/demo.gif" alt="echōma Demo" width="100%" />'
+echo '  <img src="./public/demos/demo.gif" alt="Echoma Demo" width="100%" />'
 echo '</div>'
 echo ""
 echo "================================"

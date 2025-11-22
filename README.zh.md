@@ -23,9 +23,9 @@ graph LR
     style E fill:#f59f00,stroke:#e67700,color:#fff
 ```
 
-### 🎯 echōma 的差異化優勢
+### 🎯 Echoma 的差異化優勢
 
-| 功能 | 傳統 Web3 日記 | echōma |
+| 功能 | 傳統 Web3 日記 | Echoma |
 |------|---------------|---------|
 | **加密方式** | ❌ 無或伺服器端 | ✅ **客戶端 AES-GCM-256** |
 | **密鑰派生** | 🔴 PBKDF2（弱） | 🟢 **Argon2id（64MB 記憶體困難）** |

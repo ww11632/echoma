@@ -107,9 +107,9 @@ graph LR
 
 ---
 
-## 🆚 Differentiation: echōma vs. Traditional Web3 Diary
+## 🆚 Differentiation: Echoma vs. Traditional Web3 Diary
 
-| Feature | Traditional Web3 Diary | echōma |
+| Feature | Traditional Web3 Diary | Echoma |
 |---------|------------------------|---------|
 | **Encryption** | ❌ Server-side or None | ✅ **Client-side AES-GCM-256 + Argon2id** |
 | **Key Derivation** | 🔴 Simple PBKDF2 (10k iter) | 🟢 **Argon2id (64MB Memory-Hard)** |
@@ -127,7 +127,7 @@ graph LR
 
 ```mermaid
 journey
-    title echōma User Journey
+    title Echoma User Journey
     section Write
       Open App: 5: User
       Write Entry: 5: User
@@ -313,7 +313,7 @@ graph TB
 
 ## 📞 For Reviewers
 
-**What makes echōma different?**
+**What makes Echoma different?**
 
 1. **Not just a Web3 diary** → It's a **privacy-first encrypted journal with blockchain proof**
 2. **Not just IPFS + NFT** → It's **Walrus + Sui + Argon2id + Seal Policies**

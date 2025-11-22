@@ -86,14 +86,14 @@ gifski --fps 8 --quality 85 --width 960 demo.mov -o demo.gif
 ```markdown
 ## 🎬 Demo
 
-![echōma Demo](./public/demos/demo.gif)
+![Echoma Demo](./public/demos/demo.gif)
 ```
 
 或使用 HTML 控制尺寸：
 
 ```html
 <div align="center">
-  <img src="./public/demos/demo.gif" alt="echōma Demo" width="100%" />
+  <img src="./public/demos/demo.gif" alt="Echoma Demo" width="100%" />
 </div>
 ```
 
