@@ -503,10 +503,12 @@ const Timeline = () => {
                       timeDiff: blobCreatedTime ? Math.abs(new Date(potentialMatch.created_at).getTime() - blobCreatedTime) / 1000 : null
                     } : 'none');
                     
+                    const fallbackEmotion = potentialMatch?.emotion || "joy"; // 使用有效枚舉，避免 "encrypted"
+                    
                     // 創建新的鏈上記錄
                     const onChainRecord: EmotionRecord = {
                       id: blob.objectId, // 使用 objectId 本身，確保唯一性
-                      emotion: potentialMatch?.emotion || "encrypted", // 優先使用匹配的Supabase記錄的emotion
+                      emotion: fallbackEmotion, // 優先使用匹配的Supabase記錄的emotion
                       intensity: potentialMatch?.intensity || 50,
                       description: potentialMatch?.description || "", // 加密內容，需要解密才能顯示
                       blob_id: blob.blobId,
