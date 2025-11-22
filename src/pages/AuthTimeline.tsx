@@ -615,13 +615,23 @@ const AuthTimeline = () => {
 
   // 解密記錄描述
   const decryptDescription = useCallback(async (record: EmotionRecord) => {
+    console.log(`[AuthTimeline] 🔓 decryptDescription 被調用，記錄 ID: ${record.id}`, {
+      isDecrypting: decryptingRecords.has(record.id),
+      alreadyDecrypted: !!decryptedDescriptions[record.id],
+      hasEncryptedData: !!record.encrypted_data,
+      blobId: record.blob_id,
+      isLocal: isLocalRecord(record),
+    });
+    
     // 如果正在解密，則跳過
     if (decryptingRecords.has(record.id)) {
+      console.log(`[AuthTimeline] ⏭️ 跳過：記錄 ${record.id} 正在解密中`);
       return;
     }
     
     // 如果已經解密，不需要重新解密
     if (decryptedDescriptions[record.id]) {
+      console.log(`[AuthTimeline] ⏭️ 跳過：記錄 ${record.id} 已經解密過`);
       return;
     }
 
