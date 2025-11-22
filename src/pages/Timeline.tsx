@@ -4122,7 +4122,7 @@ const Timeline = () => {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between mb-2 gap-2">
                           <div className="min-w-0 flex-1">
-                            <h3 className="font-semibold text-base md:text-lg truncate">{emotionConfig.label}</h3>
+                            <h3 className="font-semibold text-base md:text-lg truncate">{emotionConfig.label.replace(emotionConfig.emoji, '').trim()}</h3>
                             <p className="text-xs md:text-sm text-muted-foreground">{t("timeline.intensityValue", { value: record.intensity })}</p>
                           </div>
                           <div className="text-right flex-shrink-0 flex items-center gap-2">
