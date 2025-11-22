@@ -4,7 +4,7 @@
 
 
 
-📺 [Watch Demo Video](YOUR_YOUTUBE_LINK) | 📄 [Full Submission](./hackathon_submission.md) 
+📺 [Watch Demo Video](YOUR_YOUTUBE_LINK) | 📄 [White paper](./Echoma_WhitePaper.md) 
 
 
 
