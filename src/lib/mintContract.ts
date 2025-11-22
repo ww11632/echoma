@@ -1637,95 +1637,75 @@ export async function queryAccessHistory(
   const targetNetwork = network || getCurrentNetwork();
   const client = suiClient || getClientForNetwork(targetNetwork);
   const packageId = getPackageId(targetNetwork);
+  const targetNftLower = entryNftId.toLowerCase();
 
   try {
-    // 查询 AccessGrantedEvent 和 AccessRevokedEvent
+    // Paginate module events to ensure we don't miss older grants/revokes
+    const fetchEvents = async (kind: "grant" | "revoke") => {
+      const results: Array<{
+        type: "grant" | "revoke";
+        address: string;
+        timestamp: number;
+        transactionDigest: string;
+      }> = [];
+
+      let cursor: string | null | undefined = undefined;
+      let pages = 0;
+      const maxPages = 10; // up to ~500 events if limit=50
+      const limit = 50;
+
+      while (pages < maxPages) {
+        const resp = await client.queryEvents({
+          query: {
+            MoveModule: {
+              package: packageId,
+              module: POLICY_MODULE,
+            },
+          },
+          cursor,
+          limit,
+        });
+
+        if (!resp.data || resp.data.length === 0) {
+          break;
+        }
+
+        for (const e of resp.data) {
+          const eventType = e.type || e.typeName || "";
+          const isGrant = eventType.includes("AccessGrantedEvent") || eventType.includes("AccessGranted");
+          const isRevoke = eventType.includes("AccessRevokedEvent") || eventType.includes("AccessRevoked");
+          if ((kind === "grant" && !isGrant) || (kind === "revoke" && !isRevoke)) continue;
+
+          try {
+            const parsed = typeof e.parsedJson === "string" ? JSON.parse(e.parsedJson) : e.parsedJson;
+            const eventNftId = parsed?.entry_nft_id?.toLowerCase();
+            if (eventNftId !== targetNftLower) continue;
+
+            results.push({
+              type: kind,
+              address: parsed?.grantee || "",
+              timestamp: e.timestampMs ? Number(e.timestampMs) : Date.now(),
+              transactionDigest: e.id.txDigest || "",
+            });
+          } catch {
+            continue;
+          }
+        }
+
+        pages += 1;
+        if (!resp.hasNextPage || !resp.nextCursor) break;
+        cursor = resp.nextCursor;
+      }
+
+      return results;
+    };
+
     const [grantedEvents, revokedEvents] = await Promise.all([
-      client.queryEvents({
-        query: {
-          MoveModule: {
-            package: packageId,
-            module: POLICY_MODULE,
-          },
-        },
-        limit: 100,
-      }).then(result => 
-        result.data
-          .filter((e: any) => {
-            const eventType = e.type || e.typeName || "";
-            return eventType.includes("AccessGrantedEvent") || eventType.includes("AccessGranted");
-          })
-          .filter((e: any) => {
-            try {
-              const parsed = typeof e.parsedJson === "string" 
-                ? JSON.parse(e.parsedJson) 
-                : e.parsedJson;
-              // 比较时规范化地址格式（都转小写）
-              const eventNftId = parsed?.entry_nft_id?.toLowerCase();
-              const targetNftId = entryNftId.toLowerCase();
-              return eventNftId === targetNftId;
-            } catch {
-              return false;
-            }
-          })
-          .map((e: any) => {
-            const parsed = typeof e.parsedJson === "string" 
-              ? JSON.parse(e.parsedJson) 
-              : e.parsedJson;
-            return {
-              type: "grant" as const,
-              address: parsed?.grantee || "",
-              timestamp: e.timestampMs ? Number(e.timestampMs) : Date.now(),
-              transactionDigest: e.id.txDigest || "",
-            };
-          })
-      ),
-      client.queryEvents({
-        query: {
-          MoveModule: {
-            package: packageId,
-            module: POLICY_MODULE,
-          },
-        },
-        limit: 100,
-      }).then(result =>
-        result.data
-          .filter((e: any) => {
-            const eventType = e.type || e.typeName || "";
-            return eventType.includes("AccessRevokedEvent") || eventType.includes("AccessRevoked");
-          })
-          .filter((e: any) => {
-            try {
-              const parsed = typeof e.parsedJson === "string" 
-                ? JSON.parse(e.parsedJson) 
-                : e.parsedJson;
-              // 比较时规范化地址格式（都转小写）
-              const eventNftId = parsed?.entry_nft_id?.toLowerCase();
-              const targetNftId = entryNftId.toLowerCase();
-              return eventNftId === targetNftId;
-            } catch {
-              return false;
-            }
-          })
-          .map((e: any) => {
-            const parsed = typeof e.parsedJson === "string" 
-              ? JSON.parse(e.parsedJson) 
-              : e.parsedJson;
-            return {
-              type: "revoke" as const,
-              address: parsed?.grantee || "",
-              timestamp: e.timestampMs ? Number(e.timestampMs) : Date.now(),
-              transactionDigest: e.id.txDigest || "",
-            };
-          })
-      ),
+      fetchEvents("grant"),
+      fetchEvents("revoke"),
     ]);
 
-    const history = [...grantedEvents, ...revokedEvents].sort(
-      (a, b) => b.timestamp - a.timestamp
-    );
-
-    return history;
+    return [...grantedEvents, ...revokedEvents].sort((a, b) => b.timestamp - a.timestamp);
   } catch (error) {
     console.error("[mintContract] Error querying access history:", error);
     return [];
