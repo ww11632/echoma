@@ -1370,20 +1370,22 @@ const Timeline = () => {
       
       // 更新記錄的 metadata（例如真實時間戳與情緒/強度）
       // 修正：始終執行更新，確保解密後的情緒能正確顯示
+      // 💡 關鍵修復：如果 snapshot 中有 emotion，強制使用它（即使原記錄是 "encrypted"）
       setRecords(prev => {
         const updated = prev.map(r => {
           if (r.id !== record.id) return r;
           const updatedRecord = {
             ...r,
             created_at: snapshotTimestamp || r.created_at,
-            emotion: snapshot.emotion || r.emotion,
+            emotion: snapshot.emotion && snapshot.emotion !== "encrypted" ? snapshot.emotion : r.emotion,
             intensity: typeof snapshot.intensity === "number" ? snapshot.intensity : r.intensity,
             wallet_address: snapshot.walletAddress || r.wallet_address,
           };
           console.log(`[Timeline] 🔄 Updating record ${r.id}:`, {
             oldEmotion: r.emotion,
-            newEmotion: updatedRecord.emotion,
             snapshotEmotion: snapshot.emotion,
+            newEmotion: updatedRecord.emotion,
+            willChange: updatedRecord.emotion !== r.emotion,
           });
           return updatedRecord;
         });
