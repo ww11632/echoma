@@ -1597,22 +1597,68 @@ export async function getAuthorizedAddresses(
 ): Promise<string[]> {
   const targetNetwork = network || getCurrentNetwork();
   const client = suiClient || getClientForNetwork(targetNetwork);
+  const normalizedEntryId = normalizeSuiObjectId(entryNftId);
+  const normalizedRegistryId = normalizeSuiObjectId(registryId);
 
   try {
-    // 通过查询事件来构建授权列表（最可靠的方法）
+    // 1) 直接读取策略动态字段，拿到当前授权地址列表（最准确）
+    try {
+      const dynamicField = await client.getDynamicFieldObject({
+        parentId: normalizedRegistryId,
+        name: {
+          type: "0x2::object::ID",
+          value: normalizedEntryId,
+        },
+      });
+
+      if ((dynamicField as any)?.error) {
+        throw new Error((dynamicField as any).error?.code || "Dynamic Field not found");
+      }
+
+      const policyValue = (dynamicField.data as any)?.content?.fields?.value?.fields;
+      const authorizedVec = policyValue?.authorized_addresses;
+      if (Array.isArray(authorizedVec)) {
+        // Move vector<address> comes back as array of bech32 or 0x strings; normalize to 0x lowercase
+        return authorizedVec
+          .map((addr: string) => addr?.toString()?.toLowerCase())
+          .filter(Boolean);
+      }
+    } catch (dfError: any) {
+      const msg = dfError?.message || "";
+      const isRpcErr =
+        msg.includes("RPC_SERIALIZATION_ERROR") ||
+        msg.includes("malformed utf8") ||
+        msg.includes("Deserialization error");
+      const isPolicyNotFound =
+        msg.includes("Dynamic Field not found") ||
+        msg.includes("Entry does not exist") ||
+        msg.includes("not found") ||
+        msg.includes("borrow_child_object_mut") ||
+        msg.includes("dynamic_field");
+
+      if (isRpcErr) {
+        console.warn("[mintContract] RPC serialization error when reading authorized addresses dynamic field:", msg);
+        throw new Error(`RPC_SERIALIZATION_ERROR: ${msg}`);
+      }
+
+      if (isPolicyNotFound) {
+        console.warn("[mintContract] Policy not found when reading authorized addresses for", entryNftId);
+        return [];
+      }
+
+      console.warn("[mintContract] Unexpected error reading authorized addresses, fallback to events:", dfError);
+    }
+
+    // 2) 回退到历史事件重建授权列表
     const history = await queryAccessHistory(entryNftId, registryId, targetNetwork, client);
     const authorizedSet = new Set<string>();
-    
-    // 从历史事件中重建授权列表
-    // 按时间顺序处理，grant 添加，revoke 移除
     for (const event of history) {
       if (event.type === "grant") {
-        authorizedSet.add(event.address);
+        authorizedSet.add(event.address.toLowerCase());
       } else if (event.type === "revoke") {
-        authorizedSet.delete(event.address);
+        authorizedSet.delete(event.address.toLowerCase());
       }
     }
-    
     return Array.from(authorizedSet);
   } catch (error) {
     console.error("[mintContract] Error getting authorized addresses:", error);
