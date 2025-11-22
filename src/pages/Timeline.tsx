@@ -3943,6 +3943,11 @@ const Timeline = () => {
                 });
                 
                 const displayEmotion = getEmotionValue(record);
+                console.log(`[Timeline] ✨ Display emotion for ${record.id}:`, {
+                  recordEmotion: record.emotion,
+                  decryptedEmotion: decryptedEmotions[record.id],
+                  finalDisplayEmotion: displayEmotion,
+                });
                 const emotionKey = displayEmotion as keyof typeof emotionLabels;
                 const emotionConfig = emotionLabels[emotionKey] || {
                   label: displayEmotion.charAt(0).toUpperCase() + displayEmotion.slice(1),
