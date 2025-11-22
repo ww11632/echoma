@@ -3771,6 +3771,7 @@ const Timeline = () => {
                 {Object.entries(emotionTrendData).slice(0, 3).map(([emotion, data]) => {
                   const config = emotionLabels[emotion as keyof typeof emotionLabels];
                   if (!config) return null;
+                  const cleanLabel = config.label.replace(config.emoji, "").trim();
                   
                   const actualData = data.actual.map((value, index) => ({ 
                     period: index + 1, 
@@ -3789,7 +3790,7 @@ const Timeline = () => {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="text-xl">{config.emoji}</span>
-                          <span className="font-medium">{config.label}</span>
+                          <span className="font-medium">{cleanLabel}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className={`text-sm ${
