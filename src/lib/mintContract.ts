@@ -1,6 +1,6 @@
 // src/lib/mintContract.ts
 import { Transaction } from "@mysten/sui/transactions";
-import { fromB64, normalizeSuiObjectId } from "@mysten/sui/utils";
+import { normalizeSuiObjectId } from "@mysten/sui/utils";
 import { SuiClient } from "@mysten/sui/client";
 import { getClientForNetwork } from "./suiClient";
 import { getCurrentNetwork, type SuiNetwork } from "./networkConfig";
@@ -1465,7 +1465,44 @@ export async function isPublicSeal(
   const normalizedRegistryId = normalizeSuiObjectId(registryId);
 
   try {
-    // 1) Try reading the dynamic field directly (avoids devInspect RPC serialization issues)
+    // 1) Try reading from PolicyCreatedEvent to avoid RPC serialization on large responses
+    try {
+      const events = await client.queryEvents({
+        query: {
+          MoveEventType: `${packageId}::${POLICY_MODULE}::PolicyCreatedEvent`,
+        },
+        limit: 50,
+      });
+
+      const matched = events.data.find((e: any) => {
+        try {
+          const parsed = typeof e.parsedJson === "string" ? JSON.parse(e.parsedJson) : e.parsedJson;
+          return parsed?.entry_nft_id?.toLowerCase() === normalizedEntryId.toLowerCase();
+        } catch {
+          return false;
+        }
+      });
+
+      if (matched) {
+        const parsed = typeof matched.parsedJson === "string" ? JSON.parse(matched.parsedJson) : matched.parsedJson;
+        if (typeof parsed?.is_public === "boolean") {
+          return parsed.is_public;
+        }
+      }
+    } catch (eventErr: any) {
+      const msg = eventErr?.message || "";
+      const isRpcErr =
+        msg.includes("RPC_SERIALIZATION_ERROR") ||
+        msg.includes("malformed utf8") ||
+        msg.includes("Deserialization error");
+      if (isRpcErr) {
+        console.warn("[mintContract] RPC serialization error when querying PolicyCreatedEvent:", msg);
+        throw new Error(`RPC_SERIALIZATION_ERROR: ${msg}`);
+      }
+      console.warn("[mintContract] Failed to query PolicyCreatedEvent, will try dynamic field:", eventErr);
+    }
+
+    // 2) Try reading the dynamic field directly (avoids devInspect RPC serialization issues)
     try {
       const dynamicField = await client.getDynamicFieldObject({
         parentId: normalizedRegistryId,
@@ -1511,35 +1548,7 @@ export async function isPublicSeal(
       // Fallback to devInspect below
     }
 
-    // 2) Fallback: devInspect the Move call
-    // Use Transaction class for better compatibility
-    const tx = new Transaction();
-    // Set a dummy sender for devInspectTransactionBlock (required for transaction building)
-    tx.setSender("0x0000000000000000000000000000000000000000000000000000000000000000");
-    tx.moveCall({
-      target: `${packageId}::${POLICY_MODULE}::is_public_seal`,
-      arguments: [
-        tx.pure.id(normalizedEntryId),
-        tx.object(normalizedRegistryId),
-      ],
-    });
-
-    const result = await client.devInspectTransactionBlock({
-      sender: "0x0000000000000000000000000000000000000000000000000000000000000000",
-      transactionBlock: await tx.build({ client }),
-    });
-
-    if (result.results && result.results.length > 0) {
-      const returnValue = result.results[0].returnValues?.[0];
-      if (returnValue) {
-        const [value] = returnValue;
-        if (typeof value === "string") {
-          const decoded = fromB64(value);
-          return decoded[0] === 1;
-        }
-        return Array.isArray(value) ? value[0] === 1 : false;
-      }
-    }
+    // If neither event nor dynamic field resolved, treat as no policy
     return false;
   } catch (error: any) {
     // 检查是否是预期的错误（没有访问策略）
