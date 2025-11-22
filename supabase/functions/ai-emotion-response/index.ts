@@ -23,13 +23,24 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    console.log('[AI Response] Env vars present:', { url: !!supabaseUrl, key: !!supabaseKey });
+    console.log('[AI Response] Env vars present:', { url: !!supabaseUrl, key: !!supabaseKey, serviceKey: !!supabaseServiceKey });
+
+    if (!supabaseUrl || !supabaseKey || !supabaseServiceKey) {
+      throw new Error('Missing required environment variables');
+    }
+
+    // Create service client for rate limiting (bypasses RLS)
+    const serviceClient = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
 
     // Create Supabase client
     let supabase: ReturnType<typeof createClient>;
     let user: { id: string } | null = null;
     let isAnonymous = false;
-    let serviceClient: ReturnType<typeof createClient> | null = null;
 
     if (authHeader) {
       // Try authenticated user path first
@@ -62,34 +73,19 @@ Deno.serve(async (req) => {
         // Fall back to anonymous mode instead of rejecting
         isAnonymous = true;
         
-        // Create service client for anonymous rate limiting
-        if (supabaseUrl && supabaseServiceKey) {
-          serviceClient = createClient(supabaseUrl, supabaseServiceKey);
-        }
-        
         // Recreate client without auth
-        supabase = createClient(supabaseUrl ?? '', supabaseKey ?? '');
+        supabase = createClient(supabaseUrl, supabaseKey);
       } else {
         user = authData.user;
         console.log('User authenticated:', user.id);
-        
-        // Create service client for authenticated user rate limiting
-        if (supabaseUrl && supabaseServiceKey) {
-          serviceClient = createClient(supabaseUrl, supabaseServiceKey);
-        }
       }
     } else {
       // Anonymous user path - require anonymousId in request body
       isAnonymous = true;
       console.log('[AI Response] Anonymous user mode');
       
-      // Create service client for anonymous rate limiting
-      if (supabaseUrl && supabaseServiceKey) {
-        serviceClient = createClient(supabaseUrl, supabaseServiceKey);
-      }
-      
       // Create regular client for anonymous users (no auth)
-      supabase = createClient(supabaseUrl ?? '', supabaseKey ?? '');
+      supabase = createClient(supabaseUrl, supabaseKey);
     }
 
     // Parse and validate request body
@@ -216,27 +212,7 @@ Deno.serve(async (req) => {
         return createRateLimitResponse(rateLimitCheck.resetAt, true, normalizedLanguage);
       }
     } else if (user) {
-      // Check rate limit for authenticated users (before processing request)
-      // Use service client for rate limiting to bypass RLS
-      if (!serviceClient) {
-        console.error('[AI Response] Service client not available for authenticated rate limiting');
-        const errorMessage = normalizedLanguage.startsWith('zh')
-          ? '服務暫時不可用，請稍後再試。'
-          : 'Service temporarily unavailable. Please try again later.';
-        
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: errorMessage,
-            errorCode: 'SERVICE_UNAVAILABLE'
-          }),
-          {
-            status: 503,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          }
-        );
-      }
-      
+      // Check rate limit for authenticated users (using service client to bypass RLS)
       const rateLimitCheck = await checkRateLimit(serviceClient, user.id);
       if (!rateLimitCheck.allowed) {
         console.warn('[AI Response] Rate limit exceeded for user:', user.id);
@@ -356,16 +332,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 获取 API key（支持 rotation）
-    // 创建服务端 Supabase 客户端用于 API key 管理（如果还没有）
-    if (!serviceClient) {
-      const supabaseServiceUrl = Deno.env.get('SUPABASE_URL');
-      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-      if (supabaseServiceUrl && supabaseServiceKey) {
-        serviceClient = createClient(supabaseServiceUrl, supabaseServiceKey);
-      }
-    }
-    
+    // Get API key (with rotation support)
     let apiKey: string | null = null;
     
     if (serviceClient) {
