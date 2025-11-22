@@ -335,6 +335,10 @@ const Timeline = () => {
                       encrypted_data_present: !!r.encrypted_data,
                       originalEmotion: r.emotion,
                       isValidEmotion: r.emotion && ['joy', 'sadness', 'anger', 'anxiety', 'confusion', 'peace'].includes(r.emotion),
+                      originalId: r.id,
+                      sui_ref: r.sui_ref,
+                      willUseIdAsSuiRef: !!r.sui_ref,
+                      finalId: r.sui_ref || r.id,
                     });
                     
                     // 確保emotion是有效值，如果DB返回的emotion是有效的就使用，否則才標記為encrypted
@@ -4140,23 +4144,34 @@ const Timeline = () => {
                               </span>
                             </div>
                             {/* 訪問權限管理按鈕 - 僅當記錄是 NFT 時顯示 */}
-                            {!selectionMode && record.sui_ref && record.id === record.sui_ref && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedRecordForAccessControl(record);
-                                  setAccessControlDialogOpen(true);
-                                }}
-                                className="h-8 px-2 gap-1.5"
-                                title={t("timeline.accessControl") || "訪問權限管理"}
-                              >
-                                <Users className="h-4 w-4" />
-                                <span className="hidden sm:inline text-xs">
-                                  {t("timeline.accessControl") || "訪問權限管理"}
-                                </span>
-                              </Button>
-                            )}
+                            {(() => {
+                              const shouldShow = !selectionMode && record.sui_ref && record.id === record.sui_ref;
+                              console.log(`[Timeline] Access Control button for record:`, {
+                                recordId: record.id?.substring(0, 20),
+                                suiRef: record.sui_ref?.substring(0, 20),
+                                selectionMode,
+                                hasSuiRef: !!record.sui_ref,
+                                idsMatch: record.id === record.sui_ref,
+                                shouldShow
+                              });
+                              return shouldShow ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedRecordForAccessControl(record);
+                                    setAccessControlDialogOpen(true);
+                                  }}
+                                  className="h-8 px-2 gap-1.5"
+                                  title={t("timeline.accessControl") || "訪問權限管理"}
+                                >
+                                  <Users className="h-4 w-4" />
+                                  <span className="hidden sm:inline text-xs">
+                                    {t("timeline.accessControl") || "訪問權限管理"}
+                                  </span>
+                                </Button>
+                              ) : null;
+                            })()}
                             {/* Actions Menu */}
                             {!selectionMode && (
                               <DropdownMenu>
