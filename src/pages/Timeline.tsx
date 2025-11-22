@@ -3990,12 +3990,20 @@ const Timeline = () => {
                   finalDisplayEmotion: displayEmotion,
                 });
                 const emotionKey = displayEmotion as keyof typeof emotionLabels;
+                console.log(`[Timeline] 🔑 Emotion key:`, emotionKey, 'Type:', typeof emotionKey);
+                console.log(`[Timeline] 📚 Available keys in emotionLabels:`, Object.keys(emotionLabels));
+                console.log(`[Timeline] 🎯 emotionLabels[emotionKey]:`, emotionLabels[emotionKey]);
                 const emotionConfig = emotionLabels[emotionKey] || {
                   label: displayEmotion.charAt(0).toUpperCase() + displayEmotion.slice(1),
                   emoji: "😊",
                   gradient: "from-gray-400 to-slate-400",
                   color: "#94a3b8",
                 };
+                console.log(`[Timeline] 🎨 Final emotionConfig for ${record.id}:`, {
+                  label: emotionConfig.label,
+                  emoji: emotionConfig.emoji,
+                  gradient: emotionConfig.gradient,
+                });
                 const isLocal = isLocalRecord(record);
                 
                 return (
