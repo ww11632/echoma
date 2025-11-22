@@ -613,24 +613,26 @@ const Timeline = () => {
                     // 解析標籤
                     const tags = nft.tagsCsv ? nft.tagsCsv.split(",").map(t => t.trim()).filter(Boolean) : [];
                     
+                    // 嘗試從 allRecords 中找到有相同 blob_id 的 Supabase 記錄
+                    const matchingSupabaseRecord = blobIdFromNft 
+                      ? allRecords.find(r => r.blob_id === blobIdFromNft && r.emotion !== "encrypted")
+                      : null;
+                    
                     // 創建 NFT 記錄
-                    // 注意：NFT 中沒有存儲 emotion 類型，只有 mood_text
-                    // 使用 "encrypted" 表示這是加密記錄（雖然 NFT 中 mood_text 是明文，但為了與其他記錄一致）
-                    // 優先使用從鏈上獲取的 transaction_digest，如果沒有則為 null（可能從數據庫獲取）
                     const nftRecord: EmotionRecord = {
                       id: nft.nftId, // 使用 NFT ID 作為唯一標識
-                      emotion: "encrypted", // NFT 中沒有存儲 emotion 類型，使用 "encrypted" 表示需要從描述推斷
+                      emotion: matchingSupabaseRecord?.emotion || "encrypted", // 優先使用 Supabase 記錄的 emotion
                       intensity: intensity,
                       description: nft.moodText || "", // NFT 中存儲的 mood_text（這是描述，不是 emotion 類型）
                       blob_id: blobIdFromNft || `nft_${nft.nftId.slice(0, 8)}`, // 使用從 URL 提取的 blob ID，或生成 NFT 前綴的 ID
                       walrus_url: walrusUrlFromNft, // 使用標準化後的 Walrus URL，確保與 blob 對象一致
-                      payload_hash: "",
-                      is_public: false,
+                      payload_hash: matchingSupabaseRecord?.payload_hash || "",
+                      is_public: matchingSupabaseRecord?.is_public || false,
                       proof_status: "confirmed", // NFT 肯定是已確認的
                       sui_ref: nft.nftId,
                       created_at: nft.timestamp,
                       wallet_address: currentAccountSnapshot?.address || null,
-                      tags: tags.length > 0 ? tags : undefined,
+                      tags: tags.length > 0 ? tags : matchingSupabaseRecord?.tags,
                       transaction_digest: nft.transactionDigest || null, // 從鏈上 NFT 對象的 previousTransaction 獲取
                     };
                     
@@ -678,18 +680,18 @@ const Timeline = () => {
                       
                       const nftRecord: EmotionRecord = {
                         id: nft.nftId,
-                        emotion: "encrypted",
+                        emotion: existing.emotion || "encrypted", // 保留原有記錄的 emotion
                         intensity: intensity,
-                        description: nft.moodText || "",
+                        description: nft.moodText || existing.description || "",
                         blob_id: blobIdFromNft,
                         walrus_url: walrusUrlFromNft,
-                        payload_hash: "",
-                        is_public: false,
+                        payload_hash: existing.payload_hash || "",
+                        is_public: existing.is_public || false,
                         proof_status: "confirmed",
                         sui_ref: nft.nftId,
                         created_at: nft.timestamp,
                         wallet_address: currentAccountSnapshot?.address || null,
-                        tags: tags.length > 0 ? tags : undefined,
+                        tags: tags.length > 0 ? tags : existing.tags,
                         transaction_digest: nft.transactionDigest || null,
                       };
                       
