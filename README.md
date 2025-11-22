@@ -108,19 +108,13 @@ graph TB
 
 ### 🎯 What Makes Echoma Different?
 
-#### 🆚 Differentiation: echōma vs. Traditional Web3 Diary
-
-| Feature | Traditional Web3 Diary | echōma |
+| Feature | Public-by-Default IPFS Diaries | Echoma |
 |---------|------------------------|---------|
-| **Encryption** | ❌ Server-side or None | ✅ **Client-side AES-GCM-256 + Argon2id** |
-| **Key Derivation** | 🔴 Simple PBKDF2 (10k iter) | 🟢 **Argon2id (64MB Memory-Hard)** |
-| **Storage** | 🟡 Centralized IPFS Gateway | 🟢 **Decentralized Walrus (Sui Native)** |
-| **Access Control** | ❌ NFT = Full Access | ✅ **Seal Policies: Dynamic Grant/Revoke** |
-| **Privacy Model** | 🔴 Metadata Leakage | 🟢 **Zero-Knowledge (Server sees ciphertext only)** |
-| **Brute-Force Resistance** | 🔴 GPU Attack: ~3 hours | 🟢 **GPU Attack: ~12 hours (+300%)** |
-| **ASIC Resistance** | 🔴 Weak | 🟢 **Strong (+500%)** |
-| **Data Integrity** | 🟡 Blockchain Hash | 🟢 **AES-GCM Authentication Tag + Blockchain** |
-| **Backward Compatibility** | ❌ Breaking Changes | ✅ **Versioned Encryption Headers** |
+| **Encryption** | ❌ None or Server-side | ✅ **Client-side AES-GCM-256** |
+| **Key Derivation** | 🔴 PBKDF2 (weak) | 🟢 **Argon2id (64MB Memory-Hard)** |
+| **Storage** | 🟡 IPFS Gateway | 🟢 **Walrus (Sui Native)** |
+| **Access Control** | ❌ NFT = Full Access | ✅ **Dynamic Grant/Revoke** |
+| **Privacy** | 🔴 Metadata Leakage | 🟢 **Zero-Knowledge** |
 
 📖 **See full comparison:** [SECURITY_FEATURES.md](./SECURITY_FEATURES.md) | [THREAT_MODEL_EN.md](./THREAT_MODEL_EN.md) | [View Complete Architecture Diagrams →](./ARCHITECTURE_VISUAL.md)
 
