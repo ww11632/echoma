@@ -1311,7 +1311,7 @@ const Timeline = () => {
     }
     
     // 如果已經解密，不需要重新解密
-    if (decryptedDescriptions[record.id]) {
+    if (record.id in decryptedDescriptions) {
       return;
     }
 
