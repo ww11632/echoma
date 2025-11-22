@@ -331,12 +331,13 @@ const Timeline = () => {
                       hasWalrusData,
                       isLocal,
                       blob_id: blobId,
-                      walrus_url: walrusUrl
+                      walrus_url: walrusUrl,
+                      emotion: r.emotion, // 添加日誌
                     });
                     
                     return {
                       id: r.id,
-                      emotion: r.emotion || "encrypted",
+                      emotion: r.emotion && r.emotion !== '' ? r.emotion : "encrypted",
                       intensity: r.intensity || 50,
                       description: r.description,
                       blob_id: blobId,
@@ -376,7 +377,7 @@ const Timeline = () => {
                     
                     return {
                       id: r.id,
-                      emotion: r.emotion || "encrypted",
+                      emotion: r.emotion && r.emotion !== '' ? r.emotion : "encrypted",
                       intensity: r.intensity || 50,
                       description: r.description,
                       blob_id: blobId,
