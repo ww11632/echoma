@@ -108,6 +108,8 @@ graph TB
 
 ### 🎯 What Makes Echoma Different?
 
+> Most Web3 diaries store plaintext or semi-encrypted data on centralized IPFS gateways. Echoma is the first to combine: client-side encryption + memory-hard KDF + Walrus + Seal Policies.
+
 | Feature | Public-by-Default IPFS Diaries | Echoma |
 |---------|------------------------|---------|
 | **Encryption** | ❌ None or Server-side | ✅ **Client-side AES-GCM-256** |
@@ -143,8 +145,8 @@ hashLength: 32
 ```
 
 **Security Impact:**
-- ✅ +300% GPU resistance vs PBKDF2
-- ✅ +500% ASIC resistance
+- ✅ Significantly increases GPU cracking cost (estimated +200–300%)
+- ✅ Strong resistance against ASIC-optimized brute-force (order of magnitude higher cost)
 - ✅ Automatic fallback to enhanced PBKDF2 (300k iterations) for unsupported devices
 
 📖 [Full technical details](./ARGON2ID_UPGRADE_SUMMARY.md)
@@ -552,7 +554,7 @@ Echoma now supports user-defined encryption passwords for enhanced security.
   - ✅ Full WASM integration with `hash-wasm` library
   - ✅ Memory-hard parameters: 3 iterations × 64 MB × 4 threads
   - ✅ Intelligent fallback to enhanced PBKDF2 (300k+ iterations)
-  - ✅ **Security boost:** +300% GPU resistance, +500% ASIC resistance
+  - ✅ **Security boost:** Significantly increases GPU cracking cost (estimated +200–300%), strong ASIC resistance (order of magnitude higher cost)
   - ✅ All tests passed (5/5), production-ready
   - 📖 See [ARGON2ID_UPGRADE_SUMMARY.md](./ARGON2ID_UPGRADE_SUMMARY.md) for details
 - **NFT Minting on Sui** – Deployed to testnet and mainnet
