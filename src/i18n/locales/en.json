@@ -48,7 +48,7 @@
     "mainnet": "Mainnet",
     "network": "Network",
     "testnetNotice": "⚠️ This app is currently running on Sui Testnet for testing purposes only",
-    "mainnetNotice": "✅ Connected to Sui Mainnet. Transactions are live.",
+    "mainnetNotice": "Connected to Sui Mainnet",
     "toggleTheme": "Toggle theme",
     "light": "Light",
     "dark": "Dark",

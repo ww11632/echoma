@@ -48,7 +48,7 @@
     "mainnet": "主網",
     "network": "網路",
     "testnetNotice": "⚠️ 此應用目前運行於 Sui 測試網，僅供測試使用",
-    "mainnetNotice": "✅ 已連線至 Sui 主網，操作將直接上鏈",
+    "mainnetNotice": "已連線至 Sui 主網",
     "toggleTheme": "切換主題",
     "light": "淺色",
     "dark": "深色",
