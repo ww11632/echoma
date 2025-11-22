@@ -628,15 +628,22 @@ const AuthTimeline = () => {
   // 💡 優化：如果數據庫中的 emotion 已經是有效值（不是 "encrypted" 或 null），直接使用
   const getEmotionValue = useCallback((record: EmotionRecord) => {
     // 優先使用解密後的情緒
-    if (decryptedEmotions[record.id]) {
-      return decryptedEmotions[record.id];
+    const decrypted = decryptedEmotions[record.id];
+    console.log(`[getEmotionValue] Record ${record.id}:`, {
+      decrypted,
+      recordEmotion: record.emotion,
+      hasDecrypted: !!decrypted,
+    });
+    
+    if (decrypted && decrypted !== "encrypted") {
+      return decrypted;
     }
     // 如果數據庫中的 emotion 是有效值（不是 "encrypted" 且不是 null/undefined），直接使用
     if (record.emotion && record.emotion !== "encrypted") {
       return record.emotion;
     }
     // 否則返回 "encrypted" 顯示鎖頭圖標
-    return record.emotion || "encrypted";
+    return "encrypted";
   }, [decryptedEmotions]);
 
   // 解密記錄描述
@@ -842,11 +849,20 @@ const AuthTimeline = () => {
       
       // 紀錄解密後的情緒，避免重新載入後又顯示鎖頭
       // 修正：只有當 resolvedEmotion 不是 "encrypted" 時才記錄
+      console.log(`[AuthTimeline] 💾 Setting decryptedEmotion for ${record.id}:`, {
+        resolvedEmotion,
+        willSet: resolvedEmotion && resolvedEmotion !== "encrypted",
+      });
+      
       if (resolvedEmotion && resolvedEmotion !== "encrypted") {
-        setDecryptedEmotions(prev => ({
-          ...prev,
-          [record.id]: resolvedEmotion,
-        }));
+        setDecryptedEmotions(prev => {
+          const next = {
+            ...prev,
+            [record.id]: resolvedEmotion,
+          };
+          console.log(`[AuthTimeline] ✅ Updated decryptedEmotions:`, next);
+          return next;
+        });
       }
 
       // 儲存解密後的描述
