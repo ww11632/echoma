@@ -36,6 +36,18 @@ Deno.serve(async (req) => {
       }
     );
 
+    // Create service client for rate limiting (bypasses RLS)
+    const serviceClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        },
+      }
+    );
+
     // Verify user authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -46,8 +58,8 @@ Deno.serve(async (req) => {
 
     console.log('User authenticated:', user.id);
 
-    // Check rate limit before processing
-    const rateLimitCheck = await checkRateLimit(supabase, user.id);
+    // Check rate limit before processing (using service client to bypass RLS)
+    const rateLimitCheck = await checkRateLimit(serviceClient, user.id);
     if (!rateLimitCheck.allowed) {
       console.warn(`Rate limit exceeded for user ${user.id}`);
       return new Response(
