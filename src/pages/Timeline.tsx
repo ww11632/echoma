@@ -1354,9 +1354,16 @@ const Timeline = () => {
           console.log(`[Timeline] Successfully fetched from database backup`);
         } catch (backupError) {
           const errorMsg = (backupError as Error).message;
+          const shouldFallbackToWalrus =
+            errorMsg.includes("Data not available in database backup") ||
+            errorMsg.toLowerCase().includes("not found") ||
+            errorMsg.includes("404") ||
+            errorMsg.toLowerCase().includes("no data") ||
+            errorMsg.toLowerCase().includes("missing");
+
           // If the error indicates data is on Walrus only, try fetching from Walrus
-          if (errorMsg.includes("Data not available in database backup")) {
-            console.log(`[Timeline] No database backup found, fetching from Walrus...`);
+          if (shouldFallbackToWalrus) {
+            console.log(`[Timeline] No database backup found (${errorMsg}), fetching from Walrus...`);
             try {
               encryptedDataString = await retryWithBackoff(
                 () => readFromWalrus(record.blob_id, recordNetwork),
