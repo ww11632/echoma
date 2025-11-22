@@ -481,26 +481,56 @@ const Timeline = () => {
                   });
 
                   if (!existing) {
+                    // 嘗試從已有的Supabase記錄中找到可能匹配的記錄
+                    // 這些記錄可能在上傳時Walrus失敗，使用了database fallback，所以blob_id為null
+                    const validEmotions = ['joy', 'sadness', 'anger', 'anxiety', 'confusion', 'peace'];
+                    const blobCreatedTime = blob.createdAt ? new Date(blob.createdAt).getTime() : null;
+                    const potentialMatch = blobCreatedTime ? allRecords.find(r => {
+                      // 只匹配Supabase記錄（blob_id為null且emotion有效）
+                      if (r.blob_id !== null || !r.emotion || !validEmotions.includes(r.emotion)) {
+                        return false;
+                      }
+                      // 檢查時間是否接近（5分鐘內）
+                      const recordTime = new Date(r.created_at).getTime();
+                      const timeDiff = Math.abs(recordTime - blobCreatedTime);
+                      return timeDiff < 5 * 60 * 1000; // 5分鐘
+                    }) : null;
+                    
+                    console.log(`[Timeline] Creating on-chain blob record for ${blob.objectId}, found potential Supabase match:`, potentialMatch ? {
+                      id: potentialMatch.id,
+                      emotion: potentialMatch.emotion,
+                      created_at: potentialMatch.created_at,
+                      timeDiff: blobCreatedTime ? Math.abs(new Date(potentialMatch.created_at).getTime() - blobCreatedTime) / 1000 : null
+                    } : 'none');
+                    
                     // 創建新的鏈上記錄
-                    // 注意：鏈上記錄可能沒有 emotion/intensity 等資訊，這些在加密的 blob 中
-                    // 我們可以嘗試從 blob 讀取，或使用預設值
-                    // 使用 objectId 本身作為 id，確保唯一性
                     const onChainRecord: EmotionRecord = {
                       id: blob.objectId, // 使用 objectId 本身，確保唯一性
-                      emotion: "encrypted", // 加密資料尚未解密前提示為已加密
-                      intensity: 50, // 預設值
-                      description: "", // 加密內容，需要解密才能顯示
+                      emotion: potentialMatch?.emotion || "encrypted", // 優先使用匹配的Supabase記錄的emotion
+                      intensity: potentialMatch?.intensity || 50,
+                      description: potentialMatch?.description || "", // 加密內容，需要解密才能顯示
                       blob_id: blob.blobId,
                       walrus_url: getWalrusUrl(blob.blobId, currentNetworkSnapshot),
-                      payload_hash: "",
-                      is_public: false,
+                      payload_hash: potentialMatch?.payload_hash || "",
+                      is_public: potentialMatch?.is_public || false,
                       proof_status: "confirmed", // 鏈上記錄肯定是已確認的
                       sui_ref: blob.objectId,
                       created_at: blob.createdAt || new Date().toISOString(),
                       wallet_address: currentAccountSnapshot?.address || null,
                     };
-                    allRecords.push(onChainRecord);
-                    addedCount++;
+                    
+                    // 如果找到了匹配的Supabase記錄，更新它的blob_id和sui_ref，避免重複
+                    if (potentialMatch) {
+                      potentialMatch.blob_id = blob.blobId;
+                      potentialMatch.walrus_url = getWalrusUrl(blob.blobId, currentNetworkSnapshot);
+                      potentialMatch.sui_ref = blob.objectId;
+                      potentialMatch.proof_status = "confirmed";
+                      console.log(`[Timeline] ✅ Updated Supabase record ${potentialMatch.id} with blob info from chain`);
+                      // 不添加鏈上記錄，因為已經更新了Supabase記錄
+                    } else {
+                      allRecords.push(onChainRecord);
+                      addedCount++;
+                    }
                     console.log(`[Timeline] ✅ Added on-chain record:`, {
                       blobId: blob.blobId,
                       objectId: blob.objectId,
