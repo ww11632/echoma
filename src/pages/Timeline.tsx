@@ -3917,6 +3917,14 @@ const Timeline = () => {
                 // 安全檢查：確保記錄存在
                 if (!record) return null;
                 
+                // Debug: 檢查記錄的emotion值
+                console.log(`[Timeline] Rendering record ${record.id}:`, {
+                  emotion: record.emotion,
+                  blob_id: record.blob_id,
+                  sui_ref: record.sui_ref,
+                  decryptedEmotion: decryptedEmotions[record.id],
+                });
+                
                 const displayEmotion = getEmotionValue(record);
                 const emotionKey = displayEmotion as keyof typeof emotionLabels;
                 const emotionConfig = emotionLabels[emotionKey] || {
