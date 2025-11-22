@@ -763,21 +763,20 @@ const AuthTimeline = () => {
         : null;
       
       // 更新記錄的 metadata（例如真實時間戳與情緒/強度、標籤）
-      if (snapshotTimestamp || snapshot.emotion || snapshot.intensity || snapshot.tags) {
-        setRecords(prev =>
-          sortRecordsByDate(prev.map(r => {
-            if (r.id !== record.id) return r;
-            return {
-              ...r,
-              created_at: snapshotTimestamp || r.created_at,
-              emotion: snapshot.emotion || r.emotion,
-              intensity: typeof snapshot.intensity === "number" ? snapshot.intensity : r.intensity,
-              wallet_address: snapshot.walletAddress || r.wallet_address,
-              tags: snapshot.tags || r.tags, // 從解密後的 snapshot 中提取 tags
-            };
-          }))
-        );
-      }
+      // 修正：始終執行更新，確保解密後的情緒能正確顯示
+      setRecords(prev =>
+        sortRecordsByDate(prev.map(r => {
+          if (r.id !== record.id) return r;
+          return {
+            ...r,
+            created_at: snapshotTimestamp || r.created_at,
+            emotion: snapshot.emotion || r.emotion,
+            intensity: typeof snapshot.intensity === "number" ? snapshot.intensity : r.intensity,
+            wallet_address: snapshot.walletAddress || r.wallet_address,
+            tags: snapshot.tags || r.tags, // 從解密後的 snapshot 中提取 tags
+          };
+        }))
+      );
       
       // 儲存解密後的描述
       setDecryptedDescriptions(prev => ({
