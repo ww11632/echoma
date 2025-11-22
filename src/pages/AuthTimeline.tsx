@@ -268,8 +268,7 @@ const AuthTimeline = () => {
         
         return {
           id: r.id,
-          // emotion in DB should always be a valid enum; keep it as-is (avoid "encrypted" fallback)
-          emotion: r.emotion,
+          emotion: r.emotion || "encrypted",
           intensity: r.intensity || 50,
           description: r.description,
           blob_id: blobId,
@@ -404,7 +403,7 @@ const AuthTimeline = () => {
                 
                 const record: EmotionRecord = {
                   id: newRecord.id,
-                  emotion: newRecord.emotion,
+                  emotion: newRecord.emotion || "encrypted",
                   intensity: newRecord.intensity || 50,
                   description: newRecord.description,
                   blob_id: blobId,
@@ -627,10 +626,17 @@ const AuthTimeline = () => {
 
   // Return decrypted emotion when available so UI doesn't fall back to the lock icon
   const getEmotionValue = useCallback((record: EmotionRecord) => {
-    // 優先使用解密後的情緒；否則使用數據庫中的枚舉值
+    // 優先使用解密後的情緒
     const decrypted = decryptedEmotions[record.id];
-    if (decrypted) return decrypted;
-    return record.emotion;
+    if (decrypted && decrypted !== "encrypted") {
+      return decrypted;
+    }
+    // 如果數據庫中的 emotion 是有效值，直接使用
+    if (record.emotion && record.emotion !== "encrypted") {
+      return record.emotion;
+    }
+    // 否則返回 "encrypted"
+    return "encrypted";
   }, [decryptedEmotions]);
 
   // 解密記錄描述
@@ -800,18 +806,13 @@ const AuthTimeline = () => {
         ? new Date(snapshot.timestamp).toISOString()
         : null;
       // Normalize emotion from snapshot to handle legacy field names
-      // 💡 不要回退到 record.emotion，因為它可能是 "encrypted"（無效值）
       const resolvedEmotion =
         snapshot.emotion ||
         snapshot.selectedEmotion ||
         snapshot.mood ||
         snapshot.feeling ||
         snapshot.emotionType ||
-        null; // ✅ 不回退到 record.emotion
-      
-      // 驗證 resolvedEmotion 是否是有效的 emotion enum 值
-      const validEmotions = ['joy', 'sadness', 'anger', 'anxiety', 'confusion', 'peace'];
-      const isValidEmotion = resolvedEmotion && validEmotions.includes(resolvedEmotion);
+        record.emotion;
       
       // 更新記錄的 metadata（例如真實時間戳與情緒/強度、標籤）
       // 修正：始終執行更新，確保解密後的情緒能正確顯示
@@ -823,7 +824,7 @@ const AuthTimeline = () => {
           const updatedRecord = {
             ...r,
             created_at: snapshotTimestamp || r.created_at,
-            emotion: isValidEmotion ? resolvedEmotion : r.emotion, // 只有有效的 enum 值才更新
+            emotion: resolvedEmotion && resolvedEmotion !== "encrypted" ? resolvedEmotion : r.emotion,
             intensity: typeof snapshot.intensity === "number" ? snapshot.intensity : r.intensity,
             wallet_address: snapshot.walletAddress || r.wallet_address,
             tags: snapshot.tags || r.tags, // 從解密後的 snapshot 中提取 tags
@@ -831,7 +832,6 @@ const AuthTimeline = () => {
           console.log(`[AuthTimeline] 🔄 Updating record ${r.id}:`, {
             oldEmotion: r.emotion,
             snapshotEmotion: resolvedEmotion,
-            isValidEmotion, // ✅ 添加這個
             newEmotion: updatedRecord.emotion,
             willChange: updatedRecord.emotion !== r.emotion,
           });
@@ -841,15 +841,12 @@ const AuthTimeline = () => {
       });
       
       // 紀錄解密後的情緒，避免重新載入後又顯示鎖頭
-      // 💡 關鍵：只有當 resolvedEmotion 是有效的 enum 值時才記錄
-      if (isValidEmotion) {
-        console.log(`[AuthTimeline] ✅ 設置 decryptedEmotions[${record.id}] = ${resolvedEmotion}`);
+      // 修正：只有當 resolvedEmotion 不是 "encrypted" 時才記錄
+      if (resolvedEmotion && resolvedEmotion !== "encrypted") {
         setDecryptedEmotions(prev => ({
           ...prev,
           [record.id]: resolvedEmotion,
         }));
-      } else {
-        console.warn(`[AuthTimeline] ⚠️ 跳過設置 decryptedEmotions：resolvedEmotion "${resolvedEmotion}" 不是有效的 emotion enum 值`);
       }
 
       // 儲存解密後的描述
