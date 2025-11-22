@@ -3957,6 +3957,14 @@ const Timeline = () => {
                   gradient: "from-gray-400 to-slate-400",
                   color: "#94a3b8",
                 };
+                
+                console.log(`[Timeline Render] Record ${record.id.slice(0, 8)}:`, {
+                  displayEmotion,
+                  emotionKey,
+                  emoji: emotionConfig.emoji,
+                  label: emotionConfig.label,
+                });
+                
                 const isLocal = isLocalRecord(record);
                 
                 return (
