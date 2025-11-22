@@ -1553,6 +1553,20 @@ const Timeline = () => {
     } catch (error: any) {
       console.error(`[Timeline] Failed to decrypt record ${record.id}:`, error);
       
+      // ✅ 關鍵優化：如果 emotion 已經是有效值，解密失敗不應該阻止顯示
+      // 只有當基本資訊（emotion）缺失或無效時，才顯示錯誤
+      const hasValidEmotion = record.emotion && record.emotion !== "encrypted";
+      
+      if (hasValidEmotion) {
+        console.warn(`[Timeline] ⚠️ 解密失敗，但記錄 ${record.id} 已有有效 emotion (${record.emotion})，跳過錯誤顯示`);
+        // 標記為失敗，避免重複嘗試
+        setFailedAutoDecrypts(prev => new Set(prev).add(record.id));
+        return; // 不設置錯誤狀態，不顯示錯誤訊息
+      }
+      
+      // 如果沒有有效 emotion，則顯示錯誤（這是真正需要解密才能顯示的情況）
+      console.error(`[Timeline] ❌ 解密失敗且記錄 ${record.id} 沒有有效 emotion，顯示錯誤`);
+      
       // 提取詳細錯誤資訊
       let errorType = "unknown";
       let errorMessage = t("timeline.decryptFailedDesc");
