@@ -1586,6 +1586,14 @@ const Timeline = () => {
       
       if (hasValidEmotion) {
         console.warn(`[Timeline] ⚠️ 解密失敗，但記錄 ${record.id} 已有有效 emotion (${record.emotion})，跳過錯誤顯示`);
+        
+        // ✅ 即使解密失敗，也要設定 description 以顯示 UI
+        // 優先使用資料庫中的明文描述
+        setDecryptedDescriptions(prev => ({
+          ...prev,
+          [record.id]: record.description || '',
+        }));
+        
         // 標記為失敗，避免重複嘗試
         setFailedAutoDecrypts(prev => new Set(prev).add(record.id));
         return; // 不設置錯誤狀態，不顯示錯誤訊息
