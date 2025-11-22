@@ -859,11 +859,23 @@ const AuthTimeline = () => {
         console.warn(`[AuthTimeline] ⚠️ 跳過設置 decryptedEmotions：resolvedEmotion "${resolvedEmotion}" 不是有效的 emotion enum 值`);
       }
 
-      // 儲存解密後的描述
+      // 儲存解密後的描述（兼容舊字段，避免空白）
+      const resolvedDescription =
+        snapshot.description && snapshot.description.trim().length > 0
+          ? snapshot.description
+          : snapshot.content && snapshot.content.trim().length > 0
+            ? snapshot.content
+            : snapshot.text && snapshot.text.trim().length > 0
+              ? snapshot.text
+              : snapshot.note && snapshot.note.trim().length > 0
+                ? snapshot.note
+                : snapshot.message && snapshot.message.trim().length > 0
+                  ? snapshot.message
+                  : null;
+
       setDecryptedDescriptions(prev => ({
         ...prev,
-        // fallback to record.description to avoid blank UI if snapshot lacks description
-        [record.id]: snapshot.description || record.description || '',
+        [record.id]: resolvedDescription ?? record.description ?? prev[record.id] ?? '',
       }));
       
       // 清除失敗標記（如果之前失敗過）
