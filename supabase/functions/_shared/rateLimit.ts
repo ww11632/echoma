@@ -11,11 +11,11 @@ import { corsHeaders } from './cors.ts';
  */
 export const RATE_LIMIT_CONFIG = {
   // Maximum requests per window for authenticated users
-  maxRequests: 10,
+  maxRequests: 50,
   // Maximum requests per window for anonymous users (more restrictive)
-  maxRequestsAnonymous: 3,
+  maxRequestsAnonymous: 10,
   // Maximum requests per IP address per window (防止单 IP 大量请求)
-  maxRequestsPerIP: 20,
+  maxRequestsPerIP: 100,
   // Time window in milliseconds (1 minute)
   windowMs: 60 * 1000,
 } as const;
