@@ -91,7 +91,7 @@ graph LR
         I --> J[🔗 Link to Journal]
     end
     
-    subgraph "Step 4: Access Control (Optional)"
+    subgraph "Step 4: (Optional) Share or Keep Private"
         J --> K{Need Sharing?}
         K -->|Yes| L[🔐 Create Seal Policy]
         K -->|No| M[🔒 Private Only]
@@ -109,6 +109,8 @@ graph LR
 
 ## 🆚 Differentiation: Echoma vs. Traditional Web3 Diary
 
+> Most Web3 diaries store plaintext or semi-encrypted data on centralized IPFS gateways. Echoma is the first to combine: client-side encryption + memory-hard KDF + Walrus + Seal Policies.
+
 | Feature | Public-by-Default IPFS Diaries | Echoma |
 |---------|------------------------|---------|
 | **Encryption** | ❌ Server-side or None | ✅ **Client-side AES-GCM-256 + Argon2id** |
@@ -116,8 +118,8 @@ graph LR
 | **Storage** | 🟡 Centralized IPFS Gateway | 🟢 **Decentralized Walrus (Sui Native)** |
 | **Access Control** | ❌ NFT = Full Access | ✅ **Seal Policies: Dynamic Grant/Revoke** |
 | **Privacy Model** | 🔴 Metadata Leakage | 🟢 **Zero-Knowledge (Server sees ciphertext only)** |
-| **Brute-Force Resistance** | 🔴 GPU Attack: ~3 hours | 🟢 **GPU Attack: ~12 hours (+300%)** |
-| **ASIC Resistance** | 🔴 Weak | 🟢 **Strong (+500%)** |
+| **Brute-Force Resistance** | 🔴 GPU Attack: ~3 hours | 🟢 **Significantly increases GPU cracking cost (estimated +200–300%)** |
+| **ASIC Resistance** | 🔴 Weak | 🟢 **Strong resistance against ASIC-optimized brute-force (order of magnitude higher cost)** |
 | **Data Integrity** | 🟡 Blockchain Hash | 🟢 **AES-GCM Authentication Tag + Blockchain** |
 | **Backward Compatibility** | ❌ Breaking Changes | ✅ **Versioned Encryption Headers** |
 
