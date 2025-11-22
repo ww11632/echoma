@@ -1631,6 +1631,8 @@ export async function getAuthorizedAddresses(
         msg.includes("Deserialization error");
       const isPolicyNotFound =
         msg.includes("Dynamic Field not found") ||
+        msg.includes("dynamicFieldNotFound") ||
+        msg.includes("dynamicfield") ||
         msg.includes("Entry does not exist") ||
         msg.includes("not found") ||
         msg.includes("borrow_child_object_mut") ||
