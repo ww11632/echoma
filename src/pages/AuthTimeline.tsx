@@ -2805,6 +2805,7 @@ const AuthTimeline = () => {
                 <Calendar
                   mode="single"
                   className="rounded-md border"
+                  locale={i18n.language === 'zh-TW' ? zhTW : enUS}
                   modifiers={{
                     hasRecord: (date) => {
                       const dateKey = format(date, 'yyyy-MM-dd');
