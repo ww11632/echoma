@@ -758,16 +758,24 @@ const AuthTimeline = () => {
       
       // 解析解密後的 JSON 獲取快照
       const snapshot = JSON.parse(decryptedString);
+      console.log(`[AuthTimeline] 📦 Snapshot data for ${record.id}:`, {
+        emotion: snapshot.emotion,
+        intensity: snapshot.intensity,
+        timestamp: snapshot.timestamp,
+        hasDescription: !!snapshot.description,
+        hasTags: !!snapshot.tags,
+      });
+      
       const snapshotTimestamp = snapshot.timestamp
         ? new Date(snapshot.timestamp).toISOString()
         : null;
       
       // 更新記錄的 metadata（例如真實時間戳與情緒/強度、標籤）
       // 修正：始終執行更新，確保解密後的情緒能正確顯示
-      setRecords(prev =>
-        sortRecordsByDate(prev.map(r => {
+      setRecords(prev => {
+        const updated = prev.map(r => {
           if (r.id !== record.id) return r;
-          return {
+          const updatedRecord = {
             ...r,
             created_at: snapshotTimestamp || r.created_at,
             emotion: snapshot.emotion || r.emotion,
@@ -775,8 +783,15 @@ const AuthTimeline = () => {
             wallet_address: snapshot.walletAddress || r.wallet_address,
             tags: snapshot.tags || r.tags, // 從解密後的 snapshot 中提取 tags
           };
-        }))
-      );
+          console.log(`[AuthTimeline] 🔄 Updating record ${r.id}:`, {
+            oldEmotion: r.emotion,
+            newEmotion: updatedRecord.emotion,
+            snapshotEmotion: snapshot.emotion,
+          });
+          return updatedRecord;
+        });
+        return sortRecordsByDate(updated);
+      });
       
       // 儲存解密後的描述
       setDecryptedDescriptions(prev => ({
