@@ -1695,7 +1695,7 @@ export async function queryAccessHistory(
         transactionDigest: string;
       }> = [];
 
-      let cursor: string | null | undefined = undefined;
+      let cursor: any = null;
       let pages = 0;
       const maxPages = 10; // up to ~500 events if limit=50
       const limit = 50;
@@ -1717,7 +1717,7 @@ export async function queryAccessHistory(
         }
 
         for (const e of resp.data) {
-          const eventType = e.type || e.typeName || "";
+          const eventType = e.type || "";
           const isGrant = eventType.includes("AccessGrantedEvent") || eventType.includes("AccessGranted");
           const isRevoke = eventType.includes("AccessRevokedEvent") || eventType.includes("AccessRevoked");
           if ((kind === "grant" && !isGrant) || (kind === "revoke" && !isRevoke)) continue;
