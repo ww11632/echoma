@@ -1,7 +1,8 @@
 // src/lib/mintContract.ts
 import { Transaction } from "@mysten/sui/transactions";
-import { normalizeSuiObjectId } from "@mysten/sui/utils";
+import { normalizeSuiObjectId, fromB64 } from "@mysten/sui/utils";
 import { SuiClient } from "@mysten/sui/client";
+import { bcs } from "@mysten/sui/bcs";
 import { getClientForNetwork } from "./suiClient";
 import { getCurrentNetwork, type SuiNetwork } from "./networkConfig";
 import { extractBlobIdFromUrl } from "./walrus";
@@ -1597,6 +1598,7 @@ export async function getAuthorizedAddresses(
 ): Promise<string[]> {
   const targetNetwork = network || getCurrentNetwork();
   const client = suiClient || getClientForNetwork(targetNetwork);
+  const packageId = getPackageId(targetNetwork);
   const normalizedEntryId = normalizeSuiObjectId(entryNftId);
   const normalizedRegistryId = normalizeSuiObjectId(registryId);
 
@@ -1677,6 +1679,46 @@ export async function getAuthorizedAddresses(
         authorizedSet.delete(addr);
       }
     }
+
+    // 3) 如果动态字段和事件都无法获取，使用链上只读函数作为兜底
+    if (authorizedSet.size === 0) {
+      try {
+        const tx = new Transaction();
+        tx.moveCall({
+          target: `${packageId}::${POLICY_MODULE}::get_authorized_addresses`,
+          arguments: [
+            tx.pure.id(entryNftId),
+            tx.object(registryId),
+          ],
+        });
+
+        const inspect = await client.devInspectTransactionBlock({
+          transactionBlock: tx,
+          // 使用零地址作为模拟发送者，避免依赖钱包
+          sender: "0x0000000000000000000000000000000000000000000000000000000000000000",
+        });
+
+        const returnValues = inspect.results?.[0]?.returnValues;
+        const firstReturn = returnValues?.[0];
+        if (firstReturn && Array.isArray(firstReturn) && firstReturn.length >= 2) {
+          const [bytesBase64, type] = firstReturn;
+          if (typeof bytesBase64 === "string" && typeof type === "string" && type.includes("vector<address>")) {
+            try {
+              const decoded = bcs.de("vector<address>", fromB64(bytesBase64)) as string[];
+              decoded
+                .map((addr) => normalizeAddr(addr))
+                .filter(Boolean)
+                .forEach((addr) => authorizedSet.add(addr as string));
+            } catch (decodeErr) {
+              console.warn("[mintContract] Failed to decode authorized addresses from devInspect:", decodeErr);
+            }
+          }
+        }
+      } catch (inspectErr) {
+        console.warn("[mintContract] devInspect fallback failed when reading authorized addresses:", inspectErr);
+      }
+    }
+
     return Array.from(authorizedSet);
   } catch (error) {
     console.error("[mintContract] Error getting authorized addresses:", error);

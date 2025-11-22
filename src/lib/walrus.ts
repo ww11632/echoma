@@ -741,10 +741,19 @@ export function createSignerFromWallet(
         },
       });
       
-      console.log("[Signer] Transaction executed successfully, digest:", response.digest);
+      console.log("[Signer] Transaction executed, digest:", response.digest);
       console.log("[Signer] Response effects type:", typeof response.effects);
       console.log("[Signer] Response events type:", typeof response.events);
       console.log("[Signer] Response events isArray:", Array.isArray(response.events));
+
+      // Surface failed executions instead of silently proceeding
+      const status = (response as any)?.effects?.status?.status;
+      const statusError = (response as any)?.effects?.status?.error;
+      if (status && status !== "success") {
+        const message = statusError || "Unknown execution error";
+        console.error("[Signer] ❌ Transaction failed:", message);
+        throw new Error(`Transaction failed: ${message}`);
+      }
       
       // executeTransactionBlock returns effects as an object with specific structure
       // Walrus SDK expects the result to have effects and events in a specific format
