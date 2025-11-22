@@ -1704,7 +1704,7 @@ export async function getAuthorizedAddresses(
           const [bytesBase64, type] = firstReturn;
           if (typeof bytesBase64 === "string" && typeof type === "string" && type.includes("vector<address>")) {
             try {
-              const decoded = bcs.de("vector<address>", fromB64(bytesBase64)) as string[];
+              const decoded = bcs.vector(bcs.Address).parse(fromB64(bytesBase64)) as string[];
               decoded
                 .map((addr) => normalizeAddr(addr))
                 .filter(Boolean)
