@@ -746,13 +746,13 @@ const Record = () => {
                 tagsCsv,
                 imageUrl,
                 imageMime,
+                isPublic, // isPublic - 记录到链上策略
+                policyRegistryId,
                 undefined, // imageSha256 - optional
                 undefined, // audioUrl - optional
                 undefined, // audioMime - optional
                 undefined, // audioSha256 - optional
                 undefined, // audioDurationMs - optional
-                isPublic, // isPublic - 记录到链上策略
-                policyRegistryId,
                 currentAccount.address, // sender
                 currentNetwork, // network
                 suiClient // suiClient

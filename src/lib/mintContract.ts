@@ -853,19 +853,20 @@ export async function hasAccess(
   const packageId = getPackageId(targetNetwork);
 
   try {
-    // 使用 moveCall 来调用 view 函数
+    // Create transaction to call view function
+    const tx = new Transaction();
+    tx.moveCall({
+      target: `${packageId}::${POLICY_MODULE}::has_access`,
+      arguments: [
+        tx.pure.id(entryNftId),
+        tx.pure.address(requesterAddress),
+        tx.object(registryId),
+      ],
+    });
+    
     const result = await client.devInspectTransactionBlock({
       sender: requesterAddress,
-      transactionBlock: {
-        kind: "moveCall",
-        data: {
-          packageId: packageId,
-          module: POLICY_MODULE,
-          function: "has_access",
-          arguments: [entryNftId, requesterAddress, registryId],
-          typeArguments: [],
-        },
-      },
+      transactionBlock: tx,
     });
 
     // 解析返回结果
@@ -1861,13 +1862,13 @@ export async function mintEntryWithPolicy(
   tagsCsv: string,
   imageUrl: string,
   imageMime: string,
+  isPublic: boolean,
+  registryId: string,
   imageSha256?: Uint8Array,
   audioUrl?: string,
   audioMime?: string,
   audioSha256?: Uint8Array,
   audioDurationMs?: number,
-  isPublic: boolean,
-  registryId: string,
   sender?: string,
   network?: SuiNetwork,
   suiClient?: SuiClient
