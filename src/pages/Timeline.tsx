@@ -650,7 +650,7 @@ const Timeline = () => {
                     
                     // 嘗試從 allRecords 中找到有相同 blob_id 的 Supabase 記錄，並確保emotion是有效值
                     const validEmotions = ['joy', 'sadness', 'anger', 'anxiety', 'confusion', 'peace'];
-                    const matchingSupabaseRecord = blobIdFromNft 
+                    let matchingSupabaseRecord = blobIdFromNft 
                       ? allRecords.find(r => 
                           r.blob_id === blobIdFromNft && 
                           r.emotion && 
@@ -658,11 +658,36 @@ const Timeline = () => {
                         )
                       : null;
                     
+                    // 如果通過blob_id沒找到，嘗試通過時間匹配（5分鐘內）
+                    if (!matchingSupabaseRecord && nft.timestamp) {
+                      const nftTime = new Date(nft.timestamp).getTime();
+                      matchingSupabaseRecord = allRecords.find(r => {
+                        // 只匹配Supabase記錄（blob_id為null且emotion有效）
+                        if (r.blob_id !== null || !r.emotion || !validEmotions.includes(r.emotion)) {
+                          return false;
+                        }
+                        // 檢查時間是否接近（5分鐘內）
+                        const recordTime = new Date(r.created_at).getTime();
+                        const timeDiff = Math.abs(recordTime - nftTime);
+                        return timeDiff < 5 * 60 * 1000; // 5分鐘
+                      });
+                    }
+                    
                     console.log(`[Timeline] Creating NFT record for ${nft.nftId}, found matching Supabase record:`, matchingSupabaseRecord ? {
                       id: matchingSupabaseRecord.id,
                       emotion: matchingSupabaseRecord.emotion,
-                      blob_id: matchingSupabaseRecord.blob_id
+                      blob_id: matchingSupabaseRecord.blob_id,
+                      timeDiff: nft.timestamp ? Math.abs(new Date(matchingSupabaseRecord.created_at).getTime() - new Date(nft.timestamp).getTime()) / 1000 : null
                     } : 'none');
+                    
+                    // 如果找到了匹配的Supabase記錄，更新它避免重複
+                    if (matchingSupabaseRecord && blobIdFromNft) {
+                      matchingSupabaseRecord.blob_id = blobIdFromNft;
+                      matchingSupabaseRecord.walrus_url = walrusUrlFromNft;
+                      matchingSupabaseRecord.sui_ref = nft.nftId;
+                      matchingSupabaseRecord.proof_status = "confirmed";
+                      console.log(`[Timeline] ✅ Updated Supabase record ${matchingSupabaseRecord.id} with NFT info`);
+                    }
                     
                     // 創建 NFT 記錄
                     const nftRecord: EmotionRecord = {
