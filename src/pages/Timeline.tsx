@@ -312,27 +312,23 @@ const Timeline = () => {
                 const response = await supabase.functions.invoke('get-emotions');
                 if (!response.error && response.data?.success) {
                   const convertedRecords: EmotionRecord[] = response.data.records.map((r: any) => {
-                    // 更寬鬆地判斷是否有 Walrus 資料：只要有非本地 blob_id 或 walrus_url 即視為 Walrus
-                    const rawBlobId = r.blob_id || extractBlobIdFromUrl(r.walrus_url || "") || "";
-                    const nonLocalBlobId = rawBlobId && !String(rawBlobId).startsWith("local_");
-                    const hasWalrusData =
-                      nonLocalBlobId ||
-                      (r.walrus_url && !r.walrus_url.startsWith("local://"));
-                    const isLocal = !hasWalrusData;
+                    // 判斷是否為 Walrus 記錄：有 blob_id 且不是 local_ 開頭
+                    const hasValidBlobId = r.blob_id && !r.blob_id.startsWith("local_");
+                    const hasValidWalrusUrl = r.walrus_url && !r.walrus_url.startsWith("local://");
+                    const isLocal = !hasValidBlobId && !hasValidWalrusUrl;
                     
-                    // 缺少 walrus_url 時，用 blob_id 補齊標準 Walrus URL（避免被誤判為本地）
-                    const blobId = hasWalrusData
-                      ? (nonLocalBlobId ? rawBlobId : (r.walrus_url || "").split("/").pop() || rawBlobId)
-                      : `local_${r.id.slice(0, 8)}`;
+                    // 使用實際的 blob_id 和 walrus_url，或生成本地 ID
+                    const blobId = hasValidBlobId 
+                      ? r.blob_id 
+                      : (hasValidWalrusUrl ? extractBlobIdFromUrl(r.walrus_url) : null) || `local_${r.id.slice(0, 8)}`;
                     
-                    const walrusUrl = hasWalrusData
-                      ? (r.walrus_url && !r.walrus_url.startsWith("local://")
-                          ? r.walrus_url
-                          : (blobId ? getWalrusUrl(blobId, currentNetworkSnapshot) : `local://${r.id}`))
-                      : `local://${r.id}`;
+                    const walrusUrl = hasValidWalrusUrl
+                      ? r.walrus_url
+                      : (hasValidBlobId ? getWalrusUrl(r.blob_id, currentNetworkSnapshot) : `local://${r.id}`);
                     
                     console.log(`[Timeline] Processing Supabase record ${r.id}:`, {
-                      hasWalrusData,
+                      hasValidBlobId,
+                      hasValidWalrusUrl,
                       isLocal,
                       blob_id: blobId,
                       walrus_url: walrusUrl,
@@ -369,22 +365,19 @@ const Timeline = () => {
                 try {
                   const apiRecords = await getEmotions(session.access_token);
                   const convertedApiRecords: EmotionRecord[] = apiRecords.map((r: any) => {
-                    const rawBlobId = r.blob_id || extractBlobIdFromUrl(r.walrus_url || "") || "";
-                    const nonLocalBlobId = rawBlobId && !String(rawBlobId).startsWith("local_");
-                    const hasWalrusData =
-                      nonLocalBlobId ||
-                      (r.walrus_url && !r.walrus_url.startsWith("local://"));
-                    const isLocal = !hasWalrusData;
+                    // 判斷是否為 Walrus 記錄：有 blob_id 且不是 local_ 開頭
+                    const hasValidBlobId = r.blob_id && !r.blob_id.startsWith("local_");
+                    const hasValidWalrusUrl = r.walrus_url && !r.walrus_url.startsWith("local://");
+                    const isLocal = !hasValidBlobId && !hasValidWalrusUrl;
                     
-                    const blobId = hasWalrusData
-                      ? (nonLocalBlobId ? rawBlobId : (r.walrus_url || "").split("/").pop() || rawBlobId)
-                      : `local_${r.id.slice(0, 8)}`;
+                    // 使用實際的 blob_id 和 walrus_url，或生成本地 ID
+                    const blobId = hasValidBlobId 
+                      ? r.blob_id 
+                      : (hasValidWalrusUrl ? extractBlobIdFromUrl(r.walrus_url) : null) || `local_${r.id.slice(0, 8)}`;
                     
-                    const walrusUrl = hasWalrusData
-                      ? (r.walrus_url && !r.walrus_url.startsWith("local://")
-                          ? r.walrus_url
-                          : (blobId ? getWalrusUrl(blobId, currentNetworkSnapshot) : `local://${r.id}`))
-                      : `local://${r.id}`;
+                    const walrusUrl = hasValidWalrusUrl
+                      ? r.walrus_url
+                      : (hasValidBlobId ? getWalrusUrl(r.blob_id, currentNetworkSnapshot) : `local://${r.id}`);
                     
                     return {
                       id: r.id,
