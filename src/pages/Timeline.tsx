@@ -340,7 +340,7 @@ const Timeline = () => {
                     const isValidEmotion = r.emotion && validEmotions.includes(r.emotion);
                     
                     return {
-                      id: r.id,
+                      id: r.sui_ref || r.id, // 如果有NFT，使用NFT ID作為記錄ID
                       emotion: isValidEmotion ? r.emotion : "encrypted",
                       intensity: r.intensity || 50,
                       description: r.description,
@@ -373,7 +373,7 @@ const Timeline = () => {
                     const walrusUrl = hasValidWalrusUrl ? r.walrus_url : (hasValidBlobId ? getWalrusUrl(r.blob_id, currentNetworkSnapshot) : null);
                     
                     return {
-                      id: r.id,
+                      id: r.sui_ref || r.id, // 如果有NFT，使用NFT ID作為記錄ID
                       emotion: r.emotion && r.emotion !== '' ? r.emotion : "encrypted",
                       intensity: r.intensity || 50,
                       description: r.description,
