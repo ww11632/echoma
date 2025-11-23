@@ -5,10 +5,15 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
+// Fallback to hardcoded values if environment variables are not available
+// This is necessary for Lovable Cloud preview environments
+const supabaseUrl = SUPABASE_URL || 'https://xafoyjtagyqljqbpcepv.supabase.co';
+const supabaseKey = SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhhZm95anRhZ3lxbGpxYnBjZXB2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI3Njg2MzcsImV4cCI6MjA3ODM0NDYzN30.rMyvH1Kgg9i6H0qk4pHyL-USa0RYq9sTi99qCqa8AYo';
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
   auth: {
     storage: localStorage,
     persistSession: true,
