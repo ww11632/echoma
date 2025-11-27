@@ -4,7 +4,7 @@
 
 
 
-📺 [Watch Demo Video](YOUR_YOUTUBE_LINK) | 📄 [White paper](./Echoma_WhitePaper.md) 
+📺 [Watch Demo Video](https://www.youtube.com/watch?v=3WgYDIByx50) | 📄 [White paper](./Echoma_WhitePaper.md) 
 
 
 
